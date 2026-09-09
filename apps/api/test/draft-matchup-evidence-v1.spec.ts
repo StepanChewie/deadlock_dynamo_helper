@@ -18,7 +18,7 @@ function evidence() {
 
 function decision() {
   return {
-    state: { heroId: 6 },
+    state: { heroId: 6, matchId: 'match-a' },
     enemyHeroIds: [22, 11, 22],
     enemyLiveStates: [
       { steamId: 'enemy-22', heroId: 22, souls: 5000 },
@@ -55,7 +55,7 @@ function matchupScore(itemId: number) {
 }
 
 describe('DraftMatchupEvidenceV1Service', () => {
-  it('queries only the current hero and full enemy set, then derives one score per returned item', async () => {
+  it('queries only the current hero and full enemy set, then derives one score per returned item from smoothed threat', async () => {
     const rows = [
       persistedRow('snapshot-active', 100, 11),
       persistedRow('snapshot-active', 100, 22),
@@ -65,19 +65,27 @@ describe('DraftMatchupEvidenceV1Service', () => {
     const repository = {
       findActive: jest.fn(async () => rows),
     };
+    const rawThreatScores = [
+      { heroId: 11, steamId: 'enemy-11', threatMultiplier: 1.5 },
+      { heroId: 22, steamId: 'enemy-22', threatMultiplier: 0.75 },
+    ];
     const threat = {
-      scoreEnemies: jest.fn(() => [
-        { heroId: 11, threatMultiplier: 1.5 },
-        { heroId: 22, threatMultiplier: 0.75 },
+      scoreEnemies: jest.fn(() => rawThreatScores),
+    };
+    const history = {
+      update: jest.fn(() => [
+        { score: rawThreatScores[0], smoothedThreatMultiplier: 1.3, alpha: 0.35 },
+        { score: rawThreatScores[1], smoothedThreatMultiplier: 0.9, alpha: 0.35 },
       ]),
     };
     const matchup = {
       scoreItem: jest.fn((input: { itemId: number }) => matchupScore(input.itemId)),
     };
-    const service = new DraftMatchupEvidenceV1Service(
-      repository as never,
-      threat as never,
-      matchup as never,
+    const service = new (DraftMatchupEvidenceV1Service as any)(
+      repository,
+      threat,
+      matchup,
+      history,
     );
     const base = evidence();
     const liveDecision = decision();
@@ -92,6 +100,11 @@ describe('DraftMatchupEvidenceV1Service', () => {
       enemyHeroIds: [11, 22],
     });
     expect(threat.scoreEnemies).toHaveBeenCalledWith(liveDecision.enemyLiveStates);
+    expect(history.update).toHaveBeenCalledWith({
+      matchId: 'match-a',
+      scores: rawThreatScores,
+      alpha: 0.35,
+    });
     expect(matchup.scoreItem).toHaveBeenCalledTimes(2);
     expect(matchup.scoreItem).toHaveBeenNthCalledWith(1, expect.objectContaining({
       ourHeroId: 6,
@@ -99,8 +112,8 @@ describe('DraftMatchupEvidenceV1Service', () => {
       enemyHeroIds: [11, 22],
       rows,
       enemyThreats: [
-        { heroId: 11, threatMultiplier: 1.5 },
-        { heroId: 22, threatMultiplier: 0.75 },
+        { heroId: 11, threatMultiplier: 1.3 },
+        { heroId: 22, threatMultiplier: 0.9 },
       ],
     }));
     expect(matchup.scoreItem).toHaveBeenNthCalledWith(2, expect.objectContaining({ itemId: 200 }));
@@ -110,37 +123,45 @@ describe('DraftMatchupEvidenceV1Service', () => {
       '200': matchupScore(200),
     });
     expect(result.draftEnemyThreats).toEqual([
-      { heroId: 11, threatMultiplier: 1.5 },
-      { heroId: 22, threatMultiplier: 0.75 },
+      { heroId: 11, threatMultiplier: 1.3 },
+      { heroId: 22, threatMultiplier: 0.9 },
     ]);
     expect(base.draftMatchupByItemId).toBeUndefined();
   });
 
   it('preserves neutral skeleton-driven behavior when no relational WPA rows are active', async () => {
     const repository = { findActive: jest.fn(async () => []) };
-    const threat = { scoreEnemies: jest.fn(() => [{ heroId: 11, threatMultiplier: 1.2 }]) };
+    const rawThreatScores = [{ heroId: 11, steamId: 'enemy-11', threatMultiplier: 1.2 }];
+    const threat = { scoreEnemies: jest.fn(() => rawThreatScores) };
+    const history = {
+      update: jest.fn(() => [{ score: rawThreatScores[0], smoothedThreatMultiplier: 1.1, alpha: 0.35 }]),
+    };
     const matchup = { scoreItem: jest.fn() };
-    const service = new DraftMatchupEvidenceV1Service(
-      repository as never,
-      threat as never,
-      matchup as never,
+    const service = new (DraftMatchupEvidenceV1Service as any)(
+      repository,
+      threat,
+      matchup,
+      history,
     );
 
     const result = await service.enrich(evidence(), decision());
 
     expect(result.draftMatchupByItemId).toEqual({});
     expect(result.draftMatchupSnapshotId).toBeUndefined();
+    expect(result.draftEnemyThreats).toEqual([{ heroId: 11, threatMultiplier: 1.1 }]);
     expect(matchup.scoreItem).not.toHaveBeenCalled();
   });
 
   it('fails neutral rather than taking the planner down when relational WPA querying fails', async () => {
     const repository = { findActive: jest.fn(async () => { throw new Error('db unavailable'); }) };
     const threat = { scoreEnemies: jest.fn(() => []) };
+    const history = { update: jest.fn(() => []) };
     const matchup = { scoreItem: jest.fn() };
-    const service = new DraftMatchupEvidenceV1Service(
-      repository as never,
-      threat as never,
-      matchup as never,
+    const service = new (DraftMatchupEvidenceV1Service as any)(
+      repository,
+      threat,
+      matchup,
+      history,
     );
 
     const result = await service.enrich(evidence(), decision());

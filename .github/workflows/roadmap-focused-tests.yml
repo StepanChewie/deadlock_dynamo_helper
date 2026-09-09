@@ -65,6 +65,7 @@ jobs:
         run: |
           set -euo pipefail
           yarn workspace @deadlock-live-probe/api test --runTestsByPath \
+            test/adaptive-config-v1.spec.ts \
             test/adaptive-economy-12-flex-slots-v1.spec.ts \
             test/adaptive-economy-v1.spec.ts \
             test/adaptive-build-planner-capacity-v1.spec.ts \
@@ -73,6 +74,7 @@ jobs:
             test/enemy-threat-history-v1.spec.ts \
             test/threat-weighted-matchup-v1.spec.ts \
             test/draft-matchup-evidence-v1.spec.ts \
+            test/statlocker-adaptive-module-draft-matchup-v1.spec.ts \
             test/adaptive-evidence-scorer-v1.spec.ts \
             test/adaptive-recommendation-draft-matchup-v1.spec.ts \
             test/build-slot-planner-held-count-v1.spec.ts \
