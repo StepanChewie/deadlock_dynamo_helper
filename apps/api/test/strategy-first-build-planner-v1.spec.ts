@@ -41,7 +41,7 @@ function decision(ownedItemIds: readonly number[], souls: number, unlockedFlexSl
       economy: { spendableSouls: observedFact(souls, 'test'), shopOpportunity: observedFact('AVAILABLE', 'test') },
     },
     itemGraph: graph, catalogVersionId: 'c', catalogSha256, rulesetId: 'r1', localSteamId: 'p',
-    allyHeroIds: [], enemyHeroIds: [9], allyItemIds: [], enemyItemIds: [],
+    allyHeroIds: [], enemyHeroIds: [9], allyItemIds: [], enemyItemIds: [], enemyLiveStates: [],
     slots: deriveAdaptiveSlotStateV1(ownedItemIds, graph, slotRules, { unlockedFlexSlots, evidence: 'OBSERVED' }),
     investment: unknownAdaptiveInvestmentStateV1(), economyRulesEvidence: 'UNKNOWN', stateRevision: 'revision-test',
   };
@@ -134,6 +134,41 @@ describe('strategy-first build planner v1', () => {
     const plannedIds = result.recommendedBuild.filter((entry) => entry.status !== 'OWNED').map((entry) => entry.itemId);
     expect(plannedIds).toContain(3);
     expect(plannedIds).not.toContain(2);
+  });
+
+  it('keeps the previous uncommitted branch when challenger improvement is below the 0.08 plan-switch threshold', () => {
+    const branchA = { ...goal('branch-a', 2), type: 'BRANCH' as const };
+    const branchB = { ...goal('branch-b', 3), type: 'BRANCH' as const };
+    const spec = strategy([goal('core', 1), branchA, branchB], [{ branchGroupId: 'branch', optionGoalIds: ['branch-a', 'branch-b'], minSelect: 1, maxSelect: 1 }]);
+    const nearTieScorer = {
+      scoreItem(itemId: number) {
+        const score = itemId === 2 ? 0.70 : itemId === 3 ? 0.75 : 0.5;
+        return { itemId, score, confidence: 0.8, completeness: 1, components: [], version: 'adaptive-evidence-scorer-v1' as const };
+      },
+    } as any;
+    const nearTiePlanner = new StrategyFirstBuildPlannerV1Service(nearTieScorer);
+    const result = nearTiePlanner.plan({
+      decision: decision([1], 5000),
+      evidence: emptyEvidence,
+      strategies: [spec],
+      previousContract: {
+        strategyId: 's',
+        status: 'IN_PROGRESS',
+        commitment: 'PROVISIONAL',
+        currentGoalId: 'branch-a',
+        goalStates: { core: 'SATISFIED', 'branch-a': 'ACTIVE', 'branch-b': 'READY' },
+        selectedBranches: { branch: 'branch-a' },
+        committedBranches: {},
+        temporaryItemIds: [],
+        reservedSituationalWindowIds: [],
+        remainingHardGoalIds: [],
+        completionReasonCodes: [],
+      },
+    });
+
+    expect(result.contract.selectedBranches.branch).toBe('branch-a');
+    expect(result.recommendedBuild.some((item) => item.itemId === 2)).toBe(true);
+    expect(result.recommendedBuild.some((item) => item.itemId === 3)).toBe(false);
   });
 
   it('prioritizes a hard investment objective over a higher-scored optional item', () => {

@@ -11,9 +11,12 @@ import { RecommendationItemCatalogItemV1 } from '../deadlock-live/entities/recom
 import { RecommendationItemCatalogRecipeV1 } from '../deadlock-live/entities/recommendation-item-catalog-recipe-v1.entity';
 import { RecommendationItemCatalogVersionV1 } from '../deadlock-live/entities/recommendation-item-catalog-version-v1.entity';
 import { StatlockerEvidenceSnapshotV1Entity } from '../deadlock-live/entities/statlocker-evidence-snapshot-v1.entity';
+import { StatlockerVsHeroWpaRawSnapshotV1Entity } from '../deadlock-live/entities/statlocker-vs-hero-wpa-raw-snapshot-v1.entity';
+import { StatlockerVsHeroWpaRowV1Entity } from '../deadlock-live/entities/statlocker-vs-hero-wpa-row-v1.entity';
 import { AdaptiveBuildPlannerV1Service } from './adaptive-build-planner-v1.service';
 import { AdaptiveChoiceResolverV1Service } from './adaptive-choice-resolver-v1.service';
 import { AdaptiveDecisionStateV1Service } from './adaptive-decision-state-v1.service';
+import { AdaptiveDecisionTraceV1Service } from './adaptive-decision-trace-v1.service';
 import { AdaptiveEvidenceScorerV1Service } from './adaptive-evidence-scorer-v1.service';
 import { AdaptivePhaseEligibilityV1Service } from './adaptive-phase-eligibility-v1.service';
 import { AdaptivePlannerServingRouterV1Service } from './adaptive-planner-serving-router-v1.service';
@@ -36,6 +39,9 @@ import { BuildStrategySessionV1Service } from './build-strategy-session-v1.servi
 import { BuildStrategySnapshotStoreV1Service } from './build-strategy-snapshot-store-v1.service';
 import { BuildStrategyValidatorV1Service } from './build-strategy-validator-v1.service';
 import { ConsensusStrategyFallbackV1Service } from './consensus-strategy-fallback-v1.service';
+import { DraftMatchupEvidenceV1Service } from './draft-matchup-evidence-v1.service';
+import { EnemyThreatHistoryV1Service } from './enemy-threat-history-v1.service';
+import { EnemyThreatV1Service } from './enemy-threat-v1.service';
 import { HistoricalBuildTrajectorySourceV2Service } from './historical-build-trajectory-source-v2.service';
 import { HistoricalPlannerTrajectoryExtractorV2Service } from './historical-planner-trajectory-extractor-v2.service';
 import { PlannerTrajectoryBuilderV2Service } from './planner-trajectory-builder-v2.service';
@@ -48,6 +54,10 @@ import { StatlockerEvidenceService } from './statlocker-evidence.service';
 import { StatlockerNormalizerService } from './statlocker-normalizer.service';
 import { StatlockerRefreshService } from './statlocker-refresh.service';
 import { StatlockerSnapshotStoreService } from './statlocker-snapshot-store.service';
+import { StatlockerVsHeroWpaPublisherV1Service } from './statlocker-vs-hero-wpa-publisher-v1.service';
+import { StatlockerVsHeroWpaRawStoreV1Service } from './statlocker-vs-hero-wpa-raw-store-v1.service';
+import { StatlockerVsHeroWpaRepositoryV1Service } from './statlocker-vs-hero-wpa-repository-v1.service';
+import { StatlockerVsHeroWpaRowNormalizerV1Service } from './statlocker-vs-hero-wpa-row-normalizer-v1.service';
 import { StrategyFirstAdaptivePlannerFacadeV1Service } from './strategy-first-adaptive-planner-facade-v1.service';
 import { StrategyFirstBuildPlannerV1Service } from './strategy-first-build-planner-v1.service';
 import { StrategyFirstLegacyPlannerAdapterV1Service } from './strategy-first-legacy-planner-adapter-v1.service';
@@ -55,6 +65,7 @@ import { StrategyFirstOperationsV1Service } from './strategy-first-operations-v1
 import { StrategyFirstPromotionGateV1Service } from './strategy-first-promotion-gate-v1.service';
 import { StrategyFirstSituationalOverlayV1Service } from './strategy-first-situational-overlay-v1.service';
 import { StrategyFirstTransactionPlanV1Service } from './strategy-first-transaction-plan-v1.service';
+import { ThreatWeightedMatchupV1Service } from './threat-weighted-matchup-v1.service';
 import { TransactionPlanCompilerV1Service } from './transaction-plan-compiler-v1.service';
 import { TransactionPlanReconcilerV1Service } from './transaction-plan-reconciler-v1.service';
 import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-v1.service';
@@ -69,6 +80,8 @@ import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-
       RecommendationItemCatalogRecipeV1,
       RecommendationEconomyRulesSnapshotV1Entity,
       StatlockerEvidenceSnapshotV1Entity,
+      StatlockerVsHeroWpaRawSnapshotV1Entity,
+      StatlockerVsHeroWpaRowV1Entity,
       AdaptiveRecommendationDecisionV1Entity,
       BuildStrategySnapshotV1Entity,
       MatchPlayer,
@@ -83,12 +96,21 @@ import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-
     StatlockerBrowserCollectorService,
     StatlockerNormalizerService,
     StatlockerSnapshotStoreService,
+    StatlockerVsHeroWpaRawStoreV1Service,
+    StatlockerVsHeroWpaPublisherV1Service,
+    StatlockerVsHeroWpaRepositoryV1Service,
+    StatlockerVsHeroWpaRowNormalizerV1Service,
     StatlockerRefreshService,
     StatlockerEvidenceService,
     BuildSkeletonService,
     RecommendationEconomyRulesStoreV1Service,
     AdaptiveDecisionStateV1Service,
+    EnemyThreatV1Service,
+    EnemyThreatHistoryV1Service,
+    ThreatWeightedMatchupV1Service,
+    DraftMatchupEvidenceV1Service,
     AdaptiveEvidenceScorerV1Service,
+    AdaptiveDecisionTraceV1Service,
     AdaptivePhaseEligibilityV1Service,
     AdaptiveRecommendationObservabilityV1Service,
     AdaptiveChoiceResolverV1Service,

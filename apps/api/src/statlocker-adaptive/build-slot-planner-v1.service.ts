@@ -87,13 +87,20 @@ export class BuildSlotPlannerV1Service {
       recipe.consumedItemIds.length > 0 && recipe.consumedItemIds.every((itemId) => owned.has(itemId)),
     );
     if (upgradeRecipe) {
-      return {
-        targetGoalId: goalId,
+      const consumedItemIds = new Set(upgradeRecipe.consumedItemIds);
+      const projectedItemIds = [
+        ...input.ownedItemIds.filter((itemId) => !consumedItemIds.has(itemId)),
         targetItemId,
-        requirement: 'UPGRADE',
-        sourceItemId: upgradeRecipe.consumedItemIds[0],
-        reasonCodes: ['OWNED_COMPONENT_REUSED'],
-      };
+      ];
+      if (this.canFit(projectedItemIds, input)) {
+        return {
+          targetGoalId: goalId,
+          targetItemId,
+          requirement: 'UPGRADE',
+          sourceItemId: upgradeRecipe.consumedItemIds[0],
+          reasonCodes: ['OWNED_COMPONENT_REUSED'],
+        };
+      }
     }
 
     if (this.canFit([...input.ownedItemIds, targetItemId], input)) {

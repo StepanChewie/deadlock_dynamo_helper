@@ -1,10 +1,20 @@
 import { Injectable } from '@nestjs/common';
-import { RecommendationItemGraph } from '@deadlock-live-probe/build-domain';
+import {
+  RecommendationDecisionState,
+  RecommendationItemGraph,
+  UpgradeExecutionResolutionV1,
+  resolveUpgradeExecutionPathV1,
+} from '@deadlock-live-probe/build-domain';
 import {
   AdaptiveEvidenceScorerV1Service,
   AdaptiveItemScoreContextV1,
   AdaptiveItemScoreV1,
 } from './adaptive-evidence-scorer-v1.service';
+import {
+  AdaptiveInvestmentStateV1,
+  RecommendationEconomyRulesV1,
+  deriveAdaptiveInvestmentStateV1,
+} from './adaptive-economy-v1';
 import { ADAPTIVE_POLICY_V1_CONFIG } from './statlocker-adaptive.config';
 import { ConsensusBuildGroupV1 } from './statlocker-adaptive.types';
 
@@ -23,6 +33,9 @@ export interface AdaptiveChoiceResolutionContextV1 {
   scorerContext: AdaptiveItemScoreContextV1;
   itemGraph: RecommendationItemGraph;
   ownedItemIds: readonly number[];
+  decisionState?: RecommendationDecisionState;
+  investment?: AdaptiveInvestmentStateV1;
+  economyRules?: RecommendationEconomyRulesV1;
   previousSelectedItemIds?: readonly number[];
   previousCommittedItemIds?: readonly number[];
   previousSelectedItemId?: number;
@@ -77,7 +90,10 @@ export class AdaptiveChoiceResolverV1Service {
       previousCommittedItemIds,
     );
     const scores = group.candidates
-      .map((candidate) => this.scorer.scoreItem(candidate.itemId, context.scorerContext))
+      .map((candidate) => this.scorer.scoreItem(
+        candidate.itemId,
+        choiceScorerContextV1(candidate.itemId, context),
+      ))
       .sort(compareScores);
 
     if (reconstructed.externallyDiverged) {
@@ -281,6 +297,126 @@ function buildCommittedReplacementOptionsV1(
     .slice(0, Math.max(1, group.maxSelect));
 }
 
+function choiceScorerContextV1(
+  itemId: number,
+  context: AdaptiveChoiceResolutionContextV1,
+): AdaptiveItemScoreContextV1 {
+  const decisionState = context.decisionState;
+  if (!decisionState) return context.scorerContext;
+
+  const resolution = resolveUpgradeExecutionPathV1(decisionState, itemId, context.itemGraph);
+  const economyPenalty = choiceEconomyPenaltyV1(resolution, decisionState);
+  const investmentDelta = choiceInvestmentDeltaV1(resolution, context);
+  if (economyPenalty === undefined && investmentDelta === undefined) return context.scorerContext;
+
+  return {
+    ...context.scorerContext,
+    transactionPenalty: economyPenalty === undefined
+      ? context.scorerContext.transactionPenalty
+      : clamp01((context.scorerContext.transactionPenalty ?? 0) + economyPenalty),
+    investmentDelta: investmentDelta ?? context.scorerContext.investmentDelta,
+  };
+}
+
+function choiceEconomyPenaltyV1(
+  resolution: UpgradeExecutionResolutionV1,
+  decisionState: RecommendationDecisionState,
+): number | undefined {
+  const cost = executionSoulsCostV1(resolution);
+  const spendable = decisionState.economy.spendableSouls;
+  if (cost === undefined || spendable.evidence === 'UNKNOWN' || spendable.value === undefined ||
+      !Number.isFinite(spendable.value) || spendable.value < 0) {
+    return undefined;
+  }
+  if (cost <= spendable.value) return 0;
+  return clamp01((cost - spendable.value) / Math.max(1, cost));
+}
+
+function executionSoulsCostV1(resolution: UpgradeExecutionResolutionV1): number | undefined {
+  if (resolution.kind === 'EXACT_OWNED') return 0;
+  if (resolution.kind === 'DIRECT_BUY' || resolution.kind === 'DIRECT_UPGRADE' || resolution.kind === 'MULTI_STEP_UPGRADE') {
+    return resolution.soulsCost;
+  }
+  return undefined;
+}
+
+function choiceInvestmentDeltaV1(
+  resolution: UpgradeExecutionResolutionV1,
+  context: AdaptiveChoiceResolutionContextV1,
+): AdaptiveItemScoreContextV1['investmentDelta'] | undefined {
+  if (!context.decisionState || !context.investment || !context.economyRules ||
+      context.investment.evidence === 'UNKNOWN') {
+    return undefined;
+  }
+  const projectedItemIds = projectChoiceItemIdsV1(
+    resolution,
+    [...context.decisionState.inventory.heldByItemId.keys()],
+  );
+  if (!projectedItemIds) return undefined;
+  const projectedInvestment = deriveAdaptiveInvestmentStateV1(
+    projectedItemIds,
+    context.itemGraph,
+    context.economyRules,
+  );
+  return deriveChoiceInvestmentScoreDeltaV1(context.investment, projectedInvestment);
+}
+
+function projectChoiceItemIdsV1(
+  resolution: UpgradeExecutionResolutionV1,
+  ownedItemIds: readonly number[],
+): readonly number[] | undefined {
+  const owned = new Set(ownedItemIds);
+  if (resolution.kind === 'NOT_EXECUTABLE') return undefined;
+  if (resolution.kind === 'EXACT_OWNED') return [...owned].sort((a, b) => a - b);
+
+  if (resolution.kind === 'DIRECT_BUY') {
+    owned.add(resolution.targetItemId);
+    return [...owned].sort((a, b) => a - b);
+  }
+
+  for (const sourceItemId of resolution.sourceItemIds) owned.delete(sourceItemId);
+  owned.add(resolution.kind === 'DIRECT_UPGRADE' ? resolution.targetItemId : resolution.nextTargetItemId);
+  return [...owned].sort((a, b) => a - b);
+}
+
+function deriveChoiceInvestmentScoreDeltaV1(
+  before: AdaptiveInvestmentStateV1,
+  after: AdaptiveInvestmentStateV1,
+): NonNullable<AdaptiveItemScoreContextV1['investmentDelta']> {
+  if (before.evidence === 'UNKNOWN' || after.evidence === 'UNKNOWN') {
+    return {
+      evidence: 'UNKNOWN',
+      breakpointsCrossed: 0,
+      distanceReducedSouls: 0,
+      achievedBreakpointsLost: 0,
+    };
+  }
+
+  let breakpointsCrossed = 0;
+  let distanceReducedSouls = 0;
+  let achievedBreakpointsLost = 0;
+  for (const type of ['weapon', 'vitality', 'spirit'] as const) {
+    const previous = before.tracks[type];
+    const next = after.tracks[type];
+    const previousAchieved = previous.achievedBreakpoint ?? 0;
+    const nextAchieved = next.achievedBreakpoint ?? 0;
+    if (nextAchieved > previousAchieved) breakpointsCrossed += 1;
+    if (nextAchieved < previousAchieved) achievedBreakpointsLost += 1;
+    if (previous.nextBreakpoint !== undefined && previous.nextBreakpoint === next.nextBreakpoint) {
+      distanceReducedSouls += Math.max(
+        0,
+        (previous.soulsToNextBreakpoint ?? 0) - (next.soulsToNextBreakpoint ?? 0),
+      );
+    }
+  }
+  return {
+    evidence: 'RECONSTRUCTED',
+    breakpointsCrossed,
+    distanceReducedSouls,
+    achievedBreakpointsLost,
+  };
+}
+
 function requiredChoiceCount(group: ConsensusBuildGroupV1): number {
   const maxSelect = Math.max(1, Math.min(group.maxSelect, group.candidates.length));
   return Math.max(1, Math.min(maxSelect, group.minSelect));
@@ -323,4 +459,9 @@ function withChoiceCompatibility<T extends Omit<AdaptiveChoiceStateV1, 'selected
 
 function uniqueNumbers(values: readonly number[]): number[] {
   return [...new Set(values)];
+}
+
+function clamp01(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(1, value));
 }

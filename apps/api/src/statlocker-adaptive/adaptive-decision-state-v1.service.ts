@@ -34,6 +34,19 @@ export interface AdaptiveEnemyHeroV1 {
   heroName?: string;
 }
 
+export interface AdaptiveEnemyLiveStateV1 {
+  steamId: string;
+  playerName?: string;
+  heroId: number;
+  heroName?: string;
+  level?: number;
+  souls?: number;
+  kills?: number;
+  deaths?: number;
+  assists?: number;
+  heroDamage?: number;
+}
+
 export interface AdaptiveDecisionStateV1 {
   state: RecommendationDecisionState;
   itemGraph: RecommendationItemGraph;
@@ -44,6 +57,7 @@ export interface AdaptiveDecisionStateV1 {
   allyHeroIds?: readonly number[];
   enemyHeroIds: readonly number[];
   enemyHeroes?: readonly AdaptiveEnemyHeroV1[];
+  enemyLiveStates: readonly AdaptiveEnemyLiveStateV1[];
   allyItemIds?: readonly number[];
   enemyItemIds?: readonly number[];
   ourTeamSouls?: number;
@@ -186,6 +200,7 @@ export class AdaptiveDecisionStateV1Service {
     const allyHeroIds = stableHeroIds(allies);
     const enemyHeroes = resolveEnemyHeroes(match, local.teamId);
     const enemyHeroIds = enemyHeroes.map((hero) => hero.heroId);
+    const enemyLiveStates = resolveEnemyLiveStates(match, local.teamId);
     const allyItemIds = stableObservedItemIds(allies);
     const enemyItemIds = stableObservedItemIds(enemies);
     const teamTotals = calculateTeamSoulTotals(match, local.teamId);
@@ -215,6 +230,7 @@ export class AdaptiveDecisionStateV1Service {
       allyHeroIds,
       enemyHeroIds,
       enemyHeroes,
+      enemyLiveStates,
       allyItemIds,
       enemyItemIds,
       ourTeamSouls: teamTotals.our,
@@ -247,6 +263,31 @@ function resolveEnemyHeroes(match: MinimalMatchState, localTeamId: number): read
     }
   }
   return [...byHeroId.values()].sort((a, b) => a.heroId - b.heroId);
+}
+
+function resolveEnemyLiveStates(
+  match: MinimalMatchState,
+  localTeamId: number,
+): readonly AdaptiveEnemyLiveStateV1[] {
+  return Object.values(match.playersBySteamId)
+    .filter((player) => player.teamId !== undefined && player.teamId !== localTeamId && Number.isInteger(player.heroId))
+    .map((player) => ({
+      steamId: player.steamId,
+      ...(typeof player.playerName === 'string' && player.playerName.trim()
+        ? { playerName: player.playerName.trim() }
+        : {}),
+      heroId: Number(player.heroId),
+      ...(typeof player.heroName === 'string' && player.heroName.trim()
+        ? { heroName: player.heroName.trim() }
+        : {}),
+      ...(Number.isFinite(player.level) ? { level: player.level as number } : {}),
+      ...(Number.isFinite(player.souls) ? { souls: player.souls as number } : {}),
+      ...(Number.isFinite(player.kills) ? { kills: player.kills as number } : {}),
+      ...(Number.isFinite(player.deaths) ? { deaths: player.deaths as number } : {}),
+      ...(Number.isFinite(player.assists) ? { assists: player.assists as number } : {}),
+      ...(Number.isFinite(player.heroDamage) ? { heroDamage: player.heroDamage as number } : {}),
+    }))
+    .sort((a, b) => a.heroId - b.heroId || a.steamId.localeCompare(b.steamId));
 }
 
 function resolveLocalSteamId(match: MinimalMatchState, requested?: string): string {

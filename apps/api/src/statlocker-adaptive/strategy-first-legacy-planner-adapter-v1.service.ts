@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  AdaptiveDecisionTraceV1,
   AdaptivePlanSessionV1,
   AdaptiveRecommendationStrategyV1,
 } from '@deadlock-live-probe/shared';
@@ -7,6 +8,7 @@ import {
   AdaptiveBuildPlannerInputV1,
   AdaptiveBuildPlannerResultV1,
 } from './adaptive-build-planner-v1.service';
+import { AdaptiveDecisionTraceV1Service } from './adaptive-decision-trace-v1.service';
 import { StrategyFirstAdaptivePlannerFacadeV1Service } from './strategy-first-adaptive-planner-facade-v1.service';
 import { StrategyFirstBuildPlannerV1Result } from './strategy-first-build-planner-v1.service';
 import { TransactionPlanValidationV1 } from './transaction-plan-validator-v1.service';
@@ -15,10 +17,12 @@ export type StrategyFirstLegacyPlannerResultV1 = AdaptiveBuildPlannerResultV1 & 
   strategy: AdaptiveRecommendationStrategyV1;
   planSession: AdaptivePlanSessionV1;
   transactionPlanValidation: TransactionPlanValidationV1;
+  decisionTrace: AdaptiveDecisionTraceV1;
 };
 
 export type StrategyFirstFlatCompatPlannerResultV1 = AdaptiveBuildPlannerResultV1 & {
   strategy: AdaptiveRecommendationStrategyV1;
+  decisionTrace: AdaptiveDecisionTraceV1;
 };
 
 /**
@@ -30,7 +34,10 @@ export type StrategyFirstFlatCompatPlannerResultV1 = AdaptiveBuildPlannerResultV
 export class StrategyFirstLegacyPlannerAdapterV1Service {
   readonly version = 'adaptive-build-planner-v1' as const;
 
-  constructor(private readonly strategyPlanner: StrategyFirstAdaptivePlannerFacadeV1Service) {}
+  constructor(
+    private readonly strategyPlanner: StrategyFirstAdaptivePlannerFacadeV1Service,
+    private readonly decisionTrace: AdaptiveDecisionTraceV1Service,
+  ) {}
 
   plan(input: AdaptiveBuildPlannerInputV1): StrategyFirstLegacyPlannerResultV1 {
     const result = this.strategyPlanner.plan(this.toFacadeInput(input));
@@ -39,6 +46,7 @@ export class StrategyFirstLegacyPlannerAdapterV1Service {
       strategy: toAdaptiveRecommendationStrategyV1(result),
       planSession: result.planSession,
       transactionPlanValidation: result.transactionPlanValidation,
+      decisionTrace: this.decisionTrace.build(input, result),
     };
   }
 
@@ -47,6 +55,7 @@ export class StrategyFirstLegacyPlannerAdapterV1Service {
     return {
       ...this.toPlannerResult(result),
       strategy: toAdaptiveRecommendationStrategyV1(result),
+      decisionTrace: this.decisionTrace.build(input, result),
     };
   }
 

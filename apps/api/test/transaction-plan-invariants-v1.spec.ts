@@ -28,7 +28,7 @@ function decision(owned: readonly number[], souls = 5000): AdaptiveDecisionState
       economy: { spendableSouls: observedFact(souls, 'test'), shopOpportunity: observedFact('AVAILABLE', 'test') },
     },
     itemGraph: graph, catalogVersionId: 'c', catalogSha256: 'a'.repeat(64), rulesetId: 'r1', localSteamId: 'p',
-    allyHeroIds: [], enemyHeroIds: [], allyItemIds: [], enemyItemIds: [],
+    allyHeroIds: [], enemyHeroIds: [], enemyLiveStates: [], allyItemIds: [], enemyItemIds: [],
     slots: deriveAdaptiveSlotStateV1(owned, graph, slotRules, { unlockedFlexSlots: 0, evidence: 'OBSERVED' }),
     investment: unknownAdaptiveInvestmentStateV1(), economyRulesEvidence: 'UNKNOWN', stateRevision: 'r',
   };
@@ -160,6 +160,31 @@ describe('transaction plan invariants v1', () => {
       nextAction: { actionKey: 'HOLD', type: 'HOLD', targetItemId: 2, reasonCodes: [] }, recommendedBuild: [],
     });
     expect(check.violations.some((violation) => violation.code === 'UNKNOWN_SLOT_PATH')).toBe(true);
+    expect(check.violations.some((violation) => violation.code === 'PROJECTED_SLOT_VIOLATION')).toBe(true);
+  });
+
+  it('rejects a projected inventory above the 12-item held cap even when flex usage reports within capacity', () => {
+    const base = validSession();
+    const broken: AdaptivePlanSessionV1 = {
+      ...base,
+      steps: base.steps.map((step) => ({
+        ...step,
+        projectedAfter: step.projectedAfter
+          ? {
+              ...step.projectedAfter,
+              inventoryItemIds: Array.from({ length: 13 }, (_, index) => index + 1),
+              flexUsed: 12,
+              unlockedFlexSlots: 12,
+            }
+          : undefined,
+      })),
+    };
+    const check = evaluateTransactionPlanInvariantsV1({
+      decision: decision([1]),
+      planSession: broken,
+      nextAction: { actionKey: 'REPLACE_ITEM:1->2', type: 'REPLACE', sellItemId: 1, buyItemId: 2, targetItemId: 2, reasonCodes: [] },
+      recommendedBuild: validBuild(),
+    });
     expect(check.violations.some((violation) => violation.code === 'PROJECTED_SLOT_VIOLATION')).toBe(true);
   });
 

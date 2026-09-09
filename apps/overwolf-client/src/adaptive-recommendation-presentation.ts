@@ -197,9 +197,6 @@ function buildPresentedSemanticPlan(
       ));
   }
 
-  // Keep the old transaction projection only as a compatibility fallback for
-  // incomplete payloads. Normal API responses must render recommendedBuild so
-  // barriers such as WAIT -> WAIT_FOR_SOULS -> BUY never become build items.
   const semantic = recommendation.planActions;
   if (!semantic || semantic.length === 0) return [];
 
@@ -352,11 +349,23 @@ function presentSituationalPurpose(context: AdaptiveSituationalContextV1 | undef
 
 function presentAgainst(context: AdaptiveSituationalContextV1 | undefined): string | undefined {
   if (!context) return undefined;
-  const names = context.targetEnemies
+  const names = [...context.targetEnemies]
+    .filter((target) => Number.isFinite(target.score) && target.score > 0 && Number.isFinite(target.confidence) && target.confidence > 0)
+    .sort((left, right) => {
+      const role = targetRoleOrder(left.role) - targetRoleOrder(right.role);
+      if (role !== 0) return role;
+      if (right.score !== left.score) return right.score - left.score;
+      if (right.confidence !== left.confidence) return right.confidence - left.confidence;
+      return left.enemyHeroId - right.enemyHeroId;
+    })
     .map((target) => target.enemyHeroName?.trim() || getAdaptiveHeroDisplayName(target.enemyHeroId))
     .filter((name): name is string => Boolean(name));
   const unique = [...new Set(names)];
-  return unique.length > 0 ? `Against: ${unique.join(', ')}` : undefined;
+  return unique.length > 0 ? `vs ${unique.join(', ')}` : undefined;
+}
+
+function targetRoleOrder(role: 'PRIMARY' | 'SECONDARY'): number {
+  return role === 'PRIMARY' ? 0 : 1;
 }
 
 function resolveActionItemId(
@@ -471,7 +480,7 @@ function describeReplacement(
 ): string {
   const from = describeItem(replacedItem, 'a weaker item');
   const to = describeItem(targetItem, 'a stronger item');
-  return `Replace ${from} with ${to}`;
+  return `Sell ${from} - Buy ${to}`;
 }
 
 function describeItem(item: AdaptivePresentedItem | undefined, fallback: string): string {

@@ -12,6 +12,8 @@ import {
 import { AdaptiveDecisionStateV1 } from './adaptive-decision-state-v1.service';
 import { candidateGeneratorRulesFromSlotStateV1 } from './adaptive-economy-v1';
 
+const MAX_HELD_ITEM_COUNT_V1 = 12;
+
 export type TransactionPlanInvariantViolationCodeV1 =
   | 'FUTURE_TARGET_WITHOUT_STEP'
   | 'PROJECTED_SLOT_VIOLATION'
@@ -114,6 +116,13 @@ function checkProjection(
   step: AdaptivePlanStepV1,
   violations: TransactionPlanInvariantViolationV1[],
 ): void {
+  if (projection.inventoryItemIds.length > MAX_HELD_ITEM_COUNT_V1) {
+    violations.push({
+      code: 'PROJECTED_SLOT_VIOLATION',
+      stepId: step.stepId,
+      reasonCodes: ['PROJECTED_HELD_ITEM_COUNT_EXCEEDS_MAXIMUM'],
+    });
+  }
   if (projection.flexUsed > 0 && projection.unlockedFlexSlots === undefined) {
     violations.push({
       code: 'UNKNOWN_SLOT_PATH',

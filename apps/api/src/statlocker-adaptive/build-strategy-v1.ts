@@ -22,6 +22,8 @@ export type BuildGoalTypeV1 =
   | 'SITUATIONAL_RESERVATION'
   | 'TERMINAL';
 
+export type BuildGoalRigidityV1 = 'HARD_CORE' | 'SOFT_CORE' | 'FLEX';
+
 export type BuildItemLifecycleV1 =
   | 'PERMANENT_CORE'
   | 'UPGRADE_COMPONENT'
@@ -68,6 +70,8 @@ export interface BuildStrategyGoalV1 {
   maxSelect: number;
   prerequisiteGoalIds: readonly string[];
   hard: boolean;
+  /** Optional only so persisted pre-rigidity V1 strategy payloads remain readable. */
+  rigidity?: BuildGoalRigidityV1;
   lifecycleByItemId: Readonly<Record<number, BuildItemLifecycleV1>>;
   rationaleCodes: readonly string[];
 }
@@ -248,6 +252,14 @@ export function hardStrategyGoalIdsV1(strategy: BuildStrategySpecV1): readonly s
   return strategy.goals.filter((goal) => goal.hard).map((goal) => goal.goalId);
 }
 
+export function buildGoalRigidityV1(goal: BuildStrategyGoalV1): BuildGoalRigidityV1 {
+  if (goal.rigidity === 'HARD_CORE' || goal.rigidity === 'SOFT_CORE' || goal.rigidity === 'FLEX') {
+    return goal.rigidity;
+  }
+  if (goal.type === 'BRANCH' || goal.type === 'SITUATIONAL_RESERVATION') return 'FLEX';
+  return goal.hard ? 'HARD_CORE' : 'SOFT_CORE';
+}
+
 export function targetItemIdsForGoalV1(goal: BuildStrategyGoalV1): readonly number[] {
   return [...new Set(goal.targetItemIds)].sort((a, b) => a - b);
 }
@@ -270,6 +282,7 @@ export function compileStructuredConsensusStrategyV1(input: {
     maxSelect: 1,
     prerequisiteGoalIds: [],
     hard: false,
+    rigidity: 'FLEX' as const,
     lifecycleByItemId: Object.fromEntries(window.targetItemIds.map((itemId) => [itemId, 'SITUATIONAL' as const])),
     rationaleCodes: ['EXPLICIT_SITUATIONAL_WINDOW'],
   }));
@@ -313,18 +326,38 @@ export function filterRecommendationCandidatesForActiveGoalsV1(
   candidates: readonly RecommendationCandidate[],
   activeGoals: readonly BuildStrategyGoalV1[],
   itemGraph: RecommendationItemGraph,
-  options: { capacityExitItemIds?: ReadonlySet<number> } = {},
+  options: {
+    capacityExitItemIds?: ReadonlySet<number>;
+    protectedGoals?: readonly BuildStrategyGoalV1[];
+  } = {},
 ): readonly RecommendationCandidate[] {
   const targets = new Set<number>();
-  for (const goal of activeGoals) for (const itemId of goal.targetItemIds) {
-    targets.add(itemId);
-    for (const componentId of itemGraph.getTransitiveComponentIds(itemId)) targets.add(componentId);
+  for (const goal of activeGoals) {
+    for (const itemId of goal.targetItemIds) {
+      targets.add(itemId);
+      for (const componentId of itemGraph.getTransitiveComponentIds(itemId)) targets.add(componentId);
+    }
   }
+
+  const protectedHardCoreItemIds = new Set<number>();
+  for (const goal of options.protectedGoals ?? activeGoals) {
+    if (buildGoalRigidityV1(goal) !== 'HARD_CORE') continue;
+    for (const itemId of goal.targetItemIds) {
+      protectedHardCoreItemIds.add(itemId);
+      for (const componentId of itemGraph.getTransitiveComponentIds(itemId)) {
+        protectedHardCoreItemIds.add(componentId);
+      }
+    }
+  }
+
   return candidates.filter((candidate) => {
     if (candidate.action.type === 'BUY_ITEM' || candidate.action.type === 'UPGRADE_ITEM') return targets.has(candidate.action.itemId);
-    if (candidate.action.type === 'REPLACE_ITEM') return targets.has(candidate.action.buyItemId);
+    if (candidate.action.type === 'REPLACE_ITEM') {
+      return targets.has(candidate.action.buyItemId) && !protectedHardCoreItemIds.has(candidate.action.sellItemId);
+    }
     if (candidate.action.type === 'WAIT_SAVE') return candidate.action.targetItemId === undefined || targets.has(candidate.action.targetItemId);
-    return options.capacityExitItemIds?.has(candidate.action.itemId) ?? false;
+    return (options.capacityExitItemIds?.has(candidate.action.itemId) ?? false) &&
+      !protectedHardCoreItemIds.has(candidate.action.itemId);
   });
 }
 
@@ -342,6 +375,7 @@ function compatibilityGoal(group: ConsensusBuildGroupV1, graph: RecommendationIt
     maxSelect: group.maxSelect,
     prerequisiteGoalIds: [],
     hard: true,
+    rigidity: group.type === 'CHOICE' ? 'FLEX' : 'HARD_CORE',
     lifecycleByItemId: Object.fromEntries(targetItemIds.map((itemId) => [itemId, 'PERMANENT_CORE' as const])),
     rationaleCodes: ['STRUCTURED_CONSENSUS_COMPATIBILITY'],
   };

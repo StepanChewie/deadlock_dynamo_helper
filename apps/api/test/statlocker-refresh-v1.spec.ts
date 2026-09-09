@@ -91,16 +91,51 @@ function createHarness(options: { observeIdentity?: boolean } = {}) {
       catalogVersionId: 'catalog-a',
     }]),
   };
+  let rawSnapshotSequence = 0;
+  const rawVsHeroWpaStore = {
+    persistCollected: jest.fn(async (input: any) => {
+      rawSnapshotSequence += 1;
+      return {
+        snapshotId: `raw-snapshot-${rawSnapshotSequence}`,
+        ingestStatus: 'PENDING',
+        statlockerPatchId: input.statlockerPatchId,
+      };
+    }),
+  };
+  const vsHeroWpaRowNormalizer = {
+    normalize: jest.fn(() => [
+      { heroId: 10, enemyHeroId: 20, itemId: 1, count: 10, deltaWpa: 0.02, rankBucket: 'rank_8' },
+    ]),
+  };
+  const vsHeroWpaPublisher = {
+    publish: jest.fn(async (input: any) => ({ snapshotId: input.snapshotId, rowCount: input.rows.length })),
+    markFailed: jest.fn(async () => undefined),
+  };
   const service = new (StatlockerRefreshService as any)(
     collector,
     normalizer,
     store,
     undefined,
     versionRepo,
+    rawVsHeroWpaStore,
+    vsHeroWpaRowNormalizer,
+    vsHeroWpaPublisher,
   ) as StatlockerRefreshService;
   if (options.observeIdentity !== false) service.observeGameIdentity(identity, 1_000);
 
-  return { service, collector, normalizer, store, active, versionRepo, block, release: () => releaseCollector?.() };
+  return {
+    service,
+    collector,
+    normalizer,
+    store,
+    active,
+    versionRepo,
+    block,
+    rawVsHeroWpaStore,
+    vsHeroWpaRowNormalizer,
+    vsHeroWpaPublisher,
+    release: () => releaseCollector?.(),
+  };
 }
 
 describe('StatlockerRefreshService', () => {
@@ -109,6 +144,18 @@ describe('StatlockerRefreshService', () => {
     await h.service.refreshGlobalNow(false, 1_000);
     await h.service.refreshGlobalNow(false, 1_001);
     expect(h.collector.collectBatch).toHaveBeenCalledTimes(1);
+
+    // Repeated scheduler ticks inside the 24h VS_HERO_WPA TTL never re-fetch the
+    // large endpoint; the smaller global datasets keep their own 30 minute cadence,
+    // but only the elapsed 24h TTL re-arms the daily VS_HERO_WPA target.
+    await h.service.refreshGlobalNow(false, 1_000 + 23 * 60 * 60_000);
+    const vsHeroTargets = () => h.collector.collectBatch.mock.calls
+      .flatMap(([targets]) => targets)
+      .filter((target: any) => target.dataset === 'VS_HERO_WPA');
+    expect(vsHeroTargets()).toHaveLength(1);
+
+    await h.service.refreshGlobalNow(false, 1_000 + 24 * 60 * 60_000 + 1);
+    expect(vsHeroTargets()).toHaveLength(2);
   });
 
   it('uses single-flight for the same global identity', async () => {

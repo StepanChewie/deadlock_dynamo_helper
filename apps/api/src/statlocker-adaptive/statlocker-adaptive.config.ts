@@ -32,6 +32,21 @@ export interface AdaptivePolicyV1Config {
     minImprovementOverCore: number;
     targetSwitchMinImprovement: number;
     maxCoreDelaySouls: number;
+    matchupDiscoveryMinCoverage: number;
+    matchupDiscoverySellMinConfidence: number;
+    matchupDiscoveryReplaceMinImprovement: number;
+  };
+  threat: {
+    weights: {
+      souls: number;
+      heroDamage: number;
+      killsAssists: number;
+      level: number;
+      deaths: number;
+    };
+    minMultiplier: number;
+    maxMultiplier: number;
+    smoothingAlpha: number;
   };
   optionalActivationMinScore: number;
   investment: {
@@ -67,7 +82,7 @@ export interface AdaptivePolicyV1Config {
 }
 
 export const ADAPTIVE_POLICY_V1_CONFIG: AdaptivePolicyV1Config = {
-  version: 'statlocker-adaptive-v1.3.0',
+  version: 'statlocker-adaptive-v1.4.0',
   gameStateThreshold: 0.08,
   gameStateBlendWidth: 0.03,
   exactEnemyMaxMatchups: 3,
@@ -100,6 +115,21 @@ export const ADAPTIVE_POLICY_V1_CONFIG: AdaptivePolicyV1Config = {
     minImprovementOverCore: 0.08,
     targetSwitchMinImprovement: 0.05,
     maxCoreDelaySouls: 3200,
+    matchupDiscoveryMinCoverage: 0.30,
+    matchupDiscoverySellMinConfidence: 0.40,
+    matchupDiscoveryReplaceMinImprovement: 0.30,
+  },
+  threat: {
+    weights: {
+      souls: 0.35,
+      heroDamage: 0.30,
+      killsAssists: 0.20,
+      level: 0.10,
+      deaths: -0.05,
+    },
+    minMultiplier: 0.75,
+    maxMultiplier: 1.50,
+    smoothingAlpha: 0.35,
   },
   optionalActivationMinScore: 0.15,
   investment: {
@@ -173,6 +203,17 @@ const NUMERIC_ENV_SPECS: readonly NumericEnvSpec[] = [
   scalar('ADAPTIVE_SITUATIONAL_MIN_IMPROVEMENT_OVER_CORE', 0, 1, (c) => c.situational.minImprovementOverCore, (c, v) => { c.situational.minImprovementOverCore = v; }),
   scalar('ADAPTIVE_SITUATIONAL_TARGET_SWITCH_MIN_IMPROVEMENT', 0, 1, (c) => c.situational.targetSwitchMinImprovement, (c, v) => { c.situational.targetSwitchMinImprovement = v; }),
   scalar('ADAPTIVE_SITUATIONAL_MAX_CORE_DELAY_SOULS', 0, 20_000, (c) => c.situational.maxCoreDelaySouls, (c, v) => { c.situational.maxCoreDelaySouls = v; }, true),
+  scalar('ADAPTIVE_SITUATIONAL_MATCHUP_DISCOVERY_MIN_COVERAGE', 0, 1, (c) => c.situational.matchupDiscoveryMinCoverage, (c, v) => { c.situational.matchupDiscoveryMinCoverage = v; }),
+  scalar('ADAPTIVE_SITUATIONAL_MATCHUP_DISCOVERY_SELL_MIN_CONFIDENCE', 0, 1, (c) => c.situational.matchupDiscoverySellMinConfidence, (c, v) => { c.situational.matchupDiscoverySellMinConfidence = v; }),
+  scalar('ADAPTIVE_SITUATIONAL_MATCHUP_DISCOVERY_REPLACE_MIN_IMPROVEMENT', 0, 1, (c) => c.situational.matchupDiscoveryReplaceMinImprovement, (c, v) => { c.situational.matchupDiscoveryReplaceMinImprovement = v; }),
+  scalar('ADAPTIVE_THREAT_WEIGHT_SOULS', 0, 1, (c) => c.threat.weights.souls, (c, v) => { c.threat.weights.souls = v; }),
+  scalar('ADAPTIVE_THREAT_WEIGHT_HERO_DAMAGE', 0, 1, (c) => c.threat.weights.heroDamage, (c, v) => { c.threat.weights.heroDamage = v; }),
+  scalar('ADAPTIVE_THREAT_WEIGHT_KILLS_ASSISTS', 0, 1, (c) => c.threat.weights.killsAssists, (c, v) => { c.threat.weights.killsAssists = v; }),
+  scalar('ADAPTIVE_THREAT_WEIGHT_LEVEL', 0, 1, (c) => c.threat.weights.level, (c, v) => { c.threat.weights.level = v; }),
+  scalar('ADAPTIVE_THREAT_WEIGHT_DEATHS', -1, 0, (c) => c.threat.weights.deaths, (c, v) => { c.threat.weights.deaths = v; }),
+  scalar('ADAPTIVE_THREAT_MIN_MULTIPLIER', 0, 1, (c) => c.threat.minMultiplier, (c, v) => { c.threat.minMultiplier = v; }),
+  scalar('ADAPTIVE_THREAT_MAX_MULTIPLIER', 1, 3, (c) => c.threat.maxMultiplier, (c, v) => { c.threat.maxMultiplier = v; }),
+  scalar('ADAPTIVE_THREAT_SMOOTHING_ALPHA', 0.01, 1, (c) => c.threat.smoothingAlpha, (c, v) => { c.threat.smoothingAlpha = v; }),
 ];
 
 export function loadAdaptivePolicyV1Config(
@@ -216,6 +257,15 @@ export function loadAdaptivePolicyV1Config(
     });
     config.coreReplaceMinImprovement = ADAPTIVE_POLICY_V1_CONFIG.coreReplaceMinImprovement;
   }
+  if (config.threat.minMultiplier > config.threat.maxMultiplier) {
+    diagnostics.push({
+      key: 'ADAPTIVE_THREAT_MIN_MULTIPLIER',
+      reason: 'OUT_OF_RANGE',
+      fallback: ADAPTIVE_POLICY_V1_CONFIG.threat.minMultiplier,
+    });
+    config.threat.minMultiplier = ADAPTIVE_POLICY_V1_CONFIG.threat.minMultiplier;
+    config.threat.maxMultiplier = ADAPTIVE_POLICY_V1_CONFIG.threat.maxMultiplier;
+  }
 
   return { config, diagnostics };
 }
@@ -237,6 +287,10 @@ function cloneDefaults(): AdaptivePolicyV1Config {
     phase: { ...ADAPTIVE_POLICY_V1_CONFIG.phase },
     choice: { ...ADAPTIVE_POLICY_V1_CONFIG.choice },
     situational: { ...ADAPTIVE_POLICY_V1_CONFIG.situational },
+    threat: {
+      ...ADAPTIVE_POLICY_V1_CONFIG.threat,
+      weights: { ...ADAPTIVE_POLICY_V1_CONFIG.threat.weights },
+    },
     investment: { ...ADAPTIVE_POLICY_V1_CONFIG.investment },
     shrinkK: { ...ADAPTIVE_POLICY_V1_CONFIG.shrinkK },
     weights: { ...ADAPTIVE_POLICY_V1_CONFIG.weights },

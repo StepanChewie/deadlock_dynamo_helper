@@ -23,20 +23,16 @@ function item(itemId: number, slotType: RecommendationItemDefinition['slotType']
 }
 
 const definitions: RecommendationItemDefinition[] = [
-  item(1, 'weapon'),
-  item(2, 'weapon'),
-  item(3, 'weapon'),
-  item(4, 'weapon'),
-  item(5, 'weapon'),
-  item(10, 'vitality'),
-  item(20, 'spirit'),
+  ...Array.from({ length: 13 }, (_, index) => item(index + 1, 'weapon')),
+  item(20, 'vitality'),
+  item(30, 'spirit'),
 ];
 
 const graph = createRecommendationItemGraph(definitions);
 
 function state(held: readonly number[]): RecommendationDecisionState {
   return {
-    decisionId: 'category-slot-test',
+    decisionId: 'flex-slot-test',
     matchId: 'match',
     playerSlot: 0,
     gameTimeSec: 100,
@@ -55,50 +51,62 @@ function state(held: readonly number[]): RecommendationDecisionState {
   };
 }
 
-function rules(unlockedFlexSlots: number): RecommendationCandidateGeneratorRules {
+function rules(): RecommendationCandidateGeneratorRules {
   return {
-    baseSlots: 12,
-    baseSlotsByType: { weapon: 4, vitality: 4, spirit: 4 },
-    maxFlexSlots: 4,
-    unlockedFlexSlots,
-    flexCapacityEvidence: 'OBSERVED',
+    baseSlots: 0,
+    baseSlotsByType: { weapon: 0, vitality: 0, spirit: 0 },
+    maxFlexSlots: 12,
+    unlockedFlexSlots: 12,
+    flexCapacityEvidence: 'RECONSTRUCTED',
     maxActiveItems: 4,
+    activeCapacityEvidence: 'RECONSTRUCTED',
     allowSellOnlyActions: true,
     generateTargetedWaitActions: true,
   };
 }
 
-describe('category-aware recommendation slot rules', () => {
-  it('requires flex for a fifth weapon even when total inventory is below twelve items', () => {
+describe('fully flexible recommendation slot rules', () => {
+  it('allows twelve items of the same category', () => {
     const candidates = generateRecommendationCandidates({
-      state: state([1, 2, 3, 4]),
+      state: state([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]),
       itemGraph: graph,
-      rules: rules(0),
+      rules: rules(),
     });
 
-    const fifthWeapon = candidates.find((candidate) => candidate.actionId === 'BUY_ITEM:5');
-    expect(fifthWeapon?.feasible).toBe(false);
-    expect(fifthWeapon?.reasons).toContain('SLOT_LIMIT_EXCEEDED');
+    expect(candidates.find((candidate) => candidate.actionId === 'BUY_ITEM:12')?.feasible).toBe(true);
   });
 
-  it('allows the fifth weapon after one flex slot is observed unlocked', () => {
+  it('rejects a thirteenth held item regardless of category', () => {
     const candidates = generateRecommendationCandidates({
-      state: state([1, 2, 3, 4]),
+      state: state([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]),
       itemGraph: graph,
-      rules: rules(1),
+      rules: rules(),
     });
 
-    expect(candidates.find((candidate) => candidate.actionId === 'BUY_ITEM:5')?.feasible).toBe(true);
+    const thirteenth = candidates.find((candidate) => candidate.actionId === 'BUY_ITEM:13');
+    expect(thirteenth?.feasible).toBe(false);
+    expect(thirteenth?.reasons).toContain('SLOT_LIMIT_EXCEEDED');
   });
 
-  it('counts overflow independently across item categories', () => {
+  it('allows sell-and-buy replacement while inventory is twelve of twelve', () => {
     const candidates = generateRecommendationCandidates({
-      state: state([1, 2, 3, 4, 10, 20]),
+      state: state([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]),
       itemGraph: graph,
-      rules: rules(0),
+      rules: rules(),
     });
 
-    expect(candidates.find((candidate) => candidate.actionId === 'BUY_ITEM:5')?.reasons)
-      .toContain('SLOT_LIMIT_EXCEEDED');
+    const replacement = candidates.find((candidate) => candidate.actionId === 'REPLACE_ITEM:1->13');
+    expect(replacement?.feasible).toBe(true);
+    expect(replacement?.resultingItemIds).toHaveLength(12);
+  });
+
+  it('does not reserve capacity by weapon vitality or spirit category', () => {
+    const candidates = generateRecommendationCandidates({
+      state: state([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20]),
+      itemGraph: graph,
+      rules: rules(),
+    });
+
+    expect(candidates.find((candidate) => candidate.actionId === 'BUY_ITEM:30')?.feasible).toBe(true);
   });
 });

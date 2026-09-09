@@ -64,7 +64,7 @@ export class StrategyFirstTransactionPlanV1Service {
     }
 
     const selectedCandidate = matchingCurrentCandidate(input.result, input.decision);
-    const compiled = this.compiler.compile({
+    let compiled = this.compiler.compile({
       strategy: input.result.strategy,
       contract: input.result.contract,
       slotPlan: input.result.strategyPlan.slotPlan,
@@ -72,6 +72,26 @@ export class StrategyFirstTransactionPlanV1Service {
       selectedCandidates: selectedCandidate ? [selectedCandidate] : [],
       recentPurchasedItemIds: input.recentPurchasedItemIds,
     });
+    // A situational decision that cannot be compiled into a replayable transaction
+    // (for example a sell-driven wildcard replacement that would strand an unmet hard
+    // goal without an exit slot) falls back to the strategy-goal transaction path
+    // instead of discarding a viable legal plan. Fail-closed semantics still apply to
+    // the retry result.
+    let effectiveContract = input.result.contract;
+    if (!compiled.reachable && input.result.contract.activeSituationalDecision) {
+      effectiveContract = {
+        ...input.result.contract,
+        activeSituationalDecision: undefined,
+      };
+      compiled = this.compiler.compile({
+        strategy: input.result.strategy,
+        contract: effectiveContract,
+        slotPlan: input.result.strategyPlan.slotPlan,
+        decision: input.decision,
+        selectedCandidates: [],
+        recentPurchasedItemIds: input.recentPurchasedItemIds,
+      });
+    }
     let session = this.reconciler.reconcile({
       previous: input.previousPlanSession,
       strategyId: input.result.strategy.strategyId,
@@ -115,12 +135,12 @@ export class StrategyFirstTransactionPlanV1Service {
         ? 'REPLAN_REQUIRED' as const
         : input.result.contract.status;
     const contract = effectiveStatus === input.result.contract.status
-      ? input.result.contract
+      ? effectiveContract
       : {
-          ...input.result.contract,
+          ...effectiveContract,
           status: effectiveStatus,
           completionReasonCodes: unique([
-            ...input.result.contract.completionReasonCodes,
+            ...effectiveContract.completionReasonCodes,
             ...(effectiveStatus === 'WAITING' ? ['TRANSACTION_PLAN_WAITING'] : []),
           ]),
         };

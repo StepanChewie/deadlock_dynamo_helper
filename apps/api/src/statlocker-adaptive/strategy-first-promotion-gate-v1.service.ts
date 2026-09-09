@@ -5,6 +5,21 @@ import { TransactionPlanInvariantSummaryV1 } from './transaction-plan-invariants
 
 export type StrategyFirstServingModeV1 = 'LEGACY' | 'SHADOW' | 'STRATEGY';
 export type TransactionPlanServingModeV1 = 'FLAT_COMPAT' | 'TRANSACTION_SHADOW' | 'TRANSACTION_PRIMARY';
+export type ThreatWeightedServingModeV1 = 'CURRENT' | 'THREAT_WEIGHTED_SHADOW' | 'THREAT_WEIGHTED_ACTIVE';
+
+export interface ThreatWeightedPromotionStatusV1 {
+  configuredMode: ThreatWeightedServingModeV1;
+  effectiveMode: ThreatWeightedServingModeV1;
+  promotable: boolean;
+  externallyApproved: boolean;
+  minimumShadowDecisions: number;
+  shadowComparisons: number;
+  shadowFailures: number;
+  hardCoreViolationAttempts: number;
+  inventoryViolationCount: number;
+  staleEvidenceFallbackCount: number;
+  blockers: readonly string[];
+}
 
 export interface StrategyFirstPromotionStatusV1 {
   configuredMode: StrategyFirstServingModeV1;
@@ -155,6 +170,64 @@ export class StrategyFirstPromotionGateV1Service {
     };
   }
 
+  threatWeightedConfiguredMode(): ThreatWeightedServingModeV1 {
+    return parseThreatWeightedMode(process.env.ADAPTIVE_THREAT_WEIGHTED_MODE);
+  }
+
+  threatWeightedEffectiveMode(): ThreatWeightedServingModeV1 {
+    return this.threatWeightedStatus().effectiveMode;
+  }
+
+  recordThreatWeightedShadowSuccess(): void {
+    // Comparisons are counted by the observability service; kept for symmetry so the
+    // recommendation wiring has one gate entry point.
+  }
+
+  recordThreatWeightedShadowFailure(): void {
+    this.observability.recordThreatWeightedShadowFailure('gate', new Error('THREAT_WEIGHTED_SHADOW_RUNTIME_FAILURE'));
+  }
+
+  threatWeightedStatus(): ThreatWeightedPromotionStatusV1 {
+    const configuredMode = this.threatWeightedConfiguredMode();
+    const counters = this.observability.getStatus().counters;
+    const externallyApproved = parseBoolean(process.env.ADAPTIVE_THREAT_WEIGHTED_PROMOTION_APPROVED);
+    const minimumShadowDecisions = readBoundedInteger(
+      process.env.ADAPTIVE_THREAT_WEIGHTED_PROMOTION_MIN_DECISIONS,
+      100,
+      1,
+      1_000_000,
+    );
+    const hardCoreViolationAttempts = counters.threatWeightedHardCoreViolationAttemptCount ?? 0;
+    const inventoryViolationCount = counters.threatWeightedInventoryViolationCount ?? 0;
+    const blockers: string[] = [];
+    if (hardCoreViolationAttempts > 0) blockers.push('THREAT_WEIGHTED_HARD_CORE_VIOLATION_ATTEMPT');
+    if (inventoryViolationCount > 0) blockers.push('THREAT_WEIGHTED_INVENTORY_VIOLATION');
+    if (counters.threatWeightedShadowFailureCount > 0) blockers.push('THREAT_WEIGHTED_SHADOW_RUNTIME_FAILURE');
+    if (!externallyApproved && counters.threatWeightedShadowComparisonCount < minimumShadowDecisions) {
+      blockers.push('THREAT_WEIGHTED_SHADOW_SAMPLE_BELOW_PROMOTION_MINIMUM');
+    }
+    const promotable = blockers.length === 0 && (
+      externallyApproved || counters.threatWeightedShadowComparisonCount >= minimumShadowDecisions
+    );
+    // Fail closed: configuring ACTIVE without a promotable state serves shadow instead.
+    const effectiveMode: ThreatWeightedServingModeV1 = configuredMode === 'THREAT_WEIGHTED_ACTIVE'
+      ? promotable ? 'THREAT_WEIGHTED_ACTIVE' : 'THREAT_WEIGHTED_SHADOW'
+      : configuredMode;
+    return {
+      configuredMode,
+      effectiveMode,
+      promotable,
+      externallyApproved,
+      minimumShadowDecisions,
+      shadowComparisons: counters.threatWeightedShadowComparisonCount,
+      shadowFailures: counters.threatWeightedShadowFailureCount,
+      hardCoreViolationAttempts,
+      inventoryViolationCount,
+      staleEvidenceFallbackCount: counters.threatWeightedStaleEvidenceFallbackCount,
+      blockers: [...new Set(blockers)].sort(),
+    };
+  }
+
   transactionStatus(): TransactionPlanPromotionStatusV1 {
     const configuredMode = this.transactionConfiguredMode();
     const observability = this.observability.getStatus();
@@ -209,6 +282,19 @@ function parseMode(raw: string | undefined): StrategyFirstServingModeV1 {
   const normalized = raw?.trim().toUpperCase();
   if (normalized === 'LEGACY' || normalized === 'STRATEGY' || normalized === 'SHADOW') return normalized;
   return 'SHADOW';
+}
+
+function parseThreatWeightedMode(raw: string | undefined): ThreatWeightedServingModeV1 {
+  const normalized = raw?.trim().toUpperCase();
+  if (
+    normalized === 'CURRENT' ||
+    normalized === 'THREAT_WEIGHTED_SHADOW' ||
+    normalized === 'THREAT_WEIGHTED_ACTIVE'
+  ) {
+    return normalized;
+  }
+  // Fail closed: without an explicit policy the threat-weighted path is not activated.
+  return 'CURRENT';
 }
 
 function parseTransactionMode(raw: string | undefined): TransactionPlanServingModeV1 {

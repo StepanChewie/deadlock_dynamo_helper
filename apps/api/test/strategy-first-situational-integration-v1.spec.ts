@@ -12,6 +12,7 @@ import { BuildStrategySpecV1 } from '../src/statlocker-adaptive/build-strategy-v
 const items: RecommendationItemDefinition[] = [
   { itemId: 1, name: 'Core', slotType: 'weapon', active: false, availableRulesetIds: ['r1'], directPurchaseCost: 800, upgradeRecipes: [], sellTransition: { soulsRefund: 400, returnedItemIds: [] } },
   { itemId: 2, name: 'Anti CC', slotType: 'vitality', active: false, availableRulesetIds: ['r1'], directPurchaseCost: 800, upgradeRecipes: [], sellTransition: { soulsRefund: 400, returnedItemIds: [] } },
+  { itemId: 3, name: 'Matchup Discovery', slotType: 'spirit', active: false, availableRulesetIds: ['r1'], directPurchaseCost: 800, upgradeRecipes: [], sellTransition: { soulsRefund: 400, returnedItemIds: [] } },
 ];
 const graph = createRecommendationItemGraph(items);
 const slotRules = { baseSlots: 12, baseSlotsByType: { weapon: 4, vitality: 4, spirit: 4 } as const, maxFlexSlots: 4, maxActiveItems: 4 };
@@ -45,14 +46,15 @@ const strategy: BuildStrategySpecV1 = {
 
 const scorer = {
   scoreItem(itemId: number) {
-    const score = itemId === 2 ? 1.2 : 0.5;
+    const score = itemId === 3 ? 1.4 : itemId === 2 ? 1.2 : 0.5;
+    const matchup = itemId === 3 ? 0.7 : itemId === 2 ? 0.5 : 0;
     return {
       itemId,
       score,
-      confidence: itemId === 2 ? 0.9 : 0.8,
+      confidence: itemId === 1 ? 0.8 : 0.9,
       completeness: 1,
-      components: itemId === 2
-        ? [{ key: 'exactEnemyFit', raw: 0.5, normalized: 0.5, confidence: 0.9, weight: 1, weighted: 0.5 }]
+      components: matchup > 0
+        ? [{ key: 'draftMatchupFit', raw: matchup, normalized: matchup, confidence: 0.9, weight: 1, weighted: matchup }]
         : [],
       version: 'adaptive-evidence-scorer-v1' as const,
     };
@@ -62,6 +64,16 @@ const scorer = {
 const evidence: any = {
   heroId: 1, rulesetVersion: 'r1', catalogSha256: 'a'.repeat(64), statlockerPatchId: 'p', usable: true,
   snapshotIds: [], degradedReasons: [], families: [], byDataset: {},
+  draftMatchupByItemId: {
+    '3': {
+      raw: 0.08,
+      normalized: 0.7,
+      confidence: 0.9,
+      coverage: 1,
+      usedCount: 1,
+      contributions: [],
+    },
+  },
 };
 
 describe('strategy-first situational integration v1', () => {
@@ -86,5 +98,38 @@ describe('strategy-first situational integration v1', () => {
     });
     expect(result.strategyPlan.situationalDecision?.targetItemId).toBe(2);
     expect(result.recommendedBuild.find((entry) => entry.itemId === 2)?.status).toBe('NEXT');
+  });
+
+  it('discovers a legal counter-enemy-heroes item outside the strategy skeleton', () => {
+    const counterStrategy: BuildStrategySpecV1 = {
+      ...strategy,
+      situationalWindows: [{
+        windowId: 'matchup-now',
+        afterGoalIds: [],
+        beforeGoalIds: ['core'],
+        maxSlots: 1,
+        maxSouls: 1000,
+        maxCoreDelaySouls: 1000,
+        allowedPurposes: ['COUNTER_ENEMY_HEROES'],
+      }],
+    };
+    const planner = new StrategyFirstBuildPlannerV1Service(scorer);
+    const base = planner.plan({ decision, evidence, strategies: [counterStrategy] });
+    expect(base.nextAction.targetItemId).toBe(1);
+
+    const result = new StrategyFirstSituationalOverlayV1Service(scorer).apply({
+      result: base,
+      decision,
+      evidence,
+    });
+
+    expect(result.nextAction).toMatchObject({ type: 'BUY', itemId: 3, targetItemId: 3 });
+    expect(result.contract.activeSituationalDecision).toMatchObject({
+      windowId: 'matchup-now',
+      purpose: 'COUNTER_ENEMY_HEROES',
+      targetItemId: 3,
+      enemyHeroIds: [99],
+    });
+    expect(result.contract.activeSituationalDecision?.reasonCodes).toContain('MATCHUP_DISCOVERY_OUTSIDE_SKELETON');
   });
 });

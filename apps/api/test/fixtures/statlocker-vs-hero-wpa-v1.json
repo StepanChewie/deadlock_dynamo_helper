@@ -1,0 +1,61 @@
+{
+  "metadata": {
+    "minor_patches": {
+      "patches_included": ["676255623445218601"]
+    }
+  },
+  "by_patch": {
+    "patch_676255623445218601": {
+      "by_rank": {
+        "rank_8": {
+          "by_hero": {
+            "Abrams": {
+              "Arcane Surge": {
+                "_baseline": { "mean_wpa": -0.002, "count": 1500 },
+                "Apollo": { "mean_wpa": 0.05, "count": 10, "delta_wpa": 0.052 },
+                "Dynamo": { "mean_wpa": 0.01, "count": 1000, "delta_wpa": 0.012 },
+                "Billy": { "mean_wpa": -0.01, "count": 500, "delta_wpa": -0.008 }
+              },
+              "Mystic Expansion": {
+                "_baseline": { "mean_wpa": 0.001, "count": 1800 },
+                "Apollo": { "mean_wpa": 0.009, "count": 600, "delta_wpa": 0.008 },
+                "Dynamo": { "mean_wpa": 0.007, "count": 1200, "delta_wpa": 0.006 },
+                "Billy": { "mean_wpa": -0.004, "count": 700, "delta_wpa": -0.005 }
+              },
+              "Close Quarters": {
+                "_baseline": { "mean_wpa": 0.003, "count": 2100 },
+                "Apollo": { "mean_wpa": 0.007, "count": 900, "delta_wpa": 0.004 },
+                "Dynamo": { "mean_wpa": 0.012, "count": 1300, "delta_wpa": 0.009 },
+                "Billy": { "mean_wpa": 0.001, "count": 800, "delta_wpa": -0.002 }
+              }
+            }
+          }
+        },
+        "rank_9": {
+          "by_hero": {
+            "Abrams": {
+              "Arcane Surge": {
+                "_baseline": { "mean_wpa": -0.001, "count": 1600 },
+                "Apollo": { "mean_wpa": 0.001, "count": 90, "delta_wpa": 0.002 },
+                "Dynamo": { "mean_wpa": 0.008, "count": 1100, "delta_wpa": 0.009 },
+                "Billy": { "mean_wpa": -0.006, "count": 600, "delta_wpa": -0.005 }
+              },
+              "Mystic Expansion": {
+                "_baseline": { "mean_wpa": 0.002, "count": 1900 },
+                "Apollo": { "mean_wpa": 0.008, "count": 650, "delta_wpa": 0.006 },
+                "Dynamo": { "mean_wpa": 0.009, "count": 1250, "delta_wpa": 0.007 },
+                "Billy": { "mean_wpa": -0.002, "count": 750, "delta_wpa": -0.004 }
+              },
+              "Close Quarters": {
+                "_baseline": { "mean_wpa": 0.004, "count": 2200 },
+                "Apollo": { "mean_wpa": 0.009, "count": 950, "delta_wpa": 0.005 },
+                "Dynamo": { "mean_wpa": 0.011, "count": 1400, "delta_wpa": 0.007 },
+                "Billy": { "mean_wpa": 0.002, "count": 850, "delta_wpa": -0.002 }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

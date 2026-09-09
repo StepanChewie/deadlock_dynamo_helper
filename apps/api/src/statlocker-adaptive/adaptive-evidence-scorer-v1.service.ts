@@ -12,6 +12,7 @@ import {
 import { StatlockerEvidenceBundleV1 } from './statlocker-evidence.service';
 import { AdaptiveGameStateBlendV1 } from './adaptive-game-state';
 import { findConsensusCandidateV1 } from './structured-build-v1';
+import { ThreatWeightedMatchupScoreV1 } from './threat-weighted-matchup-v1.service';
 
 export interface AdaptiveInvestmentDeltaV1 {
   evidence: FactEvidence;
@@ -68,6 +69,10 @@ export interface ExactEnemyAggregateV1 {
   contributions: readonly ExactEnemyContributionV1[];
 }
 
+interface EvidenceWithDraftMatchupV1 extends StatlockerEvidenceBundleV1 {
+  draftMatchupByItemId?: Readonly<Record<string, ThreatWeightedMatchupScoreV1>>;
+}
+
 @Injectable()
 export class AdaptiveEvidenceScorerV1Service {
   readonly version = 'adaptive-evidence-scorer-v1' as const;
@@ -75,7 +80,6 @@ export class AdaptiveEvidenceScorerV1Service {
   scoreItem(itemId: number, context: AdaptiveItemScoreContextV1): AdaptiveItemScoreV1 {
     const config = ADAPTIVE_POLICY_V1_CONFIG;
     const wpaFamily = context.evidence.byDataset.WPA_PATCH_DATA;
-    const exactFamily = context.evidence.byDataset.VS_HERO_WPA;
     const chainFamily = context.evidence.byDataset.T4_CHAINS;
     const skeletonFamily = context.evidence.byDataset.CONSENSUS_SKELETON;
     const wpa = asWpaPatchData(wpaFamily.payload)?.items.find(
@@ -118,19 +122,12 @@ export class AdaptiveEvidenceScorerV1Service {
       config.weights.gameStateFit,
     ));
 
-    const exact = aggregateExactEnemyEvidenceV1(
-      asExactSlices(exactFamily.payload),
-      context.heroId,
-      itemId,
-      context.enemyHeroIds,
-      config.exactEnemyMaxMatchups,
-      config.shrinkK.exactEnemy,
-    );
+    const draftMatchup = draftMatchupForItemV1(context.evidence, itemId);
     components.push(makeComponent(
-      'exactEnemyFit',
-      exact.raw,
-      exact.normalized,
-      exact.confidence * exactFamily.confidence,
+      'draftMatchupFit',
+      draftMatchup?.raw ?? 0,
+      draftMatchup?.normalized ?? 0,
+      draftMatchup?.confidence ?? 0,
       config.weights.exactEnemyFit,
     ));
 
@@ -188,11 +185,15 @@ export class AdaptiveEvidenceScorerV1Service {
       config.weights.chainFit,
     ));
 
+    // Absence from the consensus skeleton is recorded for auditability but carries no
+    // confidence by itself: the skeleton family does not assert that unlisted items are
+    // worse, and treating absence as strong negative evidence would structurally block
+    // the outside-skeleton wildcard discovery path.
     components.push(makeComponent(
       'skeletonDeviation',
       skeletonStrength === undefined ? 1 : 0,
       skeleton && skeletonStrength === undefined ? -1 : 0,
-      skeleton ? skeletonFamily.confidence : 0,
+      skeletonStrength === undefined ? 0 : skeletonFamily.confidence,
       config.weights.skeletonDeviation,
     ));
 
@@ -328,6 +329,13 @@ export function aggregateExactEnemyEvidenceV1(
 
 export function exactEnemySlicesFromEvidenceV1(value: unknown): readonly StatlockerVsHeroSliceV1[] {
   return asExactSlices(value);
+}
+
+function draftMatchupForItemV1(
+  evidence: StatlockerEvidenceBundleV1,
+  itemId: number,
+): ThreatWeightedMatchupScoreV1 | undefined {
+  return (evidence as EvidenceWithDraftMatchupV1).draftMatchupByItemId?.[String(itemId)];
 }
 
 function scoreChainFit(

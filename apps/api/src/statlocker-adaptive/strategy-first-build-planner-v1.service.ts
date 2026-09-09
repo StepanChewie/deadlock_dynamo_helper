@@ -39,10 +39,19 @@ import {
   BuildSlotPlanV1,
   BuildStrategyGoalV1,
   BuildStrategySpecV1,
+  buildGoalRigidityV1,
 } from './build-strategy-v1';
 import { BuildStrategySelectionV1, BuildStrategySelectorV1Service } from './build-strategy-selector-v1.service';
 import { BuildStrategySessionV1, BuildStrategySessionV1Service } from './build-strategy-session-v1.service';
 import { StatlockerEvidenceBundleV1 } from './statlocker-evidence.service';
+import { derivePlannerInvestmentDeltaV1 } from './adaptive-planner-transition-v1';
+import { ADAPTIVE_POLICY_V1_CONFIG } from './statlocker-adaptive.config';
+import {
+  WholeBuildReplacementEvaluationV1,
+  WholeBuildReplacementKindV1,
+  WholeBuildUtilityContributionsV1,
+  WholeBuildUtilityV1Service,
+} from './whole-build-utility-v1.service';
 
 export interface StrategyFirstBuildPlannerV1Input {
   decision: AdaptiveDecisionStateV1;
@@ -89,6 +98,7 @@ interface ScoredStrategyCandidateV1 {
   confidence: number;
   components: readonly AdaptiveScoreComponentV1[];
   reasonCodes: readonly string[];
+  wholeBuildNetGain?: number;
 }
 
 interface ContinuityAdjustmentV1 {
@@ -104,6 +114,7 @@ export class StrategyFirstBuildPlannerV1Service {
   private readonly contracts = new BuildContractV1Service();
   private readonly slots = new BuildSlotPlannerV1Service();
   private readonly investments = new BuildInvestmentPolicyV1Service();
+  private readonly wholeBuildUtility = new WholeBuildUtilityV1Service();
 
   constructor(private readonly scorer: AdaptiveEvidenceScorerV1Service) {}
 
@@ -183,13 +194,17 @@ export class StrategyFirstBuildPlannerV1Service {
       input.decision.investment,
       transactionSelected ? 'TRANSACTION' : 'WAIT',
     );
-    const slotPlan = this.slots.plan({
-      strategy,
-      contract: investmentAwareContract,
-      itemGraph: input.decision.itemGraph,
-      ownedItemIds,
-      slots: input.decision.slots,
-    });
+    const slotPlan = alignSlotPlanWithSelectedCandidateV1(
+      this.slots.plan({
+        strategy,
+        contract: investmentAwareContract,
+        itemGraph: input.decision.itemGraph,
+        ownedItemIds,
+        slots: input.decision.slots,
+      }),
+      first?.candidate,
+      investmentAwareContract.currentGoalId,
+    );
     const effectiveContract = slotPlan.feasible
       ? investmentAwareContract
       : {
@@ -276,9 +291,19 @@ export class StrategyFirstBuildPlannerV1Service {
         committed[branch.branchGroupId] = ownedOption;
         continue;
       }
-      const best = branch.optionGoalIds
+      const ranked = branch.optionGoalIds
         .map((goalId) => ({ goalId, score: scoreGoal(goalById.get(goalId), this.scorer, scorerContext) }))
-        .sort((a, b) => b.score - a.score || a.goalId.localeCompare(b.goalId))[0];
+        .sort((a, b) => b.score - a.score || a.goalId.localeCompare(b.goalId));
+      const best = ranked[0];
+      const previousGoalId = selected[branch.branchGroupId];
+      if (best && previousGoalId && previousGoalId !== best.goalId && branch.optionGoalIds.includes(previousGoalId)) {
+        const previousScore = scoreGoal(goalById.get(previousGoalId), this.scorer, scorerContext);
+        if (Number.isFinite(previousScore) &&
+          best.score - previousScore < ADAPTIVE_POLICY_V1_CONFIG.minPlanSwitchImprovement) {
+          selected[branch.branchGroupId] = previousGoalId;
+          continue;
+        }
+      }
       if (best) selected[branch.branchGroupId] = best.goalId;
     }
     return { selected, committed };
@@ -418,7 +443,7 @@ export class StrategyFirstBuildPlannerV1Service {
       itemGraph: input.decision.itemGraph,
       rules,
     }).filter((candidate) => candidate.feasible && candidate.recommendationEligible);
-    const relevant = all
+    let relevant = all
       .filter((candidate) => this.candidateRelevant(
         candidate,
         currentGoal,
@@ -434,7 +459,15 @@ export class StrategyFirstBuildPlannerV1Service {
         branches,
         input,
         this.contracts,
-      ));
+      ))
+      .filter((candidate) => !isRecentPurchaseProtectedDirectSellV1(candidate, input));
+    const replacementEvaluationByActionId = new Map<string, WholeBuildReplacementEvaluationV1>();
+    relevant = relevant.filter((candidate) => {
+      if (candidate.action.type !== 'REPLACE_ITEM') return true;
+      const evaluation = this.evaluateReplacementWholeBuild(candidate, node, strategy, input, scorerContext);
+      replacementEvaluationByActionId.set(candidate.actionId, evaluation);
+      return evaluation.accepted;
+    });
     const transactions = relevant.filter((candidate) => candidate.action.type !== 'WAIT_SAVE');
     const candidates = transactions.length > 0
       ? relevant
@@ -489,6 +522,7 @@ export class StrategyFirstBuildPlannerV1Service {
         input.decision.itemGraph,
       );
       const continuity = continuityAdjustment(candidate, input);
+      const replacementEvaluation = replacementEvaluationByActionId.get(candidate.actionId);
       const waitAdjustment = candidate.action.type === 'WAIT_SAVE' ? (transactions.length === 0 ? 0.12 : -0.25) : 0;
       const score = (itemScore?.score ?? 0) + strategic + investmentUtility * 0.45 + continuity.score + waitAdjustment;
       const reasonCodes = [
@@ -496,6 +530,7 @@ export class StrategyFirstBuildPlannerV1Service {
         ...(activeInvestmentObjective ? [`INVESTMENT_OBJECTIVE:${activeInvestmentObjective.objectiveId}`] : []),
         ...candidate.recommendationSuppressionReasons,
         ...continuity.reasonCodes,
+        ...(replacementEvaluation?.reasonCodes ?? []),
         ...(strategic > 0 ? ['ADVANCES_SELECTED_STRATEGY'] : []),
         ...(investmentUtility > 0 ? ['ADVANCES_STRATEGIC_INVESTMENT'] : []),
       ];
@@ -505,12 +540,58 @@ export class StrategyFirstBuildPlannerV1Service {
         confidence: itemScore?.confidence ?? (candidate.action.type === 'WAIT_SAVE' ? 0.5 : 0.25),
         components: itemScore?.components ?? [],
         reasonCodes: unique(reasonCodes).sort(),
+        wholeBuildNetGain: replacementEvaluation?.netGain,
       };
-    }).sort((a, b) =>
-      b.score - a.score ||
-      b.confidence - a.confidence ||
-      a.candidate.actionId.localeCompare(b.candidate.actionId),
+    }).sort((a, b) => {
+      if (a.wholeBuildNetGain !== undefined && b.wholeBuildNetGain !== undefined &&
+        a.wholeBuildNetGain !== b.wholeBuildNetGain) {
+        return b.wholeBuildNetGain - a.wholeBuildNetGain;
+      }
+      return b.score - a.score ||
+        b.confidence - a.confidence ||
+        a.candidate.actionId.localeCompare(b.candidate.actionId);
+    });
+  }
+
+  private evaluateReplacementWholeBuild(
+    candidate: RecommendationCandidate,
+    node: StrategyNodeV1,
+    strategy: BuildStrategySpecV1,
+    input: StrategyFirstBuildPlannerV1Input,
+    scorerContext: AdaptiveItemScoreContextV1,
+  ): WholeBuildReplacementEvaluationV1 {
+    const action = candidate.action;
+    if (action.type !== 'REPLACE_ITEM') throw new Error('Expected REPLACE_ITEM candidate');
+
+    const currentItemIds = heldIds(node.decisionState);
+    const projectedDecision = projectRecommendationCandidateState(
+      node.decisionState,
+      candidate,
+      input.decision.itemGraph,
     );
+    const projectedItemIds = heldIds(projectedDecision);
+    const projectedInvestment = deriveAdaptiveInvestmentStateV1(
+      projectedItemIds,
+      input.decision.itemGraph,
+      input.decision.economyRules,
+    );
+    const investmentDelta = derivePlannerInvestmentDeltaV1(node.investment, projectedInvestment);
+    const continuity = continuityAdjustment(candidate, input);
+    const evaluation = this.wholeBuildUtility.evaluateReplacement({
+      kind: replacementKindV1(strategy, input.decision.itemGraph, action.sellItemId, action.buyItemId),
+      current: wholeBuildContributionsV1(currentItemIds, this.scorer, scorerContext),
+      candidate: wholeBuildContributionsV1(projectedItemIds, this.scorer, scorerContext),
+      transactionFriction: 0,
+      churnPenalty: Math.max(0, -continuity.score),
+      investmentLoss: investmentDelta.achievedBreakpointsLost *
+        ADAPTIVE_POLICY_V1_CONFIG.investment.achievedBreakpointDropPenalty,
+      finalItemCount: projectedItemIds.length,
+      maxItemCount: node.slots.totalCapacity ?? node.slots.baseSlots + node.slots.maxFlexSlots,
+      protectedSale: isHardCoreProtectedSaleV1(strategy, input.decision.itemGraph, action.sellItemId) ||
+        isRecentPurchaseProtectedItemV1(action.sellItemId, input),
+      sellEconomicsKnown: candidate.evidence.transaction !== 'UNKNOWN',
+    });
+    return evaluation;
   }
 
   private candidateRelevant(
@@ -536,9 +617,7 @@ export class StrategyFirstBuildPlannerV1Service {
       if (transition?.requirement === 'BLOCKED') return false;
       if (action.type === 'BUY_ITEM' || action.type === 'UPGRADE_ITEM') return relevant.has(action.itemId);
       if (action.type === 'REPLACE_ITEM') {
-        return transition?.requirement === 'REPLACE' &&
-          transition.sourceItemId === action.sellItemId &&
-          relevant.has(action.buyItemId);
+        return transition?.requirement === 'REPLACE' && relevant.has(action.buyItemId);
       }
       if (action.type === 'SELL_ITEM') {
         return transition?.requirement === 'SELL_TEMPORARY' && transition.sourceItemId === action.itemId;
@@ -569,7 +648,9 @@ export class StrategyFirstBuildPlannerV1Service {
     nextAction: AdaptiveActionV1,
     nextCandidate: RecommendationCandidate | undefined,
   ): readonly AdaptivePlannedItemV1[] {
-    const owned = heldIds(input.decision.state);
+    const currentOwned = heldIds(input.decision.state);
+    const owned = retainedOwnedItemIdsForCandidateV1(currentOwned, nextCandidate);
+    const maxHeldItems = adaptiveHeldItemCapacityV1(input.decision.slots);
     const rows: AdaptivePlannedItemV1[] = owned.map((itemId, index) => ({
       itemId,
       position: index + 1,
@@ -582,7 +663,7 @@ export class StrategyFirstBuildPlannerV1Service {
     }));
     const seen = new Set(owned);
     const nextTransactionTarget = nextCandidate ? candidateTarget(nextCandidate) : undefined;
-    if (nextTransactionTarget !== undefined && !seen.has(nextTransactionTarget) &&
+    if (nextTransactionTarget !== undefined && rows.length < maxHeldItems && !seen.has(nextTransactionTarget) &&
       !input.decision.itemGraph.isTargetSatisfied(nextTransactionTarget, owned)) {
       const score = safeScoreItem(this.scorer, nextTransactionTarget, scorerContext);
       rows.push({
@@ -602,12 +683,11 @@ export class StrategyFirstBuildPlannerV1Service {
     for (const goal of orderedGoals) {
       const state = contract.goalStates[goal.goalId];
       if (state === 'SKIPPED' || state === 'WAIVED' || state === 'SATISFIED') continue;
-      // Soft goals stay non-mandatory: they never gate completion and never become the
-      // executable target, but the semantic build path still shows the progression.
       const optionalProgression = !goal.hard && contract.currentGoalId !== goal.goalId;
       const slotTransition = slotPlan.futureTransitions.find((entry) => entry.targetGoalId === goal.goalId);
       if (slotTransition?.requirement === 'BLOCKED') continue;
       for (const itemId of goal.targetItemIds) {
+        if (rows.length >= maxHeldItems) break;
         if (seen.has(itemId) || input.decision.itemGraph.isTargetSatisfied(itemId, owned)) continue;
         if (goal.type === 'BRANCH' && !Object.values(contract.selectedBranches).includes(goal.goalId)) continue;
         const score = safeScoreItem(this.scorer, itemId, scorerContext);
@@ -660,6 +740,56 @@ export class StrategyFirstBuildPlannerV1Service {
       enemyCompositionKey: [...input.decision.enemyHeroIds].sort((a, b) => a - b).join(','),
     };
   }
+}
+
+function alignSlotPlanWithSelectedCandidateV1(
+  slotPlan: BuildSlotPlanV1,
+  candidate: RecommendationCandidate | undefined,
+  currentGoalId: string | undefined,
+): BuildSlotPlanV1 {
+  const action = candidate?.action;
+  if (action?.type !== 'REPLACE_ITEM') return slotPlan;
+
+  let aligned = false;
+  const futureTransitions = slotPlan.futureTransitions.map((transition) => {
+    if (transition.requirement !== 'REPLACE' ||
+      transition.targetItemId !== action.buyItemId ||
+      (currentGoalId !== undefined && transition.targetGoalId !== currentGoalId)) {
+      return transition;
+    }
+    aligned = true;
+    return {
+      ...transition,
+      sourceItemId: action.sellItemId,
+      reasonCodes: unique([...transition.reasonCodes, 'WHOLE_BUILD_REPLACEMENT_SELECTED']).sort(),
+    };
+  });
+  if (!aligned) return slotPlan;
+  return {
+    ...slotPlan,
+    futureTransitions,
+    reasonCodes: unique([...slotPlan.reasonCodes, 'WHOLE_BUILD_REPLACEMENT_SELECTED']).sort(),
+  };
+}
+
+function retainedOwnedItemIdsForCandidateV1(
+  ownedItemIds: readonly number[],
+  candidate: RecommendationCandidate | undefined,
+): number[] {
+  const action = candidate?.action;
+  if (!action) return [...ownedItemIds];
+  if (action.type === 'REPLACE_ITEM') return ownedItemIds.filter((itemId) => itemId !== action.sellItemId);
+  if (action.type === 'SELL_ITEM') return ownedItemIds.filter((itemId) => itemId !== action.itemId);
+  if (action.type === 'UPGRADE_ITEM') {
+    const consumed = new Set(action.consumedItemIds);
+    return ownedItemIds.filter((itemId) => !consumed.has(itemId));
+  }
+  return [...ownedItemIds];
+}
+
+function adaptiveHeldItemCapacityV1(slots: AdaptiveSlotStateV1): number {
+  const capacity = slots.totalCapacity ?? slots.baseSlots + slots.maxFlexSlots;
+  return Number.isInteger(capacity) && capacity >= 0 ? capacity : 0;
 }
 
 function applyHardInvestmentObligations(
@@ -767,6 +897,92 @@ function semanticNextTargetItemId(
       decision.itemGraph.getItem(itemId)?.slotType === objective.type &&
       !decision.itemGraph.isTargetSatisfied(itemId, owned),
     );
+}
+
+function wholeBuildContributionsV1(
+  itemIds: readonly number[],
+  scorer: AdaptiveEvidenceScorerV1Service,
+  context: AdaptiveItemScoreContextV1,
+): WholeBuildUtilityContributionsV1 {
+  const result: WholeBuildUtilityContributionsV1 = {
+    skeletonAdherence: 0,
+    coreIntegrity: 0,
+    branchCoherence: 0,
+    threatMatchup: 0,
+    synergy: 0,
+    timing: 0,
+    slotEfficiency: 0,
+    economyOpportunityCost: 0,
+    investmentContinuity: 0,
+  };
+  const buildContext: AdaptiveItemScoreContextV1 = {
+    ...context,
+    ownedItemIds: [...itemIds],
+    plannedPrefixItemIds: [],
+  };
+
+  for (const itemId of itemIds) {
+    const score = safeScoreItem(scorer, itemId, buildContext);
+    for (const component of score?.components ?? []) {
+      const weighted = Number.isFinite(component.weighted) ? component.weighted : 0;
+      if (component.key === 'skeletonPrior' || component.key === 'skeletonDeviation') {
+        result.skeletonAdherence += weighted;
+      } else if (component.key === 'ownBuildFit') {
+        result.branchCoherence += weighted;
+      } else if (component.key === 'draftMatchupFit' || component.key === 'enemyCompositionFit') {
+        result.threatMatchup += weighted;
+      } else if (component.key === 'chainFit') {
+        result.synergy += weighted;
+      } else if (component.key === 'gameStateFit' || component.key === 'timingFit' || component.key === 'laneFit') {
+        result.timing += weighted;
+      } else if (component.key === 'slotEfficiency') {
+        result.slotEfficiency += weighted;
+      } else if (component.key === 'investmentUtility') {
+        result.investmentContinuity += weighted;
+      }
+    }
+  }
+  return result;
+}
+
+function replacementKindV1(
+  strategy: BuildStrategySpecV1,
+  graph: RecommendationItemGraph,
+  sellItemId: number,
+  buyItemId: number,
+): WholeBuildReplacementKindV1 {
+  if (!strategyItemUniverse(strategy, graph).has(buyItemId)) return 'OUTSIDE_SKELETON';
+  const soldGoal = strategy.goals.find((goal) => goal.targetItemIds.some((targetItemId) =>
+    targetItemId === sellItemId || graph.isComponentAncestor(sellItemId, targetItemId),
+  ));
+  return soldGoal && buildGoalRigidityV1(soldGoal) === 'SOFT_CORE' ? 'SOFT_CORE' : 'ORDINARY';
+}
+
+function isHardCoreProtectedSaleV1(
+  strategy: BuildStrategySpecV1,
+  graph: RecommendationItemGraph,
+  sellItemId: number,
+): boolean {
+  return strategy.goals
+    .filter((goal) => buildGoalRigidityV1(goal) === 'HARD_CORE')
+    .some((goal) => goal.targetItemIds.some((targetItemId) =>
+      targetItemId === sellItemId || graph.isComponentAncestor(sellItemId, targetItemId),
+    ));
+}
+
+function isRecentPurchaseProtectedItemV1(
+  itemId: number,
+  input: StrategyFirstBuildPlannerV1Input,
+): boolean {
+  return new Set(input.recentPurchasedItemIds ?? []).has(itemId);
+}
+
+function isRecentPurchaseProtectedDirectSellV1(
+  candidate: RecommendationCandidate,
+  input: StrategyFirstBuildPlannerV1Input,
+): boolean {
+  return candidate.action.type === 'SELL_ITEM' &&
+    isRecentPurchaseProtectedItemV1(candidate.action.itemId, input);
 }
 
 function strategicCandidateUtility(

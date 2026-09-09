@@ -69,8 +69,46 @@ function strategy(): BuildStrategySpecV1 {
 describe('build strategy validator v1', () => {
   const validator = new BuildStrategyValidatorV1Service();
 
-  it('accepts a coherent acyclic strategy whose items exist in the ruleset', () => {
+  it('accepts a coherent acyclic legacy strategy whose items exist in the ruleset', () => {
     expect(validator.validate(strategy(), graph)).toEqual({ valid: true, errors: [] });
+  });
+
+  it('accepts coherent explicit rigidity semantics', () => {
+    const value = strategy();
+    const explicit: BuildStrategySpecV1 = {
+      ...value,
+      goals: value.goals.map((goal) => ({ ...goal, rigidity: 'HARD_CORE' as const })),
+    };
+
+    expect(validator.validate(explicit, graph)).toEqual({ valid: true, errors: [] });
+  });
+
+  it('rejects contradictory explicit rigidity semantics', () => {
+    const value = strategy();
+    const invalid = {
+      ...value,
+      goals: value.goals.map((goal) => goal.goalId === 'g1'
+        ? { ...goal, rigidity: 'SOFT_CORE' as const }
+        : goal),
+    } satisfies BuildStrategySpecV1;
+
+    expect(validator.validate(invalid, graph).errors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'GOAL_RIGIDITY_INVALID', goalId: 'g1' }),
+    ]));
+  });
+
+  it('rejects unknown runtime rigidity values instead of silently accepting them', () => {
+    const value = strategy();
+    const invalid = {
+      ...value,
+      goals: value.goals.map((goal) => goal.goalId === 'g1'
+        ? { ...goal, rigidity: 'IMMOVABLE' }
+        : goal),
+    } as unknown as BuildStrategySpecV1;
+
+    expect(validator.validate(invalid, graph).errors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'GOAL_RIGIDITY_INVALID', goalId: 'g1' }),
+    ]));
   });
 
   it('rejects prerequisite cycles', () => {

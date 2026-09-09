@@ -10,6 +10,8 @@ import {
 } from '@deadlock-live-probe/shared';
 import { AdaptiveDecisionStateV1 } from './adaptive-decision-state-v1.service';
 import { candidateGeneratorRulesFromSlotStateV1 } from './adaptive-economy-v1';
+import { BuildStrategySpecV1 } from './build-strategy-v1';
+import { ADAPTIVE_POLICY_V1_CONFIG } from './statlocker-adaptive.config';
 import {
   AdaptiveEvidenceScorerV1Service,
   AdaptiveItemScoreV1,
@@ -22,6 +24,8 @@ import {
   BuildSituationalPurposeV1,
   BuildSituationalWindowV1,
 } from './build-strategy-v1';
+import type { DraftMatchupEvidenceBundleV1 } from './draft-matchup-evidence-v1.service';
+import { MatchupCandidateDiscoveryV1Service } from './matchup-candidate-discovery-v1.service';
 import { StatlockerEvidenceBundleV1 } from './statlocker-evidence.service';
 import { StrategyFirstBuildPlannerV1Result } from './strategy-first-build-planner-v1.service';
 
@@ -29,25 +33,27 @@ export interface StrategyFirstSituationalOverlayV1Input {
   result: StrategyFirstBuildPlannerV1Result;
   decision: AdaptiveDecisionStateV1;
   evidence: StatlockerEvidenceBundleV1;
+  recentPurchasedItemIds?: readonly number[];
 }
 
 @Injectable()
 export class StrategyFirstSituationalOverlayV1Service {
   private readonly resolver = new BuildSituationalResolverV1Service();
+  private readonly discovery = new MatchupCandidateDiscoveryV1Service();
 
   constructor(private readonly scorer: AdaptiveEvidenceScorerV1Service) {}
 
   apply(input: StrategyFirstSituationalOverlayV1Input): StrategyFirstBuildPlannerV1Result {
     const openWindows = input.result.strategy.situationalWindows
       .filter((window) => input.result.contract.reservedSituationalWindowIds.includes(window.windowId))
-      .filter((window) => hasExplicitSituationalCandidates(window));
+      .filter((window) => isActionableSituationalWindow(window));
     if (openWindows.length === 0) return input.result;
 
     const rules = candidateGeneratorRulesFromSlotStateV1(input.decision.slots, {
       allowSellOnlyActions: true,
       generateTargetedWaitActions: false,
     });
-    const legalByTarget = new Map<number, RecommendationCandidate[]>();
+    const legalCandidatesByTarget = new Map<number, RecommendationCandidate[]>();
     for (const candidate of generateRecommendationCandidates({
       state: input.decision.state,
       itemGraph: input.decision.itemGraph,
@@ -55,9 +61,21 @@ export class StrategyFirstSituationalOverlayV1Service {
     }).filter((candidate) => candidate.feasible && candidate.recommendationEligible)) {
       const target = candidateTarget(candidate);
       if (target === undefined || candidate.action.type === 'WAIT_SAVE' || candidate.action.type === 'SELL_ITEM') continue;
-      const list = legalByTarget.get(target) ?? [];
+      const list = legalCandidatesByTarget.get(target) ?? [];
       list.push(candidate);
-      legalByTarget.set(target, list);
+      legalCandidatesByTarget.set(target, list);
+    }
+    const protectedSells = protectedSellItemIds(input.result.strategy, input.result.contract);
+    for (const recentItemId of input.recentPurchasedItemIds ?? []) protectedSells.add(recentItemId);
+    const legalByTarget = new Map<number, RecommendationCandidate>();
+    for (const [targetItemId, candidates] of legalCandidatesByTarget) {
+      // Whole-build sell decisions: a replacement source must never be a protected item,
+      // and among legal sources the most expendable item is sold first, not the cheapest.
+      const legal = candidates.filter((candidate) =>
+        candidate.action.type !== 'REPLACE_ITEM' || !protectedSells.has(candidate.action.sellItemId),
+      );
+      const candidate = bestTransaction(legal, protectedSells, temporaryIds(input.result.contract));
+      if (candidate) legalByTarget.set(targetItemId, candidate);
     }
 
     const evidence: BuildSituationalCandidateEvidenceV1[] = [];
@@ -65,7 +83,7 @@ export class StrategyFirstSituationalOverlayV1Service {
       for (const purpose of window.allowedPurposes) {
         for (const itemId of explicitCandidates(window, purpose)) {
           if (input.decision.itemGraph.isTargetSatisfied(itemId, input.decision.state.inventory.heldByItemId.keys())) continue;
-          const candidate = bestTransaction(legalByTarget.get(itemId) ?? []);
+          const candidate = legalByTarget.get(itemId);
           if (!candidate) continue;
           const score = safeScore(this.scorer, itemId, input);
           if (!score) continue;
@@ -73,7 +91,7 @@ export class StrategyFirstSituationalOverlayV1Service {
             targetItemId: itemId,
             purpose,
             contextualScore: score.score,
-            statisticalSupport: exactEnemySupport(score),
+            statisticalSupport: draftMatchupSupport(score),
             confidence: score.confidence,
             effectiveCostSouls: Math.max(0, candidate.effectiveCostSouls),
             slotImpact: Math.max(0, candidate.resultingItemIds.length - input.decision.state.inventory.heldByItemId.size),
@@ -86,6 +104,19 @@ export class StrategyFirstSituationalOverlayV1Service {
         }
       }
     }
+    const draftMatchup = input.evidence as Partial<DraftMatchupEvidenceBundleV1>;
+    evidence.push(...this.discovery.discover({
+      strategy: input.result.strategy,
+      openWindows,
+      legalByTarget,
+      itemGraph: input.decision.itemGraph,
+      maxTotalItems: input.decision.slots.totalCapacity,
+      currentItemCount: input.decision.state.inventory.heldByItemId.size,
+      enemyHeroIds: input.decision.enemyHeroIds,
+      enemyItemIds: input.decision.enemyItemIds ?? [],
+      matchupByItemId: draftMatchup.draftMatchupByItemId ?? {},
+      scoreItem: (itemId) => safeScore(this.scorer, itemId, input),
+    }));
 
     const coreScore = coreContinuationScore(input.result, this.scorer, input);
     const selected = this.resolver.resolve({
@@ -93,10 +124,11 @@ export class StrategyFirstSituationalOverlayV1Service {
       contract: input.result.contract,
       continueCoreScore: coreScore,
       candidates: evidence,
+      minOverrideImprovement: ADAPTIVE_POLICY_V1_CONFIG.situational.minImprovementOverCore,
     });
     if (!selected) return input.result;
 
-    const selectedCandidate = bestTransaction(legalByTarget.get(selected.targetItemId) ?? []);
+    const selectedCandidate = legalByTarget.get(selected.targetItemId);
     if (!selectedCandidate) return input.result;
 
     const score = safeScore(this.scorer, selected.targetItemId, input);
@@ -114,6 +146,8 @@ export class StrategyFirstSituationalOverlayV1Service {
       selected.targetItemId,
       score,
       input.decision.state.inventory.heldByItemId.keys(),
+      selectedCandidate.action.type === 'REPLACE_ITEM' ? selectedCandidate.action.sellItemId : undefined,
+      input.decision.slots.totalCapacity,
     );
     const scoredAction: AdaptiveScoredActionV1 = {
       action: nextAction,
@@ -137,6 +171,33 @@ export class StrategyFirstSituationalOverlayV1Service {
       confidence: selected.confidence,
     };
   }
+}
+
+function temporaryIds(contract: StrategyFirstBuildPlannerV1Result['contract']): ReadonlySet<number> {
+  return contract.temporaryItemIds instanceof Set
+    ? contract.temporaryItemIds
+    : new Set(contract.temporaryItemIds);
+}
+
+function protectedSellItemIds(
+  strategy: BuildStrategySpecV1,
+  contract: StrategyFirstBuildPlannerV1Result['contract'],
+): Set<number> {
+  const protectedItemIds = new Set<number>();
+  for (const goal of strategy.goals) {
+    if (!goal.hard && goal.rigidity !== 'HARD_CORE') continue;
+    for (const itemId of goal.targetItemIds) protectedItemIds.add(itemId);
+  }
+  for (const committedGoalId of Object.values(contract.committedBranches)) {
+    const committedGoal = strategy.goals.find((goal) => goal.goalId === committedGoalId);
+    if (!committedGoal) continue;
+    for (const itemId of committedGoal.targetItemIds) protectedItemIds.add(itemId);
+  }
+  return protectedItemIds;
+}
+
+function isActionableSituationalWindow(window: BuildSituationalWindowV1): boolean {
+  return hasExplicitSituationalCandidates(window) || window.allowedPurposes.includes('COUNTER_ENEMY_HEROES');
 }
 
 function hasExplicitSituationalCandidates(window: BuildSituationalWindowV1): boolean {
@@ -173,8 +234,8 @@ function safeScore(
   }
 }
 
-function exactEnemySupport(score: AdaptiveItemScoreV1): number {
-  const component = score.components.find((entry) => entry.key === 'exactEnemyFit');
+function draftMatchupSupport(score: AdaptiveItemScoreV1): number {
+  const component = score.components.find((entry) => entry.key === 'draftMatchupFit');
   return Math.max(0, component?.normalized ?? component?.raw ?? 0);
 }
 
@@ -199,12 +260,29 @@ function candidateTarget(candidate: RecommendationCandidate): number | undefined
   return undefined;
 }
 
-function bestTransaction(candidates: readonly RecommendationCandidate[]): RecommendationCandidate | undefined {
+function bestTransaction(
+  candidates: readonly RecommendationCandidate[],
+  protectedSells?: ReadonlySet<number>,
+  temporaryItemIds?: ReadonlySet<number>,
+): RecommendationCandidate | undefined {
   return [...candidates].sort((a, b) =>
     transactionRank(a) - transactionRank(b) ||
+    sellExpendabilityRank(a, protectedSells, temporaryItemIds) - sellExpendabilityRank(b, protectedSells, temporaryItemIds) ||
     a.effectiveCostSouls - b.effectiveCostSouls ||
     a.actionId.localeCompare(b.actionId),
   )[0];
+}
+
+function sellExpendabilityRank(
+  candidate: RecommendationCandidate,
+  protectedSells?: ReadonlySet<number>,
+  temporaryItemIds?: ReadonlySet<number>,
+): number {
+  if (candidate.action.type !== 'REPLACE_ITEM') return 0;
+  const sellItemId = candidate.action.sellItemId;
+  if (temporaryItemIds?.has(sellItemId)) return 0;
+  if (protectedSells?.has(sellItemId)) return 2;
+  return 1;
 }
 
 function transactionRank(candidate: RecommendationCandidate): number {
@@ -233,11 +311,16 @@ function insertSituationalNext(
   itemId: number,
   score: AdaptiveItemScoreV1 | undefined,
   ownedItemIds: Iterable<number>,
+  sellItemId?: number,
+  maxRows?: number,
 ): readonly AdaptivePlannedItemV1[] {
   const owned = new Set(ownedItemIds);
+  // A replacement frees its slot: the sold item leaves the projected build so the
+  // projection never exceeds the twelve held-item capacity.
+  const soldItemIds = new Set(sellItemId === undefined ? [] : [sellItemId]);
   const withoutTarget = [...build]
     .sort((a, b) => a.position - b.position || a.itemId - b.itemId)
-    .filter((entry) => entry.itemId !== itemId);
+    .filter((entry) => entry.itemId !== itemId && !soldItemIds.has(entry.itemId));
   const ownedPrefix = withoutTarget.filter((entry) => owned.has(entry.itemId));
   const future = withoutTarget.filter((entry) => !owned.has(entry.itemId));
   const situational: AdaptivePlannedItemV1 = {
@@ -250,10 +333,12 @@ function insertSituationalNext(
     contextualSupport: score?.score ?? 0,
     reasonCodes: ['SITUATIONAL_WINDOW_ACTIVE'],
   };
-  return [...ownedPrefix, situational, ...future]
+  const rows = [...ownedPrefix, situational, ...future]
     .map((entry, index): AdaptivePlannedItemV1 => ({
       ...entry,
       position: index + 1,
       status: owned.has(entry.itemId) ? 'OWNED' : entry.itemId === itemId ? 'NEXT' : 'PLANNED',
     }));
+  // The semantic build never projects more held/planned rows than the inventory capacity.
+  return maxRows !== undefined && rows.length > maxRows ? rows.slice(0, maxRows) : rows;
 }

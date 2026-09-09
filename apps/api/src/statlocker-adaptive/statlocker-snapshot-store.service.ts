@@ -72,6 +72,10 @@ export class StatlockerSnapshotStoreService implements OnModuleInit {
 
   async publish(input: StatlockerSnapshotPublishInputV1): Promise<StatlockerStoredSnapshotV1> {
     validatePublishInput(input);
+    if (input.dataset === 'VS_HERO_WPA') {
+      throw new Error('VS_HERO_WPA is relational-only and cannot be published to the legacy snapshot store');
+    }
+
     const key = lookupKey(input);
     const current = this.active.get(key);
     if (current?.contentSha256 === input.contentSha256) {
@@ -184,6 +188,7 @@ export function isSelectableSnapshot(snapshot: Pick<
   StatlockerStoredSnapshotV1,
   'dataset' | 'schemaVersion' | 'normalizerVersion' | 'payload'
 >): boolean {
+  if (snapshot.dataset === 'VS_HERO_WPA') return false;
   if (snapshot.dataset !== 'CONSENSUS_SKELETON') return true;
   return snapshot.schemaVersion === CONSENSUS_SKELETON_SCHEMA_VERSION &&
     snapshot.normalizerVersion === CONSENSUS_SKELETON_NORMALIZER_VERSION &&

@@ -1,4 +1,5 @@
 import type { AdaptivePlanSessionV1 } from './adaptive-transaction-plan-v1';
+import type { AdaptiveDecisionTraceV1 } from './adaptive-decision-trace-v1';
 import type {
   AdaptiveBuildContractViewV1,
   AdaptiveStrategySessionViewV1,
@@ -301,5 +302,7 @@ export interface AdaptiveRecommendationResultV1 {
   strategy?: AdaptiveRecommendationStrategyV1;
   /** Transaction-first source of truth. Optional only for legacy/persisted V1 compatibility. */
   planSession?: AdaptivePlanSessionV1;
+  /** Bounded structured decision trace for debug/replay; omitted for legacy persisted recommendations. */
+  decisionTrace?: AdaptiveDecisionTraceV1;
   evidence: AdaptiveEvidenceProvenanceV1;
 }

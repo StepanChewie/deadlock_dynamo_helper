@@ -14,11 +14,11 @@ import {
 export const DEFAULT_INVENTORY_RULESET: InventoryRuleset = {
   duplicateItemsAllowed: false,
   baseSlotsByType: {
-    weapon: 4,
-    vitality: 4,
-    spirit: 4,
+    weapon: 0,
+    vitality: 0,
+    spirit: 0,
   },
-  maxFlexSlots: 4,
+  maxFlexSlots: 12,
 };
 
 export interface InventoryReducerContext {

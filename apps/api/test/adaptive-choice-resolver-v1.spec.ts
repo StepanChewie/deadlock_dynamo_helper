@@ -83,6 +83,17 @@ function family(dataset: string, payload: unknown) {
   return { dataset, scopeKey: 'global', freshness: 'FRESH', confidence: 1, payload } as any;
 }
 
+function matchup(normalized: number) {
+  return {
+    raw: normalized * 0.05,
+    normalized,
+    confidence: 1,
+    coverage: 1,
+    usedCount: 1,
+    contributions: [],
+  };
+}
+
 function evidence() {
   const group = choiceGroup();
   const items = group.candidates.map((candidate) => ({
@@ -101,6 +112,10 @@ function evidence() {
     snapshotIds: [],
     degradedReasons: [],
     families: [],
+    draftMatchupByItemId: {
+      '10': matchup(-0.4),
+      '20': matchup(0.8),
+    },
     byDataset: {
       WPA_PATCH_DATA: family('WPA_PATCH_DATA', {
         patchId: '15-1',
@@ -114,16 +129,7 @@ function evidence() {
           purchaseTiming: { medianPurchaseSec: 800 },
         })),
       }),
-      VS_HERO_WPA: family('VS_HERO_WPA', {
-        slices: [{
-          heroId: 10,
-          enemyHeroId: 30,
-          items: [
-            { itemId: 10, deltaWpa: -0.05, count: 1000 },
-            { itemId: 20, deltaWpa: 0.25, count: 1000 },
-          ],
-        }],
-      }),
+      VS_HERO_WPA: family('VS_HERO_WPA', { slices: [] }),
       T4_CHAINS: family('T4_CHAINS', { chains: [] }),
       CONSENSUS_SKELETON: family('CONSENSUS_SKELETON', { heroId: 10, profileCount: 10, groups: [group], items }),
       WPA_FILTERED_ITEMS: family('WPA_FILTERED_ITEMS', { heroId: 10, items: [] }),
@@ -175,7 +181,7 @@ describe('AdaptiveChoiceResolverV1Service', () => {
     }));
   });
 
-  it('uses exact-enemy WPA to choose between already valid alternatives', () => {
+  it('uses threat-weighted draft matchup evidence to choose between declared alternatives', () => {
     const service = new AdaptiveChoiceResolverV1Service(new AdaptiveEvidenceScorerV1Service());
     const result = service.resolveChoice(choiceGroup(), {
       scorerContext: scorerContext(),
@@ -185,6 +191,9 @@ describe('AdaptiveChoiceResolverV1Service', () => {
 
     expect(result.selectedItemId).toBe(20);
     expect(result.committed).toBe(false);
+    expect(result.scores.find((entry) => entry.itemId === 20)?.components).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: 'draftMatchupFit', raw: expect.any(Number) }),
+    ]));
   });
 
   it('retains an uncommitted previous choice when improvement is below local hysteresis', () => {

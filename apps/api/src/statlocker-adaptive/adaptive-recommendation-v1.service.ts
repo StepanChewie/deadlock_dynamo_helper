@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import {
   DEFAULT_RECOMMENDATION_CANDIDATE_RULES,
   RecommendationCandidate,
@@ -7,6 +7,7 @@ import {
 } from '@deadlock-live-probe/build-domain';
 import {
   AdaptiveActionV1,
+  AdaptiveDecisionTraceV1,
   AdaptivePlanSessionV1,
   AdaptivePlanActionV1,
   AdaptiveRecommendationRequestV1,
@@ -23,6 +24,7 @@ import {
   AdaptiveDecisionStateV1,
   AdaptiveDecisionStateV1Service,
 } from './adaptive-decision-state-v1.service';
+import { reconcileAdaptiveDecisionTraceFinalSelectionV1 } from './adaptive-decision-trace-v1.service';
 import { AdaptiveEvidenceScorerV1Service } from './adaptive-evidence-scorer-v1.service';
 import {
   buildAdaptivePlanActionsV1,
@@ -40,6 +42,11 @@ import {
   toAdaptiveBuildContractViewV1,
   toAdaptiveStrategySessionViewV1,
 } from './adaptive-strategy-state-view-v1';
+import { DraftMatchupEvidenceV1Service } from './draft-matchup-evidence-v1.service';
+import {
+  StrategyFirstPromotionGateV1Service,
+  ThreatWeightedServingModeV1,
+} from './strategy-first-promotion-gate-v1.service';
 import {
   AdaptiveStrategySessionV1,
   resolveAdaptiveStrategySessionV1,
@@ -57,6 +64,7 @@ const SCORER_VERSION = 'adaptive-evidence-scorer-v1';
 type AdaptivePlannerRuntimeResultV1 = ReturnType<AdaptiveBuildPlannerV1Service['plan']> & {
   strategy?: AdaptiveRecommendationStrategyV1;
   planSession?: AdaptivePlanSessionV1;
+  decisionTrace?: AdaptiveDecisionTraceV1;
 };
 
 interface PlannedRecommendationV1 {
@@ -69,13 +77,22 @@ export class AdaptiveRecommendationV1Service {
   private readonly situationalScorer = new AdaptiveEvidenceScorerV1Service();
   private readonly situationalEvaluator = new AdaptiveSituationalContextV1Service();
 
+  @Optional()
+  @Inject(DraftMatchupEvidenceV1Service)
+  private readonly draftMatchupEvidence?: DraftMatchupEvidenceV1Service;
+
+  private readonly promotionGate?: StrategyFirstPromotionGateV1Service;
+
   constructor(
     private readonly decisionState: AdaptiveDecisionStateV1Service,
     private readonly evidence: StatlockerEvidenceService,
     private readonly planner: AdaptiveBuildPlannerV1Service,
     private readonly replay: AdaptiveReplayV1Service,
     private readonly observability: AdaptiveRecommendationObservabilityV1Service = new AdaptiveRecommendationObservabilityV1Service(),
-  ) {}
+    promotionGate?: StrategyFirstPromotionGateV1Service,
+  ) {
+    this.promotionGate = promotionGate;
+  }
 
   async recommend(request: AdaptiveRecommendationRequestV1): Promise<AdaptiveRecommendationResultV1> {
     validateRequest(request);
@@ -107,27 +124,39 @@ export class AdaptiveRecommendationV1Service {
     const localEvidence = typeof getEvidence === 'function'
       ? getEvidence.call(this.evidence, evidenceRequest)
       : this.evidence.getLocalEvidence(evidenceRequest);
-    this.observability.recordEvidence(localEvidence);
+    const { serving: initialServingEvidence, challenger: initialChallengerEvidence } =
+      await this.resolveServingEvidence(localEvidence, initial);
+    this.observability.recordEvidence(initialServingEvidence);
 
     let plannerUnavailable = false;
     let plannedBundle: PlannedRecommendationV1 | undefined;
-    if (localEvidence.usable &&
+    if (initialServingEvidence.usable &&
       initial.economyRulesEvidence !== 'UNKNOWN' &&
       initial.slots?.mechanicsEvidence !== 'UNKNOWN') {
       try {
         plannedBundle = this.planWithSituational(
           initial,
-          localEvidence,
+          initialServingEvidence,
           previous,
           initialDelta.purchasedItemIds,
           initialDelta.soldItemIds,
           false,
         );
+        if (initialChallengerEvidence && plannedBundle) {
+          this.planShadowChallenger(
+            initial,
+            initialChallengerEvidence,
+            plannedBundle.planned,
+            previous,
+            initialDelta.purchasedItemIds,
+            initialDelta.soldItemIds,
+          );
+        }
       } catch (error) {
         plannerUnavailable = true;
         this.observability.recordEvidence({
-          ...localEvidence,
-          degradedReasons: [...localEvidence.degradedReasons, `PLANNER_UNAVAILABLE:${error instanceof Error ? error.message : 'UNKNOWN'}`],
+          ...initialServingEvidence,
+          degradedReasons: [...initialServingEvidence.degradedReasons, `PLANNER_UNAVAILABLE:${error instanceof Error ? error.message : 'UNKNOWN'}`],
         });
       }
     }
@@ -138,11 +167,14 @@ export class AdaptiveRecommendationV1Service {
       [...fresh.state.inventory.heldByItemId.keys()],
       fresh.itemGraph,
     );
-    if (localEvidence.usable && plannedBundle && fresh.stateRevision !== initial.stateRevision) {
+    const freshServingEvidence = fresh.stateRevision === initial.stateRevision
+      ? initialServingEvidence
+      : (await this.resolveServingEvidence(localEvidence, fresh)).serving;
+    if (freshServingEvidence.usable && plannedBundle && fresh.stateRevision !== initial.stateRevision) {
       try {
         plannedBundle = this.planWithSituational(
           fresh,
-          localEvidence,
+          freshServingEvidence,
           previous,
           freshDelta.purchasedItemIds,
           freshDelta.soldItemIds,
@@ -156,7 +188,7 @@ export class AdaptiveRecommendationV1Service {
     const planned = plannedBundle?.planned;
     const situationalByTargetItemId = plannedBundle?.situationalByTargetItemId ?? new Map();
 
-    const criticalEvidenceUnavailable = !localEvidence.usable ||
+    const criticalEvidenceUnavailable = !freshServingEvidence.usable ||
       fresh.economyRulesEvidence === 'UNKNOWN' ||
       fresh.slots?.mechanicsEvidence === 'UNKNOWN' ||
       plannerUnavailable;
@@ -171,7 +203,7 @@ export class AdaptiveRecommendationV1Service {
         .map((candidate) => [candidate.actionId, candidate]),
     );
 
-    const blockers = new Set<string>(localEvidence.degradedReasons);
+    const blockers = new Set<string>(freshServingEvidence.degradedReasons);
     if (plannerUnavailable) blockers.add('STRATEGY_OUT_OF_DISTRIBUTION');
     if (fresh.economyRulesEvidence === 'UNKNOWN') blockers.add('RULESET_ECONOMY_MECHANICS_UNKNOWN');
     if (fresh.slots?.mechanicsEvidence === 'UNKNOWN') blockers.add('SLOT_MECHANICS_UNKNOWN');
@@ -182,8 +214,8 @@ export class AdaptiveRecommendationV1Service {
     let legalityFallbackReasonCodes: readonly string[] = [];
 
     if (criticalEvidenceUnavailable) {
-      if (!localEvidence.usable) blockers.add('STATLOCKER_EVIDENCE_UNAVAILABLE');
-      result = unavailableRecommendation(fresh, localEvidence, blockers);
+      if (!freshServingEvidence.usable) blockers.add('STATLOCKER_EVIDENCE_UNAVAILABLE');
+      result = unavailableRecommendation(fresh, freshServingEvidence, blockers);
     } else if (planned) {
       let freshBuild = planned.planSession
         ? planned.recommendedBuild
@@ -250,7 +282,8 @@ export class AdaptiveRecommendationV1Service {
         plannerMethod: planned.strategy ? 'STRATEGY_FIRST' : 'LEGACY_GREEDY',
         strategy: planned.strategy,
         planSession,
-        evidence: toProvenance(localEvidence),
+        decisionTrace: planned.decisionTrace,
+        evidence: toProvenance(freshServingEvidence),
       };
     } else {
       throw new Error('Adaptive planner did not produce a result');
@@ -266,9 +299,20 @@ export class AdaptiveRecommendationV1Service {
           situationalByTargetItemId,
         });
     result = reconcileResultWithSemanticPlan(result, semanticPlanActions);
+    const reconciledDecisionTrace = reconcileAdaptiveDecisionTraceFinalSelectionV1(
+      result.decisionTrace,
+      result.nextAction,
+      legalityFallback || fresh.stateRevision !== initial.stateRevision,
+    );
+    if (reconciledDecisionTrace) result = { ...result, decisionTrace: reconciledDecisionTrace };
 
+    this.observability.recordRejectedReplacementObservations(
+      (result.decisionTrace?.replacements ?? [])
+        .filter((row) => !row.accepted)
+        .map((row) => ({ netImprovement: row.netImprovement, requiredThreshold: row.requiredThreshold })),
+    );
     this.observability.recordRecommendationOutcome({
-      evidence: localEvidence,
+      evidence: freshServingEvidence,
       decision: fresh,
       previousResult: previous,
       result,
@@ -276,7 +320,7 @@ export class AdaptiveRecommendationV1Service {
       legalityFallbackReasonCodes,
     });
 
-    const replayInput = this.replay.toReplayInput(fresh, localEvidence, {
+    const replayInput = this.replay.toReplayInput(fresh, freshServingEvidence, {
       previousResult: previous,
       recentPurchasedItemIds: freshDelta.purchasedItemIds,
       recentSoldItemIds: freshDelta.soldItemIds,
@@ -290,6 +334,98 @@ export class AdaptiveRecommendationV1Service {
       result,
     });
     return result;
+  }
+
+  private async enrichDraftMatchupEvidence(
+    evidence: StatlockerEvidenceBundleV1,
+    decision: AdaptiveDecisionStateV1,
+  ): Promise<StatlockerEvidenceBundleV1> {
+    if (!this.draftMatchupEvidence) return evidence;
+    try {
+      return await this.draftMatchupEvidence.enrich(evidence, decision);
+    } catch {
+      return evidence;
+    }
+  }
+
+  private resolveThreatWeightedServingMode(): ThreatWeightedServingModeV1 {
+    // Without a configured gate the path keeps its historical threat-weighted behavior;
+    // the production module always provides the policy gate. The EFFECTIVE mode enforces
+    // the fail-closed downgrade of a blocked ACTIVE configuration to shadow serving.
+    return this.promotionGate?.threatWeightedEffectiveMode() ?? 'THREAT_WEIGHTED_ACTIVE';
+  }
+
+  private async resolveServingEvidence(
+    evidence: StatlockerEvidenceBundleV1,
+    decision: AdaptiveDecisionStateV1,
+  ): Promise<{ serving: StatlockerEvidenceBundleV1; challenger?: StatlockerEvidenceBundleV1 }> {
+    const mode = this.resolveThreatWeightedServingMode();
+    if (mode === 'CURRENT' || !this.draftMatchupEvidence) return { serving: evidence };
+    const startedAt = Date.now();
+    const enriched = await this.enrichDraftMatchupEvidence(evidence, decision);
+    this.observability.recordWpaQueryLatency(Date.now() - startedAt);
+    if ((enriched as { draftMatchupDegradedReason?: string }).draftMatchupDegradedReason) {
+      this.observability.recordThreatWeightedStaleEvidenceFallback();
+    }
+    if (mode === 'THREAT_WEIGHTED_SHADOW') return { serving: evidence, challenger: enriched };
+    return { serving: enriched };
+  }
+
+  private planShadowChallenger(
+    decision: AdaptiveDecisionStateV1,
+    challengerEvidence: StatlockerEvidenceBundleV1,
+    serving: AdaptivePlannerRuntimeResultV1,
+    previous: AdaptiveRecommendationResultV1 | undefined,
+    recentPurchasedItemIds: readonly number[],
+    recentSoldItemIds: readonly number[],
+  ): void {
+    try {
+      const challenger = this.planWithSituational(
+        decision,
+        challengerEvidence,
+        previous,
+        recentPurchasedItemIds,
+        recentSoldItemIds,
+        true,
+      ).planned;
+      const fingerprint = (result: AdaptivePlannerRuntimeResultV1): string => [
+        result.nextAction.actionKey,
+        ...result.recommendedBuild.filter((row) => row.status !== 'OWNED').map((row) => row.itemId),
+      ].join(':');
+      const challengerMatchup = (challengerEvidence as {
+        draftMatchupByItemId?: Readonly<Record<string, { coverage: number; confidence: number }>>;
+      }).draftMatchupByItemId;
+      const challengerTarget = challenger.nextAction.targetItemId ?? challenger.nextAction.buyItemId;
+      const challengerMatchupScore = challengerTarget !== undefined
+        ? challengerMatchup?.[String(challengerTarget)]
+        : undefined;
+      const currentWildcard = serving.decisionTrace?.candidates.some((candidate) => candidate.selected && candidate.source !== 'SKELETON' && candidate.source !== 'BRANCH') ?? false;
+      const challengerWildcard = challenger.decisionTrace?.candidates.some((candidate) => candidate.selected && candidate.source !== 'SKELETON' && candidate.source !== 'BRANCH') ?? false;
+      this.observability.recordThreatWeightedShadowComparison({
+        decisionId: decision.state.decisionId,
+        stateRevision: decision.stateRevision,
+        currentPlanFingerprint: fingerprint(serving),
+        challengerPlanFingerprint: fingerprint(challenger),
+        currentNextActionKey: serving.nextAction.actionKey,
+        challengerNextActionKey: challenger.nextAction.actionKey,
+        nextItemDifference: (firstNextTargetItemId(challenger) ?? -1) !== (firstNextTargetItemId(serving) ?? -1),
+        branchDifference: JSON.stringify(serving.decisionTrace?.branchChoices ?? {}) !== JSON.stringify(challenger.decisionTrace?.branchChoices ?? {}),
+        wildcardActivation: challengerWildcard && !currentWildcard,
+        replacementActivation: challenger.nextAction.type === 'REPLACE' && serving.nextAction.type !== 'REPLACE',
+        ...(challenger.nextAction.type === 'REPLACE' && challenger.nextAction.sellItemId !== undefined
+          ? { sellSource: challenger.nextAction.sellItemId }
+          : {}),
+        ...(challengerMatchupScore
+          ? { matchupConfidence: challengerMatchupScore.confidence, matchupCoverage: challengerMatchupScore.coverage }
+          : {}),
+        utilityImprovement: Number(((challenger.totalScore ?? 0) - (serving.totalScore ?? 0)).toFixed(6)),
+        wouldSwitch: serving.nextAction.actionKey !== challenger.nextAction.actionKey ||
+          fingerprint(serving) !== fingerprint(challenger),
+        reasonCodes: (challenger.nextAction.reasonCodes ?? []).slice(0, 12),
+      });
+    } catch (error) {
+      this.observability.recordThreatWeightedShadowFailure(decision.state.decisionId, error);
+    }
   }
 
   private planWithSituational(
@@ -378,6 +514,10 @@ function resolveStrategySession(
     irreversibleBranchInvestment: planned.buildContract.committedChoiceItemIdsByGroup.size > 0,
     meaningfulUserDivergence: planned.buildContract.temporaryItemIds.size > 0,
   });
+}
+
+function firstNextTargetItemId(result: AdaptivePlannerRuntimeResultV1): number | undefined {
+  return result.recommendedBuild.find((row) => row.status === 'NEXT')?.itemId;
 }
 
 function optionalTargetItemIds(

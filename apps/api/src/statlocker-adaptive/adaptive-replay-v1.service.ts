@@ -37,7 +37,10 @@ import {
   AdaptiveBuildPlannerResultV1,
   AdaptiveBuildPlannerV1Service,
 } from './adaptive-build-planner-v1.service';
-import { AdaptiveDecisionStateV1 } from './adaptive-decision-state-v1.service';
+import {
+  AdaptiveDecisionStateV1,
+  AdaptiveEnemyLiveStateV1,
+} from './adaptive-decision-state-v1.service';
 import { StatlockerEvidenceBundleV1 } from './statlocker-evidence.service';
 
 export interface AdaptiveReplayObservedFactV1<T> {
@@ -77,6 +80,8 @@ export interface AdaptiveReplayDecisionV1 {
   enemyHeroIds: readonly number[];
   /** Optional so replay inputs persisted before live enemy hero names remain readable. */
   enemyHeroes?: readonly AdaptiveReplayEnemyHeroV1[];
+  /** Optional so replay inputs persisted before per-enemy live threat state remain readable. */
+  enemyLiveStates?: readonly AdaptiveEnemyLiveStateV1[];
   /** Optional so replay inputs persisted before item-context scoring remain readable. */
   allyItemIds?: readonly number[];
   enemyItemIds?: readonly number[];
@@ -298,6 +303,7 @@ function serializeDecision(decision: AdaptiveDecisionStateV1): AdaptiveReplayDec
     allyHeroIds: [...(decision.allyHeroIds ?? [])].sort((a, b) => a - b),
     enemyHeroIds: [...decision.enemyHeroIds].sort((a, b) => a - b),
     enemyHeroes: normalizeEnemyHeroes(decision.enemyHeroes, decision.enemyHeroIds),
+    enemyLiveStates: normalizeEnemyLiveStates(decision.enemyLiveStates),
     allyItemIds: [...(decision.allyItemIds ?? [])].sort((a, b) => a - b),
     enemyItemIds: [...(decision.enemyItemIds ?? [])].sort((a, b) => a - b),
     ourTeamSouls: decision.ourTeamSouls,
@@ -352,6 +358,7 @@ function reconstructDecision(input: AdaptiveReplayDecisionV1): AdaptiveDecisionS
     allyHeroIds: sortedNumbers(input.allyHeroIds ?? []),
     enemyHeroIds,
     enemyHeroes: normalizeEnemyHeroes(input.enemyHeroes, enemyHeroIds),
+    enemyLiveStates: normalizeEnemyLiveStates(input.enemyLiveStates),
     allyItemIds: sortedNumbers(input.allyItemIds ?? []),
     enemyItemIds: sortedNumbers(input.enemyItemIds ?? []),
     ourTeamSouls: input.ourTeamSouls,
@@ -406,6 +413,13 @@ function normalizeEnemyHeroes(
     if (!byHeroId.has(heroId)) byHeroId.set(heroId, { heroId });
   }
   return [...byHeroId.values()].sort((a, b) => a.heroId - b.heroId);
+}
+
+function normalizeEnemyLiveStates(
+  supplied: readonly AdaptiveEnemyLiveStateV1[] | undefined,
+): readonly AdaptiveEnemyLiveStateV1[] {
+  return [...cloneJson(supplied ?? [])]
+    .sort((a, b) => a.heroId - b.heroId || a.steamId.localeCompare(b.steamId));
 }
 
 function normalizeReplayInvestmentStateV1(

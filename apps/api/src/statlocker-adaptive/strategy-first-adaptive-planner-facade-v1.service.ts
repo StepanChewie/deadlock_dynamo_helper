@@ -151,6 +151,7 @@ export class StrategyFirstAdaptivePlannerFacadeV1Service {
           result: planned,
           decision: input.decision,
           evidence: input.evidence,
+          recentPurchasedItemIds: input.recentPurchasedItemIds,
         }) ?? planned;
   }
 }

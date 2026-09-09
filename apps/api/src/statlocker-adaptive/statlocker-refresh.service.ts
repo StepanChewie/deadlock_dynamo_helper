@@ -16,6 +16,9 @@ import {
   StatlockerNormalizedPayloadV1,
 } from './statlocker-adaptive.types';
 import { StatlockerSnapshotStoreService } from './statlocker-snapshot-store.service';
+import { StatlockerVsHeroWpaPublisherV1Service } from './statlocker-vs-hero-wpa-publisher-v1.service';
+import { StatlockerVsHeroWpaRawStoreV1Service } from './statlocker-vs-hero-wpa-raw-store-v1.service';
+import { StatlockerVsHeroWpaRowNormalizerV1Service } from './statlocker-vs-hero-wpa-row-normalizer-v1.service';
 
 export interface StatlockerGameIdentityV1 {
   rulesetVersion: string;
@@ -32,8 +35,11 @@ export interface StatlockerRefreshStatusV1 {
 }
 
 const MINUTE = 60_000;
+import { AdaptiveRecommendationObservabilityV1Service } from './adaptive-recommendation-observability-v1.service';
+
 const HOUR = 60 * MINUTE;
 const GLOBAL_REFRESH_TTL_MS = 30 * MINUTE;
+const VS_HERO_WPA_REFRESH_TTL_MS = 24 * HOUR;
 const HERO_REFRESH_TTL_MS = 36 * HOUR;
 const DEFAULT_ACTIVE_HERO_TTL_MS = 30 * MINUTE;
 const MAX_PROFILES_PER_HERO = 10;
@@ -66,6 +72,10 @@ export class StatlockerRefreshService {
     @Optional()
     @InjectRepository(RecommendationItemCatalogVersionV1)
     private readonly catalogVersionRepo?: Repository<RecommendationItemCatalogVersionV1>,
+    @Optional() private readonly rawVsHeroWpaStore?: StatlockerVsHeroWpaRawStoreV1Service,
+    @Optional() private readonly vsHeroWpaRowNormalizer?: StatlockerVsHeroWpaRowNormalizerV1Service,
+    @Optional() private readonly vsHeroWpaPublisher?: StatlockerVsHeroWpaPublisherV1Service,
+    @Optional() private readonly observability?: AdaptiveRecommendationObservabilityV1Service,
   ) {}
 
   observeGameIdentity(identity: StatlockerGameIdentityV1, _nowMs = Date.now()): void {
@@ -99,20 +109,78 @@ export class StatlockerRefreshService {
   async refreshGlobalNow(force = false, nowMs = Date.now()): Promise<void> {
     const identity = this.requireIdentity();
     const key = this.globalRefreshKey(identity);
-    if (!force && !this.isDue(key, GLOBAL_REFRESH_TTL_MS, nowMs)) return;
+    const vsHeroWpaKey = this.globalVsHeroWpaRefreshKey(identity);
+    const globalDue = force || this.isDue(key, GLOBAL_REFRESH_TTL_MS, nowMs);
+    const vsHeroWpaDue = force || this.isDue(vsHeroWpaKey, VS_HERO_WPA_REFRESH_TTL_MS, nowMs);
+    if (!globalDue && !vsHeroWpaDue) return;
+
+    const targets: StatlockerCollectionTargetV1[] = [];
+    if (globalDue) targets.push({ dataset: 'WPA_PATCH_DATA', scopeKey: 'patch:current' });
+    if (vsHeroWpaDue) targets.push({ dataset: 'VS_HERO_WPA', scopeKey: 'global' });
+    if (globalDue) targets.push({ dataset: 'T4_CHAINS', scopeKey: 'global' });
+
     return this.singleFlight(key, async () => {
       this.markAttempt(nowMs);
       try {
-        const result = await this.collector.collectBatch([
-          { dataset: 'WPA_PATCH_DATA', scopeKey: 'patch:current' },
-          { dataset: 'VS_HERO_WPA', scopeKey: 'global' },
-          { dataset: 'T4_CHAINS', scopeKey: 'global' },
-        ]);
+        const result = await this.collector.collectBatch(targets);
         for (const dataset of result.datasets) {
+          if (dataset.dataset === 'VS_HERO_WPA') {
+            const rawSnapshot = await this.rawVsHeroWpaStore?.persistCollected({
+              fetchedAt: new Date(dataset.fetchedAt),
+              sourcePath: dataset.path,
+              sourceStatus: dataset.status,
+              statlockerPatchId: result.statlockerPatchId,
+              rulesetVersion: identity.rulesetVersion,
+              catalogSha256: identity.catalogSha256,
+              collectorVersion: COLLECTOR_VERSION,
+              rawPayload: dataset.data,
+            });
+
+            if (!rawSnapshot) {
+              throw new Error('VS_HERO_WPA RAW persistence is unavailable');
+            }
+            if (rawSnapshot.ingestStatus === 'PUBLISHED') continue;
+
+            const ingestStartedAt = Date.now();
+            try {
+              if (!this.vsHeroWpaRowNormalizer || !this.vsHeroWpaPublisher) {
+                throw new Error('VS_HERO_WPA relational ingest dependencies are unavailable');
+              }
+              const rows = this.vsHeroWpaRowNormalizer.normalize(dataset.data, {
+                snapshotId: rawSnapshot.snapshotId,
+                statlockerPatchId: result.statlockerPatchId,
+                rulesetVersion: identity.rulesetVersion,
+                catalogSha256: identity.catalogSha256,
+              });
+              await this.vsHeroWpaPublisher.publish({
+                snapshotId: rawSnapshot.snapshotId,
+                rows,
+              });
+              this.observability?.recordWpaIngestOutcome({
+                dataset: 'VS_HERO_WPA',
+                durationMs: Date.now() - ingestStartedAt,
+                rowCount: rows.length,
+              });
+            } catch (error) {
+              this.observability?.recordWpaIngestOutcome({
+                dataset: 'VS_HERO_WPA',
+                durationMs: Date.now() - ingestStartedAt,
+                rowCount: 0,
+                failure: error instanceof Error ? error.message : String(error),
+              });
+              if (this.vsHeroWpaPublisher) {
+                await this.vsHeroWpaPublisher.markFailed(rawSnapshot.snapshotId, error);
+              }
+              throw error;
+            }
+            continue;
+          }
+
           const normalized = this.normalizeCollected(dataset, result.statlockerPatchId);
           await this.publishObservation(normalized, identity, dataset);
         }
-        this.lastSuccessByKey.set(key, nowMs);
+        if (globalDue) this.lastSuccessByKey.set(key, nowMs);
+        if (vsHeroWpaDue) this.lastSuccessByKey.set(vsHeroWpaKey, nowMs);
         this.markSuccess(nowMs);
       } catch (error) {
         this.lastError = describeError(error);
@@ -244,7 +312,7 @@ export class StatlockerRefreshService {
       row.catalogSha256.toLowerCase() === identity.catalogSha256.toLowerCase(),
     );
     const currentPatchId = rows
-      .filter((row) => row.dataset === 'WPA_PATCH_DATA' || row.dataset === 'VS_HERO_WPA' || row.dataset === 'T4_CHAINS')
+      .filter((row) => row.dataset === 'WPA_PATCH_DATA' || row.dataset === 'T4_CHAINS')
       .sort((a, b) => b.fetchedAt.getTime() - a.fetchedAt.getTime())[0]?.statlockerPatchId;
     const latestHeroSnapshot = rows
       .filter((row) =>
@@ -339,6 +407,10 @@ export class StatlockerRefreshService {
 
   private globalRefreshKey(identity: StatlockerGameIdentityV1): string {
     return `global:${identity.rulesetVersion}:${identity.catalogSha256}`;
+  }
+
+  private globalVsHeroWpaRefreshKey(identity: StatlockerGameIdentityV1): string {
+    return `${this.globalRefreshKey(identity)}:vs-hero-wpa`;
   }
 
   private heroRefreshKey(identity: StatlockerGameIdentityV1, heroId: number): string {

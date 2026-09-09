@@ -18,6 +18,7 @@ export interface BuildSituationalCandidateEvidenceV1 {
   slotImpact: number;
   investmentImpact: number;
   coreInterruptionSouls: number;
+  requiredImprovement?: number;
   reasonCodes: readonly string[];
 }
 
@@ -26,7 +27,7 @@ export interface ResolveBuildSituationalV1Input {
   contract: BuildContractV1;
   candidates: readonly BuildSituationalCandidateEvidenceV1[];
   continueCoreScore: number;
-  minOverrideImprovement?: number;
+  minOverrideImprovement: number;
 }
 
 @Injectable()
@@ -35,7 +36,7 @@ export class BuildSituationalResolverV1Service {
     const openWindows = input.strategy.situationalWindows
       .filter((window) => input.contract.reservedSituationalWindowIds.includes(window.windowId));
     if (openWindows.length === 0) return undefined;
-    const threshold = Math.max(0, input.minOverrideImprovement ?? 0.12);
+    const threshold = Math.max(0, input.minOverrideImprovement);
 
     const eligible = input.candidates.flatMap((candidate) => {
       const windows = openWindows.filter((window) =>
@@ -48,7 +49,7 @@ export class BuildSituationalResolverV1Service {
     }).filter(({ candidate }) =>
       candidate.confidence > 0 &&
       candidate.statisticalSupport > 0 &&
-      candidate.contextualScore - input.continueCoreScore >= threshold,
+      candidate.contextualScore - input.continueCoreScore >= requiredImprovement(candidate, threshold),
     ).sort((a, b) =>
       b.candidate.contextualScore - a.candidate.contextualScore ||
       b.candidate.confidence - a.candidate.confidence ||
@@ -78,4 +79,13 @@ export class BuildSituationalResolverV1Service {
       ])].sort(),
     };
   }
+}
+
+function requiredImprovement(
+  candidate: BuildSituationalCandidateEvidenceV1,
+  fallback: number,
+): number {
+  const candidateThreshold = candidate.requiredImprovement;
+  if (candidateThreshold === undefined || !Number.isFinite(candidateThreshold)) return fallback;
+  return Math.max(fallback, Math.max(0, candidateThreshold));
 }

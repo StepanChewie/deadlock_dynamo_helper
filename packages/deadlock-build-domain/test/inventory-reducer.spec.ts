@@ -56,9 +56,9 @@ describe('applyInventoryAction', () => {
     expect(rebought.state.heldByItemId.get(1)?.instanceId).not.toBe(firstInstanceId);
   });
 
-  it('uses all configured flex slots before rejecting inventory', () => {
+  it('allows twelve same-category items before rejecting a thirteenth item', () => {
     let state = createEmptyInventoryState();
-    for (let itemId = 1; itemId <= 8; itemId++) {
+    for (let itemId = 1; itemId <= 12; itemId++) {
       const result = applyInventoryAction(
         state,
         { type: 'BUY', item: { itemId, slotType: 'weapon' }, metadata },
@@ -68,9 +68,11 @@ describe('applyInventoryAction', () => {
       state = result.state;
     }
 
+    expect(state.heldByItemId.size).toBe(12);
+
     const overflow = applyInventoryAction(
       state,
-      { type: 'BUY', item: { itemId: 9, slotType: 'weapon' }, metadata },
+      { type: 'BUY', item: { itemId: 13, slotType: 'weapon' }, metadata },
       { recipeGraph, ruleset: DEFAULT_INVENTORY_RULESET },
     );
     expect(overflow).toMatchObject({ ok: false, error: { code: 'SLOT_LIMIT_EXCEEDED' } });

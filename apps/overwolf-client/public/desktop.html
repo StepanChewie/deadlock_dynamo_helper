@@ -59,6 +59,21 @@
       .plan-position { color:var(--slot); font:600 8px/1 "JetBrains Mono",monospace; } .plan-details { display:flex; min-width:0; flex-direction:column; gap:2px; } .plan-details strong { overflow:hidden; font-size:9px; text-overflow:ellipsis; white-space:nowrap; } .plan-details small { overflow:hidden; color:var(--dim); font:500 7px/1.1 "JetBrains Mono",monospace; text-overflow:ellipsis; white-space:nowrap; text-transform:uppercase; }
       #rec-alternatives-section { grid-column:1/-1; } #rec-alternatives { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; } .alternative-row { display:flex; justify-content:space-between; gap:7px; padding-left:8px; border-left:2px solid var(--slot,var(--dim)); color:#d7d5d6; font-size:9px; } .alternative-row small { color:var(--dim); font:500 7px/1.2 "JetBrains Mono",monospace; } .empty-row { grid-column:1/-1; color:var(--dim); font-size:9px; }
       .adaptive-footer { display:flex; justify-content:space-between; padding:0 2px; color:var(--dim); font:500 7.5px/1.2 "JetBrains Mono",monospace; text-transform:uppercase; } .source-dot { width:4px; height:4px; display:inline-block; margin-right:5px; border-radius:50%; background:var(--live); }
+
+      .decision-debug { display:none; margin-top:10px; padding:10px; border:1px solid rgba(169,120,223,.25); border-radius:10px; background:rgba(169,120,223,.045); }
+      .debug-heading { margin-bottom:8px; color:#cba9ef; font:700 9px/1.2 "JetBrains Mono",monospace; letter-spacing:.1em; text-transform:uppercase; }
+      .debug-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
+      .debug-section { min-width:0; padding:7px; border:1px solid var(--line); border-radius:7px; background:rgba(0,0,0,.14); }
+      .debug-section h3 { margin:0 0 6px; color:var(--muted); font-size:10px; }
+      .debug-empty { color:var(--dim); font-size:8px; }
+      .debug-row { margin:4px 0; padding:5px 6px; border:1px solid rgba(255,255,255,.07); border-radius:5px; color:#d8d6dc; font-size:8px; }
+      .debug-row.selected { border-color:rgba(98,212,154,.34); background:rgba(98,212,154,.06); }
+      .debug-row summary,.debug-details summary { cursor:pointer; font:600 8px/1.3 "JetBrains Mono",monospace; }
+      .debug-details { margin-top:7px; padding:7px; border:1px solid var(--line); border-radius:7px; background:rgba(0,0,0,.12); }
+      .debug-replacement { margin-top:7px; padding:7px; border-left:2px solid var(--warning); background:rgba(255,255,255,.025); }
+      .debug-replacement.verdict-accept { border-left-color:var(--live); }
+      .debug-kv { display:flex; justify-content:space-between; gap:8px; padding-top:3px; color:var(--dim); font-size:7px; }
+      .debug-kv code { color:#d8d6dc; font:500 7px/1.25 "JetBrains Mono",monospace; text-align:right; word-break:break-word; }
       #console { display:none; }
     </style>
   </head>
@@ -91,6 +106,7 @@
           <section class="section-card"><div class="section-header"><span class="section-title">Build path</span><span id="rec-plan-more"></span></div><div id="rec-plan"></div></section>
           <section id="rec-alternatives-section" class="section-card"><div class="section-header"><span class="section-title">Also viable</span></div><div id="rec-alternatives"></div></section>
         </div>
+        <section id="decision-debug" class="decision-debug" aria-label="Decision trace"></section>
         <footer class="adaptive-footer"><span><span class="source-dot"></span><span id="rec-source">Statlocker Adaptive</span></span><span id="rec-evidence">Evidence updating</span></footer>
       </div>
     </section>

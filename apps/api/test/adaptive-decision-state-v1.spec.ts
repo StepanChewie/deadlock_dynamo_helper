@@ -32,7 +32,12 @@ const matchState: MinimalMatchState = {
       heroId: 30,
       heroName: 'Enemy Thirty',
       teamId: 2,
+      level: 12,
       souls: 5000,
+      kills: 7,
+      deaths: 2,
+      assists: 8,
+      heroDamage: 24000,
       items: [],
     },
     enemyA: {
@@ -41,7 +46,9 @@ const matchState: MinimalMatchState = {
       heroId: 20,
       heroName: 'Enemy Twenty',
       teamId: 2,
+      level: 9,
       souls: 4000,
+      kills: 1,
       items: [],
     },
   },
@@ -154,16 +161,48 @@ describe('AdaptiveDecisionStateV1Service', () => {
     ]);
     expect(first.ourTeamSouls).toBe(5000);
     expect(first.enemyTeamSouls).toBe(9000);
+    expect(first.slots.baseSlotsByType).toEqual({ weapon: 0, vitality: 0, spirit: 0 });
     expect(first.slots.usedFlexSlots).toBe(1);
-    expect(first.slots.unlockedFlexSlots).toBeUndefined();
-    expect(first.slots.evidence).toBe('UNKNOWN');
+    expect(first.slots.unlockedFlexSlots).toBe(12);
+    expect(first.slots.totalCapacity).toBe(12);
+    expect(first.slots.evidence).toBe('RECONSTRUCTED');
     expect(first.economyRules).toBeUndefined();
     expect(first.economyRulesEvidence).toBe('UNKNOWN');
     expect(first.investment.evidence).toBe('UNKNOWN');
     expect(first.stateRevision).toBe(second.stateRevision);
   });
 
-  it('uses only the exact persisted economy rules for slot shape and investment state', async () => {
+  it('carries deterministic per-enemy live state without inventing missing metrics', async () => {
+    const result = await createService(true).service.build('match-1');
+
+    expect(result.enemyLiveStates).toEqual([
+      {
+        steamId: 'enemy-a',
+        playerName: 'Enemy A',
+        heroId: 20,
+        heroName: 'Enemy Twenty',
+        level: 9,
+        souls: 4000,
+        kills: 1,
+      },
+      {
+        steamId: 'enemy-b',
+        playerName: 'Enemy B',
+        heroId: 30,
+        heroName: 'Enemy Thirty',
+        level: 12,
+        souls: 5000,
+        kills: 7,
+        deaths: 2,
+        assists: 8,
+        heroDamage: 24000,
+      },
+    ]);
+    expect(result.enemyLiveStates.map((enemy) => enemy.steamId)).not.toContain('local');
+    expect(result.enemyLiveStates.map((enemy) => enemy.steamId)).not.toContain('ally');
+  });
+
+  it('uses persisted economy rules for investment while slot capacity remains canonical', async () => {
     const { service, economyRulesStore } = createService(true, matchState, exactRules);
 
     const result = await service.build('match-1');
@@ -171,7 +210,10 @@ describe('AdaptiveDecisionStateV1Service', () => {
     expect(economyRulesStore.resolveExact).toHaveBeenCalledWith('ruleset-a', catalogSha256);
     expect(result.economyRules).toEqual(exactRules);
     expect(result.economyRulesEvidence).toBe('RECONSTRUCTED');
-    expect(result.slots.baseSlotsByType).toEqual({ weapon: 4, vitality: 4, spirit: 4 });
+    expect(result.slots.baseSlotsByType).toEqual({ weapon: 0, vitality: 0, spirit: 0 });
+    expect(result.slots.maxFlexSlots).toBe(12);
+    expect(result.slots.unlockedFlexSlots).toBe(12);
+    expect(result.slots.totalCapacity).toBe(12);
     expect(result.investment.evidence).toBe('RECONSTRUCTED');
     expect(result.investment.tracks.weapon.currentValue).toBe(500);
     expect(result.investment.tracks.weapon.achievedBreakpoint).toBe(500);
@@ -188,14 +230,16 @@ describe('AdaptiveDecisionStateV1Service', () => {
     expect(unverified.state.economy.spendableSouls.evidence).toBe('UNKNOWN');
   });
 
-  it('keeps shop opportunity and flex capacity unknown and refuses partial team soul totals', async () => {
+  it('keeps shop opportunity unknown, keeps slot capacity canonical, and refuses partial team soul totals', async () => {
     const state = structuredClone(matchState);
     delete state.playersBySteamId.ally.souls;
     const result = await createService(true, state).service.build('match-1');
 
     expect(result.state.economy.shopOpportunity.value).toBeUndefined();
     expect(result.state.economy.shopOpportunity.evidence).toBe('UNKNOWN');
-    expect(result.slots.evidence).toBe('UNKNOWN');
+    expect(result.slots.evidence).toBe('RECONSTRUCTED');
+    expect(result.slots.unlockedFlexSlots).toBe(12);
+    expect(result.slots.totalCapacity).toBe(12);
     expect(result.ourTeamSouls).toBeUndefined();
     expect(result.enemyTeamSouls).toBe(9000);
   });
