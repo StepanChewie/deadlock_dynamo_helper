@@ -74,6 +74,7 @@ jobs:
             test/threat-weighted-matchup-v1.spec.ts \
             test/draft-matchup-evidence-v1.spec.ts \
             test/adaptive-evidence-scorer-v1.spec.ts \
+            test/adaptive-recommendation-draft-matchup-v1.spec.ts \
             test/build-slot-planner-held-count-v1.spec.ts \
             test/build-slot-planner-v1.spec.ts \
             test/transaction-plan-invariants-v1.spec.ts \
