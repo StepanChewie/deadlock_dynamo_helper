@@ -44,12 +44,16 @@ export class MatchupCandidateDiscoveryV1Service {
       if (consumesProtectedHardCore(candidate, protectedHardCoreItemIds)) continue;
 
       const matchup = input.matchupByItemId[String(itemId)];
-      if (!matchup || matchup.coverage < ADAPTIVE_POLICY_V1_CONFIG.situational.matchupDiscoveryMinCoverage) continue;
+      if (
+        !matchup ||
+        matchup.coverage < ADAPTIVE_POLICY_V1_CONFIG.situational.matchupDiscoveryMinCoverage ||
+        matchup.confidence < ADAPTIVE_POLICY_V1_CONFIG.situational.minTargetConfidence
+      ) continue;
 
       const score = input.scoreItem(itemId);
       if (!score || score.confidence < ADAPTIVE_POLICY_V1_CONFIG.situational.minTargetConfidence) continue;
       const statisticalSupport = draftMatchupSupport(score);
-      if (statisticalSupport <= 0 || matchup.confidence <= 0) continue;
+      if (statisticalSupport <= 0) continue;
 
       evidence.push({
         targetItemId: itemId,
