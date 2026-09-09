@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { RecommendationItemGraph } from '@deadlock-live-probe/build-domain';
-import { BuildStrategySpecV1 } from './build-strategy-v1';
+import { BuildGoalRigidityV1, BuildStrategySpecV1 } from './build-strategy-v1';
 
 export type BuildStrategyValidationErrorCodeV1 =
   | 'SCHEMA_VERSION_UNSUPPORTED'
@@ -10,6 +10,7 @@ export type BuildStrategyValidationErrorCodeV1 =
   | 'SUPPORT_OUT_OF_RANGE'
   | 'STABILITY_OUT_OF_RANGE'
   | 'DUPLICATE_GOAL_ID'
+  | 'GOAL_RIGIDITY_INVALID'
   | 'UNKNOWN_PREREQUISITE_GOAL'
   | 'PREREQUISITE_CYCLE'
   | 'INVALID_SELECTION_BOUNDS'
@@ -76,6 +77,14 @@ export class BuildStrategyValidatorV1Service {
         errors.push({ code: 'DUPLICATE_GOAL_ID', goalId: goal.goalId, message: `Duplicate goal ${goal.goalId}` });
       }
       goalIds.add(goal.goalId);
+      const rigidity = (goal as { rigidity?: unknown }).rigidity;
+      if (rigidity !== undefined && (!isKnownRigidity(rigidity) || rigidityConflicts(goal.type, goal.hard, rigidity))) {
+        errors.push({
+          code: 'GOAL_RIGIDITY_INVALID',
+          goalId: goal.goalId,
+          message: `Goal ${goal.goalId} has invalid rigidity semantics`,
+        });
+      }
       if (!Number.isInteger(goal.minSelect) || !Number.isInteger(goal.maxSelect) ||
         goal.minSelect < 0 || goal.maxSelect < 1 || goal.minSelect > goal.maxSelect ||
         goal.maxSelect > goal.targetItemIds.length) {
@@ -228,6 +237,12 @@ export class BuildStrategyValidatorV1Service {
         errors.push({ code: 'TERMINAL_UNKNOWN_GOAL', goalId, message: `Terminal policy references unknown goal ${goalId}` });
       } else if (!goal.hard) {
         errors.push({ code: 'TERMINAL_GOAL_NOT_HARD', goalId, message: `Terminal required goal ${goalId} must be hard` });
+      } else if (goal.rigidity !== undefined && goal.rigidity !== 'HARD_CORE') {
+        errors.push({
+          code: 'GOAL_RIGIDITY_INVALID',
+          goalId,
+          message: `Terminal required goal ${goalId} must be HARD_CORE when rigidity is explicit`,
+        });
       }
     }
 
@@ -339,6 +354,17 @@ function validateItem(
 
 function inProbabilityRange(value: number): boolean {
   return Number.isFinite(value) && value >= 0 && value <= 1;
+}
+
+function isKnownRigidity(value: unknown): value is BuildGoalRigidityV1 {
+  return value === 'HARD_CORE' || value === 'SOFT_CORE' || value === 'FLEX';
+}
+
+function rigidityConflicts(type: BuildStrategySpecV1['goals'][number]['type'], hard: boolean, rigidity: BuildGoalRigidityV1): boolean {
+  if (rigidity === 'HARD_CORE') return !hard;
+  if (rigidity === 'SOFT_CORE') return hard;
+  if (type === 'BRANCH' || type === 'SITUATIONAL_RESERVATION') return false;
+  return false;
 }
 
 function hasGoalCycle(strategy: BuildStrategySpecV1): boolean {
