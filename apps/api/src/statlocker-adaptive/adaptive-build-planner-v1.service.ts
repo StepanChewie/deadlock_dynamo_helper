@@ -355,6 +355,9 @@ export class AdaptiveBuildPlannerV1Service {
             scorerContext,
             itemGraph: input.decision.itemGraph,
             ownedItemIds: [...owned],
+            decisionState: input.decision.state,
+            investment: input.decision.investment,
+            economyRules: input.decision.economyRules,
             previousSelectedItemIds,
           })
         : undefined;
