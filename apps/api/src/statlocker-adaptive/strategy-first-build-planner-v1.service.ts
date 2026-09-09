@@ -638,6 +638,7 @@ export class StrategyFirstBuildPlannerV1Service {
   ): readonly AdaptivePlannedItemV1[] {
     const currentOwned = heldIds(input.decision.state);
     const owned = retainedOwnedItemIdsForCandidateV1(currentOwned, nextCandidate);
+    const maxHeldItems = adaptiveHeldItemCapacityV1(input.decision.slots);
     const rows: AdaptivePlannedItemV1[] = owned.map((itemId, index) => ({
       itemId,
       position: index + 1,
@@ -650,7 +651,7 @@ export class StrategyFirstBuildPlannerV1Service {
     }));
     const seen = new Set(owned);
     const nextTransactionTarget = nextCandidate ? candidateTarget(nextCandidate) : undefined;
-    if (nextTransactionTarget !== undefined && !seen.has(nextTransactionTarget) &&
+    if (nextTransactionTarget !== undefined && rows.length < maxHeldItems && !seen.has(nextTransactionTarget) &&
       !input.decision.itemGraph.isTargetSatisfied(nextTransactionTarget, owned)) {
       const score = safeScoreItem(this.scorer, nextTransactionTarget, scorerContext);
       rows.push({
@@ -676,6 +677,7 @@ export class StrategyFirstBuildPlannerV1Service {
       const slotTransition = slotPlan.futureTransitions.find((entry) => entry.targetGoalId === goal.goalId);
       if (slotTransition?.requirement === 'BLOCKED') continue;
       for (const itemId of goal.targetItemIds) {
+        if (rows.length >= maxHeldItems) break;
         if (seen.has(itemId) || input.decision.itemGraph.isTargetSatisfied(itemId, owned)) continue;
         if (goal.type === 'BRANCH' && !Object.values(contract.selectedBranches).includes(goal.goalId)) continue;
         const score = safeScoreItem(this.scorer, itemId, scorerContext);
@@ -773,6 +775,11 @@ function retainedOwnedItemIdsForCandidateV1(
     return ownedItemIds.filter((itemId) => !consumed.has(itemId));
   }
   return [...ownedItemIds];
+}
+
+function adaptiveHeldItemCapacityV1(slots: AdaptiveSlotStateV1): number {
+  const capacity = slots.totalCapacity ?? slots.baseSlots + slots.maxFlexSlots;
+  return Number.isInteger(capacity) && capacity >= 0 ? capacity : 0;
 }
 
 function applyHardInvestmentObligations(
