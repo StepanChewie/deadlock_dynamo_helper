@@ -32,6 +32,7 @@ export interface AdaptivePolicyV1Config {
     minImprovementOverCore: number;
     targetSwitchMinImprovement: number;
     maxCoreDelaySouls: number;
+    matchupDiscoveryMinCoverage: number;
   };
   threat: {
     weights: {
@@ -112,6 +113,7 @@ export const ADAPTIVE_POLICY_V1_CONFIG: AdaptivePolicyV1Config = {
     minImprovementOverCore: 0.08,
     targetSwitchMinImprovement: 0.05,
     maxCoreDelaySouls: 3200,
+    matchupDiscoveryMinCoverage: 0.30,
   },
   threat: {
     weights: {
@@ -197,6 +199,7 @@ const NUMERIC_ENV_SPECS: readonly NumericEnvSpec[] = [
   scalar('ADAPTIVE_SITUATIONAL_MIN_IMPROVEMENT_OVER_CORE', 0, 1, (c) => c.situational.minImprovementOverCore, (c, v) => { c.situational.minImprovementOverCore = v; }),
   scalar('ADAPTIVE_SITUATIONAL_TARGET_SWITCH_MIN_IMPROVEMENT', 0, 1, (c) => c.situational.targetSwitchMinImprovement, (c, v) => { c.situational.targetSwitchMinImprovement = v; }),
   scalar('ADAPTIVE_SITUATIONAL_MAX_CORE_DELAY_SOULS', 0, 20_000, (c) => c.situational.maxCoreDelaySouls, (c, v) => { c.situational.maxCoreDelaySouls = v; }, true),
+  scalar('ADAPTIVE_SITUATIONAL_MATCHUP_DISCOVERY_MIN_COVERAGE', 0, 1, (c) => c.situational.matchupDiscoveryMinCoverage, (c, v) => { c.situational.matchupDiscoveryMinCoverage = v; }),
   scalar('ADAPTIVE_THREAT_WEIGHT_SOULS', 0, 1, (c) => c.threat.weights.souls, (c, v) => { c.threat.weights.souls = v; }),
   scalar('ADAPTIVE_THREAT_WEIGHT_HERO_DAMAGE', 0, 1, (c) => c.threat.weights.heroDamage, (c, v) => { c.threat.weights.heroDamage = v; }),
   scalar('ADAPTIVE_THREAT_WEIGHT_KILLS_ASSISTS', 0, 1, (c) => c.threat.weights.killsAssists, (c, v) => { c.threat.weights.killsAssists = v; }),
