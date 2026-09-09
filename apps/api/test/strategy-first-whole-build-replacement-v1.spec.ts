@@ -175,4 +175,24 @@ describe('strategy-first whole-build replacement v1', () => {
     expect(result.recommendedBuild.length).toBeLessThanOrEqual(12);
     expect(result.recommendedBuild.some((item) => item.itemId === 13)).toBe(false);
   });
+
+  it('never sells an item bought inside the recent-purchase protection window', () => {
+    const replacementScores = Object.fromEntries(
+      ownedItemIds.map((itemId) => [itemId, itemId === 2 ? 0 : 2]),
+    ) as Record<number, number>;
+    replacementScores[13] = 3;
+    const planner = new StrategyFirstBuildPlannerV1Service(scorerFor(replacementScores));
+    const result = planner.plan({
+      decision,
+      evidence,
+      strategies: [strategy],
+      planningDepth: 1,
+      recentPurchasedItemIds: [2],
+    });
+
+    expect(result.nextAction.type).toBe('REPLACE');
+    expect(result.nextAction.sellItemId).not.toBe(2);
+    expect(result.recommendedBuild.some((item) => item.itemId === 2)).toBe(true);
+    expect(result.recommendedBuild).toHaveLength(12);
+  });
 });
