@@ -1,3 +1,4 @@
+// RED contract: relational row implementation must satisfy this shape and index policy.
 import { getMetadataArgsStorage } from 'typeorm';
 import { StatlockerVsHeroWpaRowV1Entity } from '../src/deadlock-live/entities/statlocker-vs-hero-wpa-row-v1.entity';
 
