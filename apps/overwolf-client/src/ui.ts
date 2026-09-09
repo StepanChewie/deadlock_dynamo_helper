@@ -4,6 +4,12 @@ import type {
   AdaptivePresentedPlanItem,
 } from './adaptive-recommendation-presentation';
 import { buildAdaptiveRecommendationPresentation } from './adaptive-recommendation-presentation';
+import {
+  AdaptiveDecisionDebugPresentation,
+  AdaptiveDecisionDebugReplacement,
+  AdaptiveDecisionDebugRow,
+  buildAdaptiveDecisionDebugPresentation,
+} from './adaptive-decision-debug-presentation';
 
 export function updateStatus(text: string, statusClass?: 'connected' | 'error' | 'init'): void {
   const el = document.getElementById('status');
@@ -97,6 +103,7 @@ export function showAdaptiveRecommendation(data: AdaptiveRecommendationResultV1)
   renderReasons(view.reasons);
   renderPlan(planItems, view.plan.remainingCount);
   renderAlternatives(view.alternatives);
+  renderDecisionDebug(buildAdaptiveDecisionDebugPresentation(data));
   clearAdaptiveError();
 }
 
@@ -130,6 +137,7 @@ export function hideSituationalPanel(): void {
   setText('guide-empty-title', 'Waiting for match data');
   setText('guide-empty-copy', 'Your Statlocker recommendation will appear automatically when the match is detected.');
   hasAdaptiveRecommendation = false;
+  renderDecisionDebug({ visible: false, sections: [], replacements: [] });
   clearAdaptiveError();
 }
 
@@ -211,6 +219,121 @@ function renderAlternatives(alternatives: readonly AdaptivePresentedAlternative[
     row.append(name, score);
     container.appendChild(row);
   });
+}
+
+function renderDecisionDebug(view: AdaptiveDecisionDebugPresentation): void {
+  const root = document.getElementById('decision-debug');
+  if (!root) return;
+  root.replaceChildren();
+  root.style.display = view.visible ? 'block' : 'none';
+  if (!view.visible) return;
+
+  const heading = document.createElement('div');
+  heading.className = 'debug-heading';
+  heading.textContent = 'Decision trace';
+  root.appendChild(heading);
+
+  const grid = document.createElement('div');
+  grid.className = 'debug-grid';
+  for (const section of view.sections) {
+    const card = document.createElement('section');
+    card.className = 'debug-section';
+    const title = document.createElement('h3');
+    title.textContent = section.title;
+    card.appendChild(title);
+    if (section.rows.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'debug-empty';
+      empty.textContent = 'Нет значимых кандидатов';
+      card.appendChild(empty);
+    } else {
+      section.rows.forEach((row) => card.appendChild(createDebugRow(row)));
+    }
+    grid.appendChild(card);
+  }
+  root.appendChild(grid);
+
+  if (view.replacements.length > 0) {
+    const replacementDetails = document.createElement('details');
+    replacementDetails.className = 'debug-details';
+    const summary = document.createElement('summary');
+    summary.textContent = 'Replacement math';
+    replacementDetails.appendChild(summary);
+    view.replacements.forEach((replacement) => replacementDetails.appendChild(createReplacementTrace(replacement)));
+    root.appendChild(replacementDetails);
+  }
+
+  if (view.policy) {
+    const details = document.createElement('details');
+    details.className = 'debug-details';
+    const summary = document.createElement('summary');
+    summary.textContent = `Policy ${view.policy.version}`;
+    details.appendChild(summary);
+    const values: readonly [string, string][] = [
+      ['Capacity', String(view.policy.heldItemCapacity)],
+      ['Threat weights', JSON.stringify(view.policy.threatWeights)],
+      ['Threat clamp', `${view.policy.threatClamp.min}..${view.policy.threatClamp.max}`],
+      ['Shrink K', JSON.stringify(view.policy.shrinkK)],
+      ['Plan switch', String(view.policy.planSwitchThreshold)],
+      ['Sell+buy', String(view.policy.sellBuyThreshold)],
+      ['Soft core replace', String(view.policy.softCoreReplaceThreshold)],
+      ['Wildcard replace', String(view.policy.wildcardReplaceThreshold)],
+      ['Matchup confidence', String(view.policy.matchupConfidenceThreshold)],
+      ['Purchase protection ms', String(view.policy.recentPurchaseProtectionMs)],
+      ['Sold rebuy penalty ms', String(view.policy.soldItemRebuyPenaltyMs)],
+    ];
+    values.forEach(([label, value]) => details.appendChild(createDebugKeyValue(label, value)));
+    root.appendChild(details);
+  }
+}
+
+function createDebugRow(row: AdaptiveDecisionDebugRow): HTMLElement {
+  const wrapper = document.createElement('details');
+  wrapper.className = `debug-row${row.selected ? ' selected' : ''}`;
+  const summary = document.createElement('summary');
+  summary.textContent = [row.headline, row.source, row.reason].filter(Boolean).join(' · ');
+  wrapper.appendChild(summary);
+  if (row.score !== undefined) wrapper.appendChild(createDebugKeyValue('Score', String(row.score)));
+  if (row.confidence !== undefined) wrapper.appendChild(createDebugKeyValue('Confidence', String(row.confidence)));
+  row.details.forEach((detail) => wrapper.appendChild(createDebugKeyValue(detail.label, detail.value)));
+  return wrapper;
+}
+
+function createReplacementTrace(replacement: AdaptiveDecisionDebugReplacement): HTMLElement {
+  const card = document.createElement('div');
+  card.className = `debug-replacement verdict-${replacement.verdict.toLowerCase()}`;
+  const title = document.createElement('strong');
+  title.textContent = `${replacement.verdict} · ${replacement.headline}`;
+  card.appendChild(title);
+  const values: readonly [string, string | number][] = [
+    ['inventory', replacement.inventory],
+    ['utilityBefore', replacement.utilityBefore],
+    ['utilityAfter', replacement.utilityAfter],
+    ['rawImprovement', replacement.rawImprovement],
+    ['matchupGain', replacement.matchupGain],
+    ['skeletonDelta', replacement.skeletonDelta],
+    ['synergyDelta', replacement.synergyDelta],
+    ['timingDelta', replacement.timingDelta],
+    ['economicLoss', replacement.economicLoss],
+    ['transactionPenalty', replacement.transactionPenalty],
+    ['churnPenalty', replacement.churnPenalty],
+    ['netImprovement', replacement.netImprovement],
+    ['requiredThreshold', replacement.requiredThreshold],
+    ['reasonCodes', replacement.reasonCodes.join(', ')],
+  ];
+  values.forEach(([label, value]) => card.appendChild(createDebugKeyValue(label, String(value))));
+  return card;
+}
+
+function createDebugKeyValue(label: string, value: string): HTMLElement {
+  const row = document.createElement('div');
+  row.className = 'debug-kv';
+  const key = document.createElement('span');
+  key.textContent = label;
+  const val = document.createElement('code');
+  val.textContent = value;
+  row.append(key, val);
+  return row;
 }
 
 function clearAdaptiveError(): void {

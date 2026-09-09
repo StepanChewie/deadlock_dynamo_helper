@@ -66,7 +66,14 @@ jobs:
           set -euo pipefail
           yarn workspace @deadlock-live-probe/overwolf-client test --runTestsByPath \
             src/adaptive-decision-debug-presentation.spec.ts \
-            src/adaptive-roadmap-presentation-v1.spec.ts
+            src/adaptive-roadmap-presentation-v1.spec.ts \
+            src/adaptive-recommendation-presentation.spec.ts
+
+      - name: Build Overwolf bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          yarn workspace @deadlock-live-probe/overwolf-client build:bundle
 
       - name: Run API roadmap regression tests
         shell: bash
