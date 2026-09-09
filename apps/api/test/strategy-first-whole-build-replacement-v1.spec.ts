@@ -158,6 +158,7 @@ describe('strategy-first whole-build replacement v1', () => {
       sourceItemId: 2,
       targetItemId: 13,
     });
+    expect(result.strategyPlan.slotPlan.reasonCodes).toContain('WHOLE_BUILD_REPLACEMENT_SELECTED');
     expect(result.recommendedBuild).toHaveLength(12);
     expect(result.recommendedBuild.some((item) => item.itemId === 2)).toBe(false);
     expect(result.recommendedBuild.find((item) => item.itemId === 13)?.status).toBe('NEXT');
