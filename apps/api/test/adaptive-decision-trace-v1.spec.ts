@@ -146,11 +146,11 @@ const scorer: any = {
   },
 };
 
-const result: StrategyFirstBuildPlannerV1Result = {
+const result = {
   gameState: 'EVEN',
   strategy,
   strategySelection: { selectedStrategyId: strategy.strategyId, commitment: 'PROVISIONAL', posteriors: [], reasonCodes: [] },
-  strategySession: { strategyId: strategy.strategyId, commitment: 'PROVISIONAL', posterior: 1, selectedAtGameTimeSec: 1200, replanReasons: [] } as any,
+  strategySession: { strategyId: strategy.strategyId, commitment: 'PROVISIONAL', posterior: 1, selectedAtGameTimeSec: 1200, replanReasons: [] },
   contract: {
     strategyId: strategy.strategyId,
     status: 'IN_PROGRESS',
@@ -174,7 +174,10 @@ const result: StrategyFirstBuildPlannerV1Result = {
     investmentPlan: { objectives: [], activeObjectiveIds: [] },
   },
   nextAction: { actionKey: 'replace:2:13', type: 'REPLACE', sellItemId: 2, buyItemId: 13, targetItemId: 13, reasonCodes: ['WHOLE_BUILD_REPLACEMENT_ACCEPTED'] },
-  recommendedBuild: ownedItemIds.filter((itemId) => itemId !== 2).map((itemId, index) => ({ itemId, position: index + 1, status: 'OWNED', score: 0, confidence: 1, skeletonStrength: 0, contextualSupport: 1, reasonCodes: ['OWNED_ITEM'] })).concat([{ itemId: 13, position: 12, status: 'NEXT', score: 0.8, confidence: 0.9, skeletonStrength: 0, contextualSupport: 0.9, reasonCodes: ['CORE'] }]),
+  recommendedBuild: [
+    ...ownedItemIds.filter((itemId) => itemId !== 2).map((itemId, index) => ({ itemId, position: index + 1, status: 'OWNED' as const, score: 0, confidence: 1, skeletonStrength: 0, contextualSupport: 1, reasonCodes: ['OWNED_ITEM'] })),
+    { itemId: 13, position: 12, status: 'NEXT' as const, score: 0.8, confidence: 0.9, skeletonStrength: 0, contextualSupport: 0.9, reasonCodes: ['CORE'] },
+  ],
   changes: [],
   rankedImmediateCandidates: [{
     action: { actionKey: 'replace:2:13', type: 'REPLACE', sellItemId: 2, buyItemId: 13, targetItemId: 13, reasonCodes: ['WHOLE_BUILD_REPLACEMENT_ACCEPTED'] },
@@ -186,7 +189,7 @@ const result: StrategyFirstBuildPlannerV1Result = {
   totalScore: 0.8,
   confidence: 0.9,
   plannerVersion: 'strategy-first-build-planner-v1',
-};
+} as any as StrategyFirstBuildPlannerV1Result;
 
 describe('adaptive decision trace v1', () => {
   it('exposes a bounded replacement trace and the exact effective policy snapshot', () => {
@@ -220,7 +223,7 @@ describe('adaptive decision trace v1', () => {
         requiredThreshold: 0.20,
       }),
     ]));
-    const selected = trace.replacements.find((row) => row.selected)!;
+    const selected = trace.replacements.find((row: any) => row.selected)!;
     expect(Number.isFinite(selected.utilityBefore)).toBe(true);
     expect(Number.isFinite(selected.utilityAfter)).toBe(true);
     expect(Number.isFinite(selected.rawImprovement)).toBe(true);
@@ -234,7 +237,7 @@ describe('adaptive decision trace v1', () => {
 
     expect(reconciled.finalSelection.action).toEqual(hold);
     expect(reconciled.finalSelection.legalityRecheckChanged).toBe(true);
-    expect(reconciled.candidates.every((candidate) => !candidate.selected)).toBe(true);
-    expect(reconciled.replacements.every((replacement) => !replacement.selected)).toBe(true);
+    expect(reconciled.candidates.every((candidate: any) => !candidate.selected)).toBe(true);
+    expect(reconciled.replacements.every((replacement: any) => !replacement.selected)).toBe(true);
   });
 });
