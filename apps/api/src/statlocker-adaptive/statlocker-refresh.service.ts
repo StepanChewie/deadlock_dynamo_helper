@@ -37,6 +37,7 @@ export interface StatlockerRefreshStatusV1 {
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const GLOBAL_REFRESH_TTL_MS = 30 * MINUTE;
+const VS_HERO_WPA_REFRESH_TTL_MS = 24 * HOUR;
 const HERO_REFRESH_TTL_MS = 36 * HOUR;
 const DEFAULT_ACTIVE_HERO_TTL_MS = 30 * MINUTE;
 const MAX_PROFILES_PER_HERO = 10;
@@ -105,15 +106,20 @@ export class StatlockerRefreshService {
   async refreshGlobalNow(force = false, nowMs = Date.now()): Promise<void> {
     const identity = this.requireIdentity();
     const key = this.globalRefreshKey(identity);
-    if (!force && !this.isDue(key, GLOBAL_REFRESH_TTL_MS, nowMs)) return;
+    const vsHeroWpaKey = this.globalVsHeroWpaRefreshKey(identity);
+    const globalDue = force || this.isDue(key, GLOBAL_REFRESH_TTL_MS, nowMs);
+    const vsHeroWpaDue = force || this.isDue(vsHeroWpaKey, VS_HERO_WPA_REFRESH_TTL_MS, nowMs);
+    if (!globalDue && !vsHeroWpaDue) return;
+
+    const targets: StatlockerCollectionTargetV1[] = [];
+    if (globalDue) targets.push({ dataset: 'WPA_PATCH_DATA', scopeKey: 'patch:current' });
+    if (vsHeroWpaDue) targets.push({ dataset: 'VS_HERO_WPA', scopeKey: 'global' });
+    if (globalDue) targets.push({ dataset: 'T4_CHAINS', scopeKey: 'global' });
+
     return this.singleFlight(key, async () => {
       this.markAttempt(nowMs);
       try {
-        const result = await this.collector.collectBatch([
-          { dataset: 'WPA_PATCH_DATA', scopeKey: 'patch:current' },
-          { dataset: 'VS_HERO_WPA', scopeKey: 'global' },
-          { dataset: 'T4_CHAINS', scopeKey: 'global' },
-        ]);
+        const result = await this.collector.collectBatch(targets);
         for (const dataset of result.datasets) {
           if (dataset.dataset === 'VS_HERO_WPA') {
             const rawSnapshot = await this.rawVsHeroWpaStore?.persistCollected({
@@ -159,7 +165,8 @@ export class StatlockerRefreshService {
           const normalized = this.normalizeCollected(dataset, result.statlockerPatchId);
           await this.publishObservation(normalized, identity, dataset);
         }
-        this.lastSuccessByKey.set(key, nowMs);
+        if (globalDue) this.lastSuccessByKey.set(key, nowMs);
+        if (vsHeroWpaDue) this.lastSuccessByKey.set(vsHeroWpaKey, nowMs);
         this.markSuccess(nowMs);
       } catch (error) {
         this.lastError = describeError(error);
@@ -386,6 +393,10 @@ export class StatlockerRefreshService {
 
   private globalRefreshKey(identity: StatlockerGameIdentityV1): string {
     return `global:${identity.rulesetVersion}:${identity.catalogSha256}`;
+  }
+
+  private globalVsHeroWpaRefreshKey(identity: StatlockerGameIdentityV1): string {
+    return `${this.globalRefreshKey(identity)}:vs-hero-wpa`;
   }
 
   private heroRefreshKey(identity: StatlockerGameIdentityV1, heroId: number): string {
