@@ -47,13 +47,14 @@ export class MatchupCandidateDiscoveryV1Service {
       if (
         !matchup ||
         matchup.coverage < ADAPTIVE_POLICY_V1_CONFIG.situational.matchupDiscoveryMinCoverage ||
-        matchup.confidence < ADAPTIVE_POLICY_V1_CONFIG.situational.minTargetConfidence
+        matchup.confidence < minimumMatchupConfidence(candidate)
       ) continue;
 
       const score = input.scoreItem(itemId);
       if (!score || score.confidence < ADAPTIVE_POLICY_V1_CONFIG.situational.minTargetConfidence) continue;
       const statisticalSupport = draftMatchupSupport(score);
       if (statisticalSupport <= 0) continue;
+      const sellDriven = candidate.action.type === 'REPLACE_ITEM';
 
       evidence.push({
         targetItemId: itemId,
@@ -65,10 +66,14 @@ export class MatchupCandidateDiscoveryV1Service {
         slotImpact: Math.max(0, candidate.resultingItemIds.length - input.currentItemCount),
         investmentImpact: 0,
         coreInterruptionSouls: Math.max(0, candidate.effectiveCostSouls),
+        ...(sellDriven
+          ? { requiredImprovement: ADAPTIVE_POLICY_V1_CONFIG.situational.matchupDiscoveryReplaceMinImprovement }
+          : {}),
         enemyHeroIds: [...input.enemyHeroIds],
         enemyItemIds: [...input.enemyItemIds],
         reasonCodes: [
           'MATCHUP_DISCOVERY_OUTSIDE_SKELETON',
+          ...(sellDriven ? ['MATCHUP_DISCOVERY_SELL_DRIVEN'] : []),
           'SITUATIONAL_PURPOSE:COUNTER_ENEMY_HEROES',
         ],
       });
@@ -76,6 +81,12 @@ export class MatchupCandidateDiscoveryV1Service {
 
     return evidence;
   }
+}
+
+function minimumMatchupConfidence(candidate: RecommendationCandidate): number {
+  return candidate.action.type === 'REPLACE_ITEM'
+    ? ADAPTIVE_POLICY_V1_CONFIG.situational.matchupDiscoverySellMinConfidence
+    : ADAPTIVE_POLICY_V1_CONFIG.situational.minTargetConfidence;
 }
 
 function strategyOwnedItems(strategy: BuildStrategySpecV1, itemGraph: RecommendationItemGraph): Set<number> {
