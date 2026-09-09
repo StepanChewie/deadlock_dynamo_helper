@@ -186,9 +186,16 @@ export function evaluateStrategyFirstInvariantsV1(
   if (situational) {
     const window = input.result.strategy.situationalWindows.find((entry) => entry.windowId === situational.windowId);
     const declaredItems = window?.candidateItemIdsByPurpose?.[situational.purpose] ?? [];
+    const declaredByStrategy = declaredItems.includes(situational.targetItemId);
+    const discoveredOutsideSkeleton =
+      situational.purpose === 'COUNTER_ENEMY_HEROES' &&
+      window?.allowedPurposes.includes('COUNTER_ENEMY_HEROES') === true &&
+      situational.reasonCodes.includes('MATCHUP_DISCOVERY_OUTSIDE_SKELETON') &&
+      situational.reasonCodes.includes('SITUATIONAL_PURPOSE:COUNTER_ENEMY_HEROES') &&
+      situational.reasonCodes.includes('SITUATIONAL_WINDOW_ACTIVE');
     const explained =
       !!window &&
-      declaredItems.includes(situational.targetItemId) &&
+      (declaredByStrategy || discoveredOutsideSkeleton) &&
       input.result.nextAction.targetItemId === situational.targetItemId &&
       situational.reasonCodes.includes('SITUATIONAL_OVERRIDE_BEATS_CONTINUE_CORE');
     if (!explained) {
