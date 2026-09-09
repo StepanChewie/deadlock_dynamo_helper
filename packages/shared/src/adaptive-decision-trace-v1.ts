@@ -13,10 +13,21 @@ export type AdaptiveDecisionCandidateSourceV1 =
   | 'DISCOVERED'
   | 'WILDCARD';
 
+export interface AdaptiveDecisionTraceMatchupContributionV1 {
+  enemyHeroId: number;
+  rawDeltaWpa: number;
+  count: number;
+  sampleConfidence: number;
+  threatMultiplier: number;
+  weightedContribution: number;
+}
+
 export interface AdaptiveDecisionTraceMatchupV1 {
   score?: number;
   confidence?: number;
   reasonCodes: readonly string[];
+  /** Bounded per-enemy contributions for the item-centric debug UI. */
+  contributions?: readonly AdaptiveDecisionTraceMatchupContributionV1[];
 }
 
 export interface AdaptiveDecisionTraceCandidateV1 {

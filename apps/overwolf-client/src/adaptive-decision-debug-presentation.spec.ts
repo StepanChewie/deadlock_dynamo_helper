@@ -44,7 +44,15 @@ function recommendation(): any {
           confidence: 0.87,
           scoreComponents: [{ key: 'draftMatchupFit', raw: 0.4, normalized: 0.4, confidence: 0.8, weight: 0.9, weighted: 0.36 }],
           rejectionReasonCodes: [],
-          matchup: { score: 0.36, confidence: 0.8, reasonCodes: ['MATCHUP_SUPPORTED'] },
+          matchup: {
+            score: 0.36,
+            confidence: 0.8,
+            reasonCodes: ['MATCHUP_SUPPORTED'],
+            contributions: [
+              { enemyHeroId: 20, rawDeltaWpa: 0.45, count: 2600, sampleConfidence: 0.84, threatMultiplier: 1.31, weightedContribution: 0.38 },
+              { enemyHeroId: 30, rawDeltaWpa: 0.12, count: 800, sampleConfidence: 0.62, threatMultiplier: 1.0, weightedContribution: 0.07 },
+            ],
+          },
           requiredThreshold: 0.2,
         },
         {
@@ -162,5 +170,18 @@ describe('adaptive decision debug presentation', () => {
 
     expect(view.visible).toBe(false);
     expect(view.sections).toEqual([]);
+  });
+
+  it('renders bounded per-enemy matchup contributions in candidate details', () => {
+    const view = buildAdaptiveDecisionDebugPresentation(recommendation());
+    const selected = view.sections.find((section) => section.title === 'Выбрали')!.rows[0];
+    const enemyRows = selected.details.filter((detail) => detail.label.startsWith('vs enemy #'));
+    expect(enemyRows).toHaveLength(2);
+    expect(enemyRows[0].label).toBe('vs enemy #20');
+    expect(enemyRows[0].value).toContain('wpa 0.45');
+    expect(enemyRows[0].value).toContain('n 2600');
+    expect(enemyRows[0].value).toContain('conf 0.84');
+    expect(enemyRows[0].value).toContain('threat ×1.31');
+    expect(enemyRows[1].label).toBe('vs enemy #30');
   });
 });

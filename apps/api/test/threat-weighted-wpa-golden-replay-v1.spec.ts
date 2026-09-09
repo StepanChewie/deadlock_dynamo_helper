@@ -922,10 +922,11 @@ describe('Threat-weighted WPA Golden Replay V1 (A-Q)', () => {
     const result = await service.recommend({ matchId: 'golden-match', localSteamId: 'steam-local' });
     expect(result.ready).toBe(true);
     const serialized = JSON.stringify(result);
-    // No RAW WPA payload may leak into the recommendation response.
+    // No RAW WPA payload may leak into the recommendation response: bounded per-enemy
+    // contribution numbers in the trace are expected, whole-dataset markers are not.
     expect(serialized).not.toContain('draftMatchupByItemId');
-    expect(serialized).not.toContain('rawDeltaWpa');
     expect(serialized).not.toContain('draftEnemyThreats');
+    expect(serialized).not.toContain('rawPayload');
     expect(serialized.length).toBeLessThan(120_000);
   });
 
@@ -958,8 +959,13 @@ describe('Threat-weighted WPA Golden Replay V1 (A-Q)', () => {
       wildcardReplace: 0.30,
       matchupConfidence: 0.35,
     });
-    // No RAW WPA dumps anywhere in the response.
-    expect(JSON.stringify(result)).not.toContain('rawDeltaWpa');
+    // No RAW WPA dumps anywhere in the response; bounded per-enemy contributions are
+    // allowed and must stay small.
+    const response = JSON.stringify(result);
+    expect(response).not.toContain('rawPayload');
+    expect(response).not.toContain('draftMatchupByItemId');
+    const contributionRows = (response.match(/"enemyHeroId"/g) ?? []).length;
+    expect(contributionRows).toBeLessThanOrEqual(24);
   });
 });
 

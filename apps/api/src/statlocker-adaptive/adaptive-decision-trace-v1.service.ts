@@ -10,6 +10,7 @@ import {
   AdaptiveActionV1,
   AdaptiveDecisionCandidateSourceV1,
   AdaptiveDecisionPolicySnapshotV1,
+  AdaptiveDecisionTraceMatchupContributionV1,
   AdaptiveDecisionReplacementTraceV1,
   AdaptiveDecisionTraceCandidateV1,
   AdaptiveDecisionTraceUtilityDeltaV1,
@@ -29,6 +30,7 @@ import { derivePlannerInvestmentDeltaV1 } from './adaptive-planner-transition-v1
 import { buildGoalRigidityV1, BuildStrategySpecV1 } from './build-strategy-v1';
 import { StrategyFirstBuildPlannerV1Result } from './strategy-first-build-planner-v1.service';
 import { ADAPTIVE_POLICY_V1_CONFIG } from './statlocker-adaptive.config';
+import type { StatlockerEvidenceBundleV1 } from './statlocker-evidence.service';
 import {
   WholeBuildReplacementKindV1,
   WholeBuildUtilityContributionsV1,
@@ -57,7 +59,7 @@ export class AdaptiveDecisionTraceV1Service {
         confidence: ranked.confidence,
         scoreComponents: ranked.components.map((component) => ({ ...component })),
         rejectionReasonCodes: selected ? [] : ['NOT_SELECTED_HIGHER_UTILITY'],
-        matchup: matchupTrace(ranked),
+        matchup: matchupTrace(ranked, input.evidence),
       });
     }
 
@@ -385,14 +387,47 @@ function classifyCandidateSource(
   return 'WILDCARD';
 }
 
-function matchupTrace(candidate: AdaptiveScoredActionV1) {
+function matchupTrace(candidate: AdaptiveScoredActionV1, evidence?: StatlockerEvidenceBundleV1) {
   const components = candidate.components.filter((component) => component.key === 'draftMatchupFit' || component.key === 'exactEnemyFit' || component.key === 'enemyCompositionFit');
-  if (components.length === 0) return { reasonCodes: [] };
+  const reasonCodes = candidate.reasonCodes.filter((code) => /MATCHUP|THREAT|ENEMY/.test(code));
+  if (components.length === 0) return { reasonCodes };
+  const contributions = matchupContributionsFromEvidenceV1(candidate, evidence);
   return {
     score: round(components.reduce((sum, component) => sum + component.weighted, 0)),
     confidence: round(Math.max(...components.map((component) => component.confidence))),
-    reasonCodes: candidate.reasonCodes.filter((code) => /MATCHUP|THREAT|ENEMY/.test(code)),
+    reasonCodes,
+    ...(contributions.length > 0 ? { contributions } : {}),
   };
+}
+
+const MAX_MATCHUP_CONTRIBUTION_ROWS_V1 = 12;
+
+function matchupContributionsFromEvidenceV1(
+  candidate: AdaptiveScoredActionV1,
+  evidence: StatlockerEvidenceBundleV1 | undefined,
+): readonly AdaptiveDecisionTraceMatchupContributionV1[] {
+  const targetItemId = candidate.action.buyItemId ?? candidate.action.itemId ?? candidate.action.targetItemId;
+  if (targetItemId === undefined || !evidence) return [];
+  const matchup = (evidence as { draftMatchupByItemId?: Readonly<Record<string, { contributions?: readonly {
+    enemyHeroId: number;
+    rawDeltaWpa: number;
+    count: number;
+    sampleConfidence: number;
+    threatMultiplier: number;
+    weightedContribution: number;
+  }[] }>> }).draftMatchupByItemId?.[String(targetItemId)];
+  if (!matchup?.contributions) return [];
+  return [...matchup.contributions]
+    .sort((a, b) => Math.abs(b.weightedContribution) - Math.abs(a.weightedContribution) || a.enemyHeroId - b.enemyHeroId)
+    .slice(0, MAX_MATCHUP_CONTRIBUTION_ROWS_V1)
+    .map((entry) => ({
+      enemyHeroId: entry.enemyHeroId,
+      rawDeltaWpa: round(entry.rawDeltaWpa),
+      count: entry.count,
+      sampleConfidence: round(entry.sampleConfidence),
+      threatMultiplier: round(entry.threatMultiplier),
+      weightedContribution: round(entry.weightedContribution),
+    }));
 }
 
 function utilityDeltas(current: WholeBuildUtilityContributionsV1, candidate: WholeBuildUtilityContributionsV1): AdaptiveDecisionTraceUtilityDeltaV1 {

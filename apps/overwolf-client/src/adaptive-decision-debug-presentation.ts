@@ -148,6 +148,12 @@ function candidateRow(candidate: AdaptiveDecisionTraceCandidateV1): AdaptiveDeci
       value: `${numeric(component.weighted)} (raw ${numeric(component.raw)}, conf ${numeric(component.confidence)})`,
     });
   }
+  for (const contribution of candidate.matchup.contributions ?? []) {
+    details.push({
+      label: `vs enemy #${contribution.enemyHeroId}`,
+      value: `wpa ${numeric(contribution.rawDeltaWpa)} / n ${contribution.count} / conf ${numeric(contribution.sampleConfidence)} / threat ×${numeric(contribution.threatMultiplier)} → ${numeric(contribution.weightedContribution)}`,
+    });
+  }
   for (const reason of candidate.matchup.reasonCodes) details.push({ label: 'Matchup reason', value: reason });
   return {
     key: candidate.action.actionKey,
