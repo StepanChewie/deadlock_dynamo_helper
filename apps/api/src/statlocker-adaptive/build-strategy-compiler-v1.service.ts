@@ -168,6 +168,7 @@ function makeGoal(
   const item = graph.getItem(candidate.itemId);
   if (!item) throw new Error(`Strategy compiler cannot reference unknown item ${candidate.itemId}`);
   const type = forcedType ?? (candidate.upgradeRate >= 0.5 || item.upgradeRecipes.length > 0 ? 'UPGRADE' : 'CORE');
+  const rigidity = type === 'BRANCH' ? 'FLEX' as const : hard ? 'HARD_CORE' as const : 'SOFT_CORE' as const;
   return {
     goalId,
     type,
@@ -177,6 +178,7 @@ function makeGoal(
     maxSelect: 1,
     prerequisiteGoalIds: [...prerequisiteGoalIds],
     hard,
+    rigidity,
     lifecycleByItemId: { [candidate.itemId]: 'PERMANENT_CORE' },
     rationaleCodes: [hard ? 'ARCHETYPE_CORE_SUPPORT' : 'ARCHETYPE_SOFT_SUPPORT', `SUPPORT:${candidate.support.toFixed(3)}`],
   };
