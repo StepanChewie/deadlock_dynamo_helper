@@ -86,6 +86,7 @@ jobs:
             test/build-strategy-validator-v1.spec.ts \
             test/build-slot-planner-held-count-v1.spec.ts \
             test/build-slot-planner-v1.spec.ts \
+            test/strategy-first-situational-integration-v1.spec.ts \
             test/transaction-plan-invariants-v1.spec.ts \
             test/statlocker-vs-hero-wpa-raw-snapshot-v1.spec.ts \
             test/statlocker-vs-hero-wpa-raw-ingest-v1.spec.ts \
