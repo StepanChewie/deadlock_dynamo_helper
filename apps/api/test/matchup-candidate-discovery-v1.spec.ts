@@ -9,6 +9,7 @@ import { BuildStrategySpecV1 } from '../src/statlocker-adaptive/build-strategy-v
 
 const items: RecommendationItemDefinition[] = [
   { itemId: 1, name: 'Hard Core', slotType: 'weapon', active: false, availableRulesetIds: ['r1'], directPurchaseCost: 800, upgradeRecipes: [], sellTransition: { soulsRefund: 400, returnedItemIds: [] } },
+  { itemId: 2, name: 'Flex', slotType: 'vitality', active: false, availableRulesetIds: ['r1'], directPurchaseCost: 800, upgradeRecipes: [], sellTransition: { soulsRefund: 400, returnedItemIds: [] } },
   { itemId: 3, name: 'Counter', slotType: 'spirit', active: false, availableRulesetIds: ['r1'], directPurchaseCost: 800, upgradeRecipes: [], sellTransition: { soulsRefund: 400, returnedItemIds: [] } },
 ];
 const graph = createRecommendationItemGraph(items);
@@ -134,6 +135,16 @@ describe('matchup candidate discovery v1', () => {
 
   it('rejects an outside-skeleton counter when matchup confidence is below the situational threshold', () => {
     const result = service.discover(input(candidate({ type: 'BUY_ITEM', itemId: 3 }, [1, 3]), 0.8, 0.2));
+
+    expect(result).toEqual([]);
+  });
+
+  it('rejects a sell-driven outside-skeleton replacement below the 0.40 matchup confidence floor', () => {
+    const result = service.discover(input(
+      candidate({ type: 'REPLACE_ITEM', sellItemId: 2, buyItemId: 3 }, [1, 3]),
+      0.8,
+      0.39,
+    ));
 
     expect(result).toEqual([]);
   });
