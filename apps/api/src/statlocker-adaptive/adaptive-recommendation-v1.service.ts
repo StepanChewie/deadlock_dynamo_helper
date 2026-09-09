@@ -306,6 +306,11 @@ export class AdaptiveRecommendationV1Service {
     );
     if (reconciledDecisionTrace) result = { ...result, decisionTrace: reconciledDecisionTrace };
 
+    this.observability.recordRejectedReplacementObservations(
+      (result.decisionTrace?.replacements ?? [])
+        .filter((row) => !row.accepted)
+        .map((row) => ({ netImprovement: row.netImprovement, requiredThreshold: row.requiredThreshold })),
+    );
     this.observability.recordRecommendationOutcome({
       evidence: freshServingEvidence,
       decision: fresh,
@@ -387,10 +392,13 @@ export class AdaptiveRecommendationV1Service {
         result.nextAction.actionKey,
         ...result.recommendedBuild.filter((row) => row.status !== 'OWNED').map((row) => row.itemId),
       ].join(':');
-      const selectedMatchupConfidence = (result: AdaptivePlannerRuntimeResultV1): number | undefined => {
-        const selected = result.decisionTrace?.candidates.find((candidate) => candidate.selected);
-        return selected?.matchup?.confidence;
-      };
+      const challengerMatchup = (challengerEvidence as {
+        draftMatchupByItemId?: Readonly<Record<string, { coverage: number; confidence: number }>>;
+      }).draftMatchupByItemId;
+      const challengerTarget = challenger.nextAction.targetItemId ?? challenger.nextAction.buyItemId;
+      const challengerMatchupScore = challengerTarget !== undefined
+        ? challengerMatchup?.[String(challengerTarget)]
+        : undefined;
       const currentWildcard = serving.decisionTrace?.candidates.some((candidate) => candidate.selected && candidate.source !== 'SKELETON' && candidate.source !== 'BRANCH') ?? false;
       const challengerWildcard = challenger.decisionTrace?.candidates.some((candidate) => candidate.selected && candidate.source !== 'SKELETON' && candidate.source !== 'BRANCH') ?? false;
       this.observability.recordThreatWeightedShadowComparison({
@@ -407,8 +415,8 @@ export class AdaptiveRecommendationV1Service {
         ...(challenger.nextAction.type === 'REPLACE' && challenger.nextAction.sellItemId !== undefined
           ? { sellSource: challenger.nextAction.sellItemId }
           : {}),
-        ...(selectedMatchupConfidence(challenger) !== undefined
-          ? { matchupConfidence: selectedMatchupConfidence(challenger) }
+        ...(challengerMatchupScore
+          ? { matchupConfidence: challengerMatchupScore.confidence, matchupCoverage: challengerMatchupScore.coverage }
           : {}),
         utilityImprovement: Number(((challenger.totalScore ?? 0) - (serving.totalScore ?? 0)).toFixed(6)),
         wouldSwitch: serving.nextAction.actionKey !== challenger.nextAction.actionKey ||

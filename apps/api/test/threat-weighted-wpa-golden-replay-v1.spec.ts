@@ -26,7 +26,13 @@ import { StatlockerVsHeroWpaRepositoryV1Service } from '../src/statlocker-adapti
 import { BuildStrategySpecV1 } from '../src/statlocker-adaptive/build-strategy-v1';
 import { ThreatWeightedMatchupV1Service } from '../src/statlocker-adaptive/threat-weighted-matchup-v1.service';
 import { StatlockerEvidenceBundleV1 } from '../src/statlocker-adaptive/statlocker-evidence.service';
-import { StatlockerVsHeroWpaAggregateSourceV1 } from '../src/statlocker-adaptive/statlocker-vs-hero-wpa-repository-v1.service';
+import {
+  StatlockerVsHeroWpaAggregateSourceV1,
+} from '../src/statlocker-adaptive/statlocker-vs-hero-wpa-repository-v1.service';
+import { StatlockerVsHeroWpaPublisherV1Service } from '../src/statlocker-adaptive/statlocker-vs-hero-wpa-publisher-v1.service';
+import { StatlockerVsHeroWpaRawSnapshotV1Entity } from '../src/deadlock-live/entities/statlocker-vs-hero-wpa-raw-snapshot-v1.entity';
+import { StatlockerVsHeroWpaRowV1Entity } from '../src/deadlock-live/entities/statlocker-vs-hero-wpa-row-v1.entity';
+import { NormalizedStatlockerVsHeroWpaRowV1 } from '../src/statlocker-adaptive/statlocker-vs-hero-wpa-row-normalizer-v1.service';
 
 // ---------------------------------------------------------------------------
 // Golden Replay V1 - fixture-driven strategy-first end-to-end scenarios A..Q.
@@ -423,6 +429,7 @@ function defaultWpaRows(): StatlockerVsHeroWpaAggregateSourceV1[] {
 interface GoldenHarnessOptions {
   wpaRows?: readonly StatlockerVsHeroWpaAggregateSourceV1[];
   wpaQueryError?: Error;
+  repository?: unknown;
   enemyLiveStates?: GoldenDecisionOverrides['enemyLiveStates'];
   ownedItemIds?: readonly number[];
   spendableSouls?: number;
@@ -469,7 +476,7 @@ export function buildGoldenService(options: GoldenHarnessOptions = {}) {
   };
 
   const draftMatchupEvidence = new DraftMatchupEvidenceV1Service(
-    repository as never,
+    (options.repository ?? repository) as never,
     new EnemyThreatV1Service(),
     new ThreatWeightedMatchupV1Service(),
     new EnemyThreatHistoryV1Service(),
@@ -872,9 +879,38 @@ describe('Threat-weighted WPA Golden Replay V1 (A-Q)', () => {
   });
 
   it('O - failed relational ingest keeps the previous active dataset serving recommendations', async () => {
-    const { service } = buildGoldenService({ ownedItemIds: [101, 102, 103, 104, 105] });
-    // The golden harness fakes the repository edge; here the previous dataset is represented
-    // by the default rows, and a failed ingest must not remove them from serving.
+    // Real publisher + real repository over an in-memory Postgres stand-in: the previous
+    // daily dataset is published and serving, the new RAW snapshot fails during row insert.
+    const dataSource = new FakeGoldenPublicationDataSource({
+      raw: [
+        goldenPublishedSnapshot('snapshot-a', 'PUBLISHED', '2026-09-08T10:00:00.000Z'),
+        goldenPublishedSnapshot('snapshot-b', 'PENDING', '2026-09-09T10:00:00.000Z'),
+      ],
+      rows: SKELETON_ITEM_IDS.flatMap((itemId) =>
+        [ENEMY_FED, ENEMY_PRIO, ENEMY_THIRD].map((enemyHeroId, index) =>
+          goldenPersistedRow('snapshot-a', itemId, enemyHeroId, 2000, 0.02, index)),
+      ),
+    });
+    const repository = new StatlockerVsHeroWpaRepositoryV1Service(
+      dataSource.getRepository(StatlockerVsHeroWpaRowV1Entity) as never,
+      dataSource.getRepository(StatlockerVsHeroWpaRawSnapshotV1Entity) as never,
+    );
+    const publisher = new StatlockerVsHeroWpaPublisherV1Service(dataSource as never);
+    dataSource.failRowInsert = true;
+
+    await expect(publisher.publish({
+      snapshotId: 'snapshot-b',
+      rows: [goldenNormalizedRow('snapshot-b', BRANCH_B_ITEM, ENEMY_FED)],
+    })).rejects.toThrow('row insert failed');
+
+    expect(goldenStatusOf(dataSource.state, 'snapshot-a')).toBe('PUBLISHED');
+    expect(goldenStatusOf(dataSource.state, 'snapshot-b')).toBe('FAILED');
+
+    // Recommendations continue on the previous active dataset.
+    const { service } = buildGoldenService({
+      ownedItemIds: [101, 102, 103, 104, 105],
+      repository,
+    });
     const result = await service.recommend({ matchId: 'golden-match', localSteamId: 'steam-local' });
     expect(result.ready).toBe(true);
     expect(result.recommendedBuild.length).toBeGreaterThan(0);
@@ -926,3 +962,158 @@ describe('Threat-weighted WPA Golden Replay V1 (A-Q)', () => {
     expect(JSON.stringify(result)).not.toContain('rawDeltaWpa');
   });
 });
+
+// --- In-memory Postgres stand-in for the relational WPA publication path (scenario O) ---
+
+type GoldenPublicationState = {
+  raw: StatlockerVsHeroWpaRawSnapshotV1Entity[];
+  rows: StatlockerVsHeroWpaRowV1Entity[];
+};
+
+class FakeGoldenPublicationDataSource {
+  state: GoldenPublicationState;
+  failRowInsert = false;
+
+  constructor(initial: GoldenPublicationState) {
+    this.state = cloneGoldenState(initial);
+  }
+
+  getRepository(entity: unknown): unknown {
+    return goldenRepositoryFor(this.state, entity, () => this.failRowInsert);
+  }
+
+  async transaction<T>(work: (manager: { getRepository(entity: unknown): unknown }) => Promise<T>): Promise<T> {
+    const draft = cloneGoldenState(this.state);
+    const manager = {
+      getRepository: (entity: unknown) => goldenRepositoryFor(draft, entity, () => this.failRowInsert),
+    };
+    const result = await work(manager);
+    this.state = draft;
+    return result;
+  }
+}
+
+function goldenRepositoryFor(
+  state: GoldenPublicationState,
+  entity: unknown,
+  shouldFailRowInsert: () => boolean,
+): unknown {
+  if (entity === StatlockerVsHeroWpaRawSnapshotV1Entity) {
+    return {
+      findOne: async (options: {
+        where: Partial<StatlockerVsHeroWpaRawSnapshotV1Entity>;
+        order?: { fetchedAt?: 'ASC' | 'DESC' };
+      }) => {
+        const rows = state.raw.filter((row) => goldenMatches(row, options.where));
+        if (options.order?.fetchedAt === 'DESC') {
+          rows.sort((a, b) => b.fetchedAt.getTime() - a.fetchedAt.getTime());
+        }
+        return rows[0];
+      },
+      update: async (
+        where: Partial<StatlockerVsHeroWpaRawSnapshotV1Entity>,
+        patch: Partial<StatlockerVsHeroWpaRawSnapshotV1Entity>,
+      ) => {
+        let affected = 0;
+        for (const row of state.raw) {
+          if (!goldenMatches(row, where)) continue;
+          Object.assign(row, patch);
+          affected += 1;
+        }
+        return { affected };
+      },
+    };
+  }
+  if (entity === StatlockerVsHeroWpaRowV1Entity) {
+    return {
+      insert: async (rows: readonly NormalizedStatlockerVsHeroWpaRowV1[]) => {
+        if (shouldFailRowInsert()) throw new Error('row insert failed');
+        let nextId = state.rows.reduce((max, row) => Math.max(max, row.id), 0) + 1;
+        for (const row of rows) {
+          state.rows.push({ id: nextId, ...row } as StatlockerVsHeroWpaRowV1Entity);
+          nextId += 1;
+        }
+        return { identifiers: [] };
+      },
+    };
+  }
+  throw new Error('unsupported repository entity');
+}
+
+function goldenPublishedSnapshot(
+  snapshotId: string,
+  ingestStatus: string,
+  fetchedAt: string,
+): StatlockerVsHeroWpaRawSnapshotV1Entity {
+  return {
+    snapshotId,
+    contentSha256: snapshotId.padEnd(64, snapshotId[0] ?? 'a').slice(0, 64),
+    fetchedAt: new Date(fetchedAt),
+    sourcePath: '/api/info/vs-hero-wpa-data',
+    sourceStatus: 200,
+    statlockerPatchId: PATCH,
+    rulesetVersion: RULESET,
+    catalogSha256: CATALOG_SHA,
+    collectorVersion: 'collector-v1',
+    rawPayload: {},
+    ingestStatus,
+    ingestMetadata: {},
+    createdAt: new Date(fetchedAt),
+  } as StatlockerVsHeroWpaRawSnapshotV1Entity;
+}
+
+function goldenNormalizedRow(
+  snapshotId: string,
+  itemId: number,
+  enemyHeroId: number,
+): NormalizedStatlockerVsHeroWpaRowV1 {
+  return {
+    snapshotId,
+    statlockerPatchId: PATCH,
+    rulesetVersion: RULESET,
+    catalogSha256: CATALOG_SHA,
+    rankBucket: 'rank_8',
+    heroId: OUR_HERO,
+    enemyHeroId,
+    itemId,
+    count: 100,
+    deltaWpa: 0.01,
+    meanWpa: 0.02,
+  };
+}
+
+function goldenPersistedRow(
+  snapshotId: string,
+  itemId: number,
+  enemyHeroId: number,
+  count: number,
+  deltaWpa: number,
+  id: number,
+): StatlockerVsHeroWpaRowV1Entity {
+  return {
+    id,
+    ...goldenNormalizedRow(snapshotId, itemId, enemyHeroId),
+    count,
+    deltaWpa,
+  } as unknown as StatlockerVsHeroWpaRowV1Entity;
+}
+
+function goldenStatusOf(state: GoldenPublicationState, snapshotId: string): string | undefined {
+  return state.raw.find((row) => row.snapshotId === snapshotId)?.ingestStatus;
+}
+
+function goldenMatches<T extends object>(row: T, where: Partial<T>): boolean {
+  return Object.entries(where).every(([key, value]) => row[key as keyof T] === value);
+}
+
+function cloneGoldenState(state: GoldenPublicationState): GoldenPublicationState {
+  return {
+    raw: state.raw.map((row) => ({
+      ...row,
+      fetchedAt: new Date(row.fetchedAt),
+      createdAt: new Date(row.createdAt),
+      ingestMetadata: { ...row.ingestMetadata },
+    })),
+    rows: state.rows.map((row) => ({ ...row })),
+  };
+}

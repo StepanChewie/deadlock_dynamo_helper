@@ -62,6 +62,8 @@ export interface AdaptiveRecommendationObservabilityCountersV1 {
   threatWeightedLowMatchupConfidenceCount: number;
   threatWeightedHardCoreViolationAttemptCount: number;
   threatWeightedInventoryViolationCount: number;
+  threatWeightedRejectedReplacementCount: number;
+  threatWeightedRejectedReplacementClosestGapMilli: number;
   wpaQueryCount: number;
   wpaQueryLatencyMsTotal: number;
   wpaQueryLatencyMsMax: number;
@@ -109,6 +111,7 @@ export interface ThreatWeightedShadowComparisonV1 {
   replacementActivation: boolean;
   sellSource?: number;
   matchupConfidence?: number;
+  matchupCoverage?: number;
   utilityImprovement: number;
   wouldSwitch: boolean;
   reasonCodes: readonly string[];
@@ -235,6 +238,8 @@ export class AdaptiveRecommendationObservabilityV1Service {
       threatWeightedLowMatchupConfidenceCount: 0,
       threatWeightedHardCoreViolationAttemptCount: 0,
       threatWeightedInventoryViolationCount: 0,
+      threatWeightedRejectedReplacementCount: 0,
+      threatWeightedRejectedReplacementClosestGapMilli: 0,
       wpaQueryCount: 0,
       wpaQueryLatencyMsTotal: 0,
       wpaQueryLatencyMsMax: 0,
@@ -457,6 +462,27 @@ export class AdaptiveRecommendationObservabilityV1Service {
 
   recordThreatWeightedStaleEvidenceFallback(): void {
     this.status.counters.threatWeightedStaleEvidenceFallbackCount += 1;
+    this.touch();
+  }
+
+  /**
+   * Calibration input for threshold tuning: how many whole-build replacements were
+   * rejected, and how close the closest rejection came to its required threshold
+   * (gap in thousandths, so a 0.011 gap under a 0.20 threshold is recorded as 11).
+   */
+  recordRejectedReplacementObservations(
+    observations: readonly { netImprovement: number; requiredThreshold: number }[],
+  ): void {
+    for (const observation of observations) {
+      const gap = observation.requiredThreshold - observation.netImprovement;
+      if (!Number.isFinite(gap) || gap < 0) continue;
+      this.status.counters.threatWeightedRejectedReplacementCount += 1;
+      const gapMilli = Math.round(gap * 1000);
+      if (this.status.counters.threatWeightedRejectedReplacementClosestGapMilli === 0 ||
+        gapMilli < this.status.counters.threatWeightedRejectedReplacementClosestGapMilli) {
+        this.status.counters.threatWeightedRejectedReplacementClosestGapMilli = gapMilli;
+      }
+    }
     this.touch();
   }
 
