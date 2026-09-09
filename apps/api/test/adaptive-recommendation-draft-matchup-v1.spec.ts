@@ -156,7 +156,7 @@ describe('AdaptiveRecommendationV1Service draft matchup integration', () => {
     };
     const planner = {
       version: 'adaptive-build-planner-v1',
-      plan: jest.fn(() => plannerResult()),
+      plan: jest.fn((_input: any) => plannerResult()),
     };
     const replay = {
       getPreviousContext: jest.fn(async () => undefined),
@@ -165,7 +165,7 @@ describe('AdaptiveRecommendationV1Service draft matchup integration', () => {
         evidenceMarker: planningEvidence.draftMarker,
         snapshotIds: planningEvidence.snapshotIds,
       })),
-      persist: jest.fn(async () => undefined),
+      persist: jest.fn(async (_payload: any) => undefined),
     };
     const draftMatchupEvidence = {
       enrich: jest.fn(async (base: any, builtDecision: any) => ({
