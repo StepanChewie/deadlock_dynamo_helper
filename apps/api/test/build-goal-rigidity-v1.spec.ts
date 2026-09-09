@@ -62,16 +62,37 @@ function compile(itemIds: readonly number[]) {
   });
 }
 
+function goal(options: {
+  goalId: string;
+  itemId: number;
+  rigidity: 'HARD_CORE' | 'SOFT_CORE' | 'FLEX';
+  type?: 'CORE' | 'SITUATIONAL_RESERVATION';
+}) {
+  return {
+    goalId: options.goalId,
+    type: options.type ?? 'CORE',
+    phase: 'EARLY',
+    targetItemIds: [options.itemId],
+    minSelect: options.rigidity === 'HARD_CORE' ? 1 : 0,
+    maxSelect: 1,
+    prerequisiteGoalIds: [],
+    hard: options.rigidity === 'HARD_CORE',
+    rigidity: options.rigidity,
+    lifecycleByItemId: { [options.itemId]: options.rigidity === 'FLEX' ? 'SITUATIONAL' : 'PERMANENT_CORE' },
+    rationaleCodes: [],
+  } as any;
+}
+
 describe('Build goal rigidity V1', () => {
   it('emits HARD_CORE, SOFT_CORE, and FLEX from mined strategy evidence', () => {
     const hard = compile([1, 1, 1, 2]);
     const soft = compile([1, 1, 2, 3]);
     const branch = compile([1, 1, 2, 2]);
 
-    expect((hard.goals.find((goal) => goal.targetItemIds.includes(1)) as any)?.rigidity).toBe('HARD_CORE');
-    expect((soft.goals.find((goal) => goal.targetItemIds.includes(1)) as any)?.rigidity).toBe('SOFT_CORE');
+    expect((hard.goals.find((entry) => entry.targetItemIds.includes(1)) as any)?.rigidity).toBe('HARD_CORE');
+    expect((soft.goals.find((entry) => entry.targetItemIds.includes(1)) as any)?.rigidity).toBe('SOFT_CORE');
     expect(branch.goals).toHaveLength(2);
-    expect(branch.goals.map((goal) => (goal as any).rigidity)).toEqual(['FLEX', 'FLEX']);
+    expect(branch.goals.map((entry) => (entry as any).rigidity)).toEqual(['FLEX', 'FLEX']);
   });
 
   it('maps consensus required core to HARD_CORE while choice and situational goals stay FLEX', () => {
@@ -103,40 +124,16 @@ describe('Build goal rigidity V1', () => {
       situationalWindows: [{ windowId: 'utility', targetItemIds: [4] }],
     });
 
-    expect((strategy.goals.find((goal) => goal.goalId === 'required:1') as any)?.rigidity).toBe('HARD_CORE');
-    expect((strategy.goals.find((goal) => goal.goalId === 'choice:2,3') as any)?.rigidity).toBe('FLEX');
-    expect((strategy.goals.find((goal) => goal.goalId === 'situational:utility') as any)?.rigidity).toBe('FLEX');
+    expect((strategy.goals.find((entry) => entry.goalId === 'required:1') as any)?.rigidity).toBe('HARD_CORE');
+    expect((strategy.goals.find((entry) => entry.goalId === 'choice:2,3') as any)?.rigidity).toBe('FLEX');
+    expect((strategy.goals.find((entry) => entry.goalId === 'situational:utility') as any)?.rigidity).toBe('FLEX');
   });
 
   it('rejects hard-core sell and replacement candidates before scoring', () => {
     const activeGoals = [
-      {
-        goalId: 'hard-core:1',
-        type: 'CORE',
-        phase: 'EARLY',
-        targetItemIds: [1],
-        minSelect: 1,
-        maxSelect: 1,
-        prerequisiteGoalIds: [],
-        hard: true,
-        rigidity: 'HARD_CORE',
-        lifecycleByItemId: { 1: 'PERMANENT_CORE' },
-        rationaleCodes: [],
-      },
-      {
-        goalId: 'flex:4',
-        type: 'SITUATIONAL_RESERVATION',
-        phase: 'MID',
-        targetItemIds: [4],
-        minSelect: 0,
-        maxSelect: 1,
-        prerequisiteGoalIds: [],
-        hard: false,
-        rigidity: 'FLEX',
-        lifecycleByItemId: { 4: 'SITUATIONAL' },
-        rationaleCodes: [],
-      },
-    ] as any;
+      goal({ goalId: 'hard-core:1', itemId: 1, rigidity: 'HARD_CORE' }),
+      goal({ goalId: 'flex:4', itemId: 4, rigidity: 'FLEX', type: 'SITUATIONAL_RESERVATION' }),
+    ];
     const candidates = [
       { action: { type: 'REPLACE_ITEM', sellItemId: 1, buyItemId: 4 } },
       { action: { type: 'REPLACE_ITEM', sellItemId: 2, buyItemId: 4 } },
@@ -152,6 +149,37 @@ describe('Build goal rigidity V1', () => {
     );
 
     expect(filtered.map((candidate) => candidate.action)).toEqual([
+      { type: 'REPLACE_ITEM', sellItemId: 2, buyItemId: 4 },
+      { type: 'SELL_ITEM', itemId: 2 },
+    ]);
+  });
+
+  it('keeps satisfied hard core protected even when only a flex goal remains active', () => {
+    const hardCoreGoal = goal({ goalId: 'hard-core:1', itemId: 1, rigidity: 'HARD_CORE' });
+    const activeFlexGoal = goal({
+      goalId: 'flex:4',
+      itemId: 4,
+      rigidity: 'FLEX',
+      type: 'SITUATIONAL_RESERVATION',
+    });
+    const candidates = [
+      { action: { type: 'REPLACE_ITEM', sellItemId: 1, buyItemId: 4 } },
+      { action: { type: 'REPLACE_ITEM', sellItemId: 2, buyItemId: 4 } },
+      { action: { type: 'SELL_ITEM', itemId: 1 } },
+      { action: { type: 'SELL_ITEM', itemId: 2 } },
+    ] as any;
+
+    const filtered = (filterRecommendationCandidatesForActiveGoalsV1 as any)(
+      candidates,
+      [activeFlexGoal],
+      graph,
+      {
+        capacityExitItemIds: new Set([1, 2]),
+        protectedGoals: [hardCoreGoal],
+      },
+    );
+
+    expect(filtered.map((candidate: any) => candidate.action)).toEqual([
       { type: 'REPLACE_ITEM', sellItemId: 2, buyItemId: 4 },
       { type: 'SELL_ITEM', itemId: 2 },
     ]);
