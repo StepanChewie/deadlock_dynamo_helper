@@ -279,7 +279,7 @@ describe('Statlocker VS_HERO_WPA RAW ingest V1', () => {
 
   it('refreshes VS_HERO_WPA every 24 hours without slowing other global datasets and force bypasses cadence', async () => {
     const collector = {
-      collectBatch: jest.fn(async () => ({
+      collectBatch: jest.fn(async (_targets: unknown) => ({
         statlockerPatchId: 'test',
         fetchedAt: '2026-09-09T10:00:00.000Z',
         datasets: [],
