@@ -52,7 +52,7 @@ const scorer = {
       confidence: itemId === 2 ? 0.9 : 0.8,
       completeness: 1,
       components: itemId === 2
-        ? [{ key: 'exactEnemyFit', raw: 0.5, normalized: 0.5, confidence: 0.9, weight: 1, weighted: 0.5 }]
+        ? [{ key: 'draftMatchupFit', raw: 0.5, normalized: 0.5, confidence: 0.9, weight: 1, weighted: 0.5 }]
         : [],
       version: 'adaptive-evidence-scorer-v1' as const,
     };
