@@ -43,6 +43,7 @@ export interface AdaptivePolicyV1Config {
     };
     minMultiplier: number;
     maxMultiplier: number;
+    smoothingAlpha: number;
   };
   optionalActivationMinScore: number;
   investment: {
@@ -78,7 +79,7 @@ export interface AdaptivePolicyV1Config {
 }
 
 export const ADAPTIVE_POLICY_V1_CONFIG: AdaptivePolicyV1Config = {
-  version: 'statlocker-adaptive-v1.3.0',
+  version: 'statlocker-adaptive-v1.4.0',
   gameStateThreshold: 0.08,
   gameStateBlendWidth: 0.03,
   exactEnemyMaxMatchups: 3,
@@ -122,6 +123,7 @@ export const ADAPTIVE_POLICY_V1_CONFIG: AdaptivePolicyV1Config = {
     },
     minMultiplier: 0.75,
     maxMultiplier: 1.50,
+    smoothingAlpha: 0.35,
   },
   optionalActivationMinScore: 0.15,
   investment: {
@@ -202,6 +204,7 @@ const NUMERIC_ENV_SPECS: readonly NumericEnvSpec[] = [
   scalar('ADAPTIVE_THREAT_WEIGHT_DEATHS', -1, 0, (c) => c.threat.weights.deaths, (c, v) => { c.threat.weights.deaths = v; }),
   scalar('ADAPTIVE_THREAT_MIN_MULTIPLIER', 0, 1, (c) => c.threat.minMultiplier, (c, v) => { c.threat.minMultiplier = v; }),
   scalar('ADAPTIVE_THREAT_MAX_MULTIPLIER', 1, 3, (c) => c.threat.maxMultiplier, (c, v) => { c.threat.maxMultiplier = v; }),
+  scalar('ADAPTIVE_THREAT_SMOOTHING_ALPHA', 0.01, 1, (c) => c.threat.smoothingAlpha, (c, v) => { c.threat.smoothingAlpha = v; }),
 ];
 
 export function loadAdaptivePolicyV1Config(

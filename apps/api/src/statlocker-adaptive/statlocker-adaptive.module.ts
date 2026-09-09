@@ -38,6 +38,8 @@ import { BuildStrategySessionV1Service } from './build-strategy-session-v1.servi
 import { BuildStrategySnapshotStoreV1Service } from './build-strategy-snapshot-store-v1.service';
 import { BuildStrategyValidatorV1Service } from './build-strategy-validator-v1.service';
 import { ConsensusStrategyFallbackV1Service } from './consensus-strategy-fallback-v1.service';
+import { DraftMatchupEvidenceV1Service } from './draft-matchup-evidence-v1.service';
+import { EnemyThreatHistoryV1Service } from './enemy-threat-history-v1.service';
 import { EnemyThreatV1Service } from './enemy-threat-v1.service';
 import { HistoricalBuildTrajectorySourceV2Service } from './historical-build-trajectory-source-v2.service';
 import { HistoricalPlannerTrajectoryExtractorV2Service } from './historical-planner-trajectory-extractor-v2.service';
@@ -62,6 +64,7 @@ import { StrategyFirstOperationsV1Service } from './strategy-first-operations-v1
 import { StrategyFirstPromotionGateV1Service } from './strategy-first-promotion-gate-v1.service';
 import { StrategyFirstSituationalOverlayV1Service } from './strategy-first-situational-overlay-v1.service';
 import { StrategyFirstTransactionPlanV1Service } from './strategy-first-transaction-plan-v1.service';
+import { ThreatWeightedMatchupV1Service } from './threat-weighted-matchup-v1.service';
 import { TransactionPlanCompilerV1Service } from './transaction-plan-compiler-v1.service';
 import { TransactionPlanReconcilerV1Service } from './transaction-plan-reconciler-v1.service';
 import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-v1.service';
@@ -102,6 +105,9 @@ import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-
     RecommendationEconomyRulesStoreV1Service,
     AdaptiveDecisionStateV1Service,
     EnemyThreatV1Service,
+    EnemyThreatHistoryV1Service,
+    ThreatWeightedMatchupV1Service,
+    DraftMatchupEvidenceV1Service,
     AdaptiveEvidenceScorerV1Service,
     AdaptivePhaseEligibilityV1Service,
     AdaptiveRecommendationObservabilityV1Service,
