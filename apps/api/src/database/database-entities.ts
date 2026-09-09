@@ -31,6 +31,7 @@ import { RecommendationValueDatasetRegistryV1 } from '../deadlock-live/entities/
 import { SoulsAffordabilityEvidenceV2Entity } from '../deadlock-live/entities/souls-affordability-evidence-v2.entity';
 import { StatlockerEvidenceSnapshotV1Entity } from '../deadlock-live/entities/statlocker-evidence-snapshot-v1.entity';
 import { StatlockerVsHeroWpaRawSnapshotV1Entity } from '../deadlock-live/entities/statlocker-vs-hero-wpa-raw-snapshot-v1.entity';
+import { StatlockerVsHeroWpaRowV1Entity } from '../deadlock-live/entities/statlocker-vs-hero-wpa-row-v1.entity';
 
 export const DATABASE_ENTITIES = [
   Match,
@@ -59,6 +60,7 @@ export const DATABASE_ENTITIES = [
   SoulsAffordabilityEvidenceV2Entity,
   StatlockerEvidenceSnapshotV1Entity,
   StatlockerVsHeroWpaRawSnapshotV1Entity,
+  StatlockerVsHeroWpaRowV1Entity,
   AdaptiveRecommendationDecisionV1Entity,
   BuildStrategySnapshotV1Entity,
   RecommendationEconomyRulesSnapshotV1Entity,
