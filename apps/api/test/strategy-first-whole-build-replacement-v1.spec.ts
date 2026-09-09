@@ -148,5 +148,13 @@ describe('strategy-first whole-build replacement v1', () => {
       targetItemId: 13,
     });
     expect(result.nextAction.type).not.toBe('BUY');
+    expect(result.strategyPlan.slotPlan.futureTransitions[0]).toMatchObject({
+      requirement: 'REPLACE',
+      sourceItemId: 2,
+      targetItemId: 13,
+    });
+    expect(result.recommendedBuild).toHaveLength(12);
+    expect(result.recommendedBuild.some((item) => item.itemId === 2)).toBe(false);
+    expect(result.recommendedBuild.find((item) => item.itemId === 13)?.status).toBe('NEXT');
   });
 });
