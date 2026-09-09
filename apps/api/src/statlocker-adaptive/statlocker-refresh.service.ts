@@ -133,28 +133,27 @@ export class StatlockerRefreshService {
               rawPayload: dataset.data,
             });
 
+            if (!rawSnapshot) {
+              throw new Error('VS_HERO_WPA RAW persistence is unavailable');
+            }
+            if (rawSnapshot.ingestStatus === 'PUBLISHED') continue;
+
             try {
-              const normalized = this.normalizeCollected(dataset, result.statlockerPatchId);
-              if (
-                rawSnapshot &&
-                rawSnapshot.ingestStatus !== 'PUBLISHED' &&
-                this.vsHeroWpaRowNormalizer &&
-                this.vsHeroWpaPublisher
-              ) {
-                const rows = this.vsHeroWpaRowNormalizer.normalize(dataset.data, {
-                  snapshotId: rawSnapshot.snapshotId,
-                  statlockerPatchId: result.statlockerPatchId,
-                  rulesetVersion: identity.rulesetVersion,
-                  catalogSha256: identity.catalogSha256,
-                });
-                await this.vsHeroWpaPublisher.publish({
-                  snapshotId: rawSnapshot.snapshotId,
-                  rows,
-                });
+              if (!this.vsHeroWpaRowNormalizer || !this.vsHeroWpaPublisher) {
+                throw new Error('VS_HERO_WPA relational ingest dependencies are unavailable');
               }
-              await this.publishObservation(normalized, identity, dataset);
+              const rows = this.vsHeroWpaRowNormalizer.normalize(dataset.data, {
+                snapshotId: rawSnapshot.snapshotId,
+                statlockerPatchId: result.statlockerPatchId,
+                rulesetVersion: identity.rulesetVersion,
+                catalogSha256: identity.catalogSha256,
+              });
+              await this.vsHeroWpaPublisher.publish({
+                snapshotId: rawSnapshot.snapshotId,
+                rows,
+              });
             } catch (error) {
-              if (rawSnapshot && this.vsHeroWpaPublisher) {
+              if (this.vsHeroWpaPublisher) {
                 await this.vsHeroWpaPublisher.markFailed(rawSnapshot.snapshotId, error);
               }
               throw error;
@@ -298,7 +297,7 @@ export class StatlockerRefreshService {
       row.catalogSha256.toLowerCase() === identity.catalogSha256.toLowerCase(),
     );
     const currentPatchId = rows
-      .filter((row) => row.dataset === 'WPA_PATCH_DATA' || row.dataset === 'VS_HERO_WPA' || row.dataset === 'T4_CHAINS')
+      .filter((row) => row.dataset === 'WPA_PATCH_DATA' || row.dataset === 'T4_CHAINS')
       .sort((a, b) => b.fetchedAt.getTime() - a.fetchedAt.getTime())[0]?.statlockerPatchId;
     const latestHeroSnapshot = rows
       .filter((row) =>
