@@ -1,10 +1,19 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { StatlockerVsHeroWpaRawSnapshotV1Entity } from '../deadlock-live/entities/statlocker-vs-hero-wpa-raw-snapshot-v1.entity';
 import { StatlockerVsHeroWpaRowV1Entity } from '../deadlock-live/entities/statlocker-vs-hero-wpa-row-v1.entity';
 
 export interface FindStatlockerVsHeroWpaRowsForSnapshotV1Input {
   snapshotId: string;
+  statlockerPatchId: string;
+  rulesetVersion: string;
+  catalogSha256: string;
+  ourHeroId: number;
+  enemyHeroIds: readonly number[];
+}
+
+export interface FindActiveStatlockerVsHeroWpaRowsV1Input {
   statlockerPatchId: string;
   rulesetVersion: string;
   catalogSha256: string;
@@ -35,7 +44,36 @@ export class StatlockerVsHeroWpaRepositoryV1Service {
   constructor(
     @InjectRepository(StatlockerVsHeroWpaRowV1Entity)
     private readonly repository: Repository<StatlockerVsHeroWpaRowV1Entity>,
+    @Optional()
+    @InjectRepository(StatlockerVsHeroWpaRawSnapshotV1Entity)
+    private readonly rawRepository?: Repository<StatlockerVsHeroWpaRawSnapshotV1Entity>,
   ) {}
+
+  async findActive(
+    input: FindActiveStatlockerVsHeroWpaRowsV1Input,
+  ): Promise<StatlockerVsHeroWpaRowV1Entity[]> {
+    if (input.enemyHeroIds.length === 0 || !this.rawRepository) return [];
+
+    const active = await this.rawRepository.findOne({
+      where: {
+        statlockerPatchId: input.statlockerPatchId,
+        rulesetVersion: input.rulesetVersion,
+        catalogSha256: input.catalogSha256.toLowerCase(),
+        ingestStatus: 'PUBLISHED',
+      },
+      order: { fetchedAt: 'DESC' },
+    });
+    if (!active) return [];
+
+    return this.findForSnapshot({
+      snapshotId: active.snapshotId,
+      statlockerPatchId: input.statlockerPatchId,
+      rulesetVersion: input.rulesetVersion,
+      catalogSha256: input.catalogSha256,
+      ourHeroId: input.ourHeroId,
+      enemyHeroIds: input.enemyHeroIds,
+    });
+  }
 
   async findForSnapshot(
     input: FindStatlockerVsHeroWpaRowsForSnapshotV1Input,

@@ -1,7 +1,12 @@
-import { Column, CreateDateColumn, Entity, PrimaryColumn, Unique } from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, Unique } from 'typeorm';
 
 @Entity('statlocker_vs_hero_wpa_raw_snapshots_v1')
 @Unique('uq_statlocker_vs_hero_wpa_raw_content_v1', ['contentSha256'])
+@Index(
+  'uq_statlocker_vs_hero_wpa_published_identity_v1',
+  ['statlockerPatchId', 'rulesetVersion', 'catalogSha256'],
+  { unique: true, where: `"ingestStatus" = 'PUBLISHED'` },
+)
 export class StatlockerVsHeroWpaRawSnapshotV1Entity {
   @PrimaryColumn({ type: 'varchar', length: 96 })
   snapshotId!: string;

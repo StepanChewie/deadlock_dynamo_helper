@@ -50,6 +50,7 @@ import { StatlockerEvidenceService } from './statlocker-evidence.service';
 import { StatlockerNormalizerService } from './statlocker-normalizer.service';
 import { StatlockerRefreshService } from './statlocker-refresh.service';
 import { StatlockerSnapshotStoreService } from './statlocker-snapshot-store.service';
+import { StatlockerVsHeroWpaPublisherV1Service } from './statlocker-vs-hero-wpa-publisher-v1.service';
 import { StatlockerVsHeroWpaRawStoreV1Service } from './statlocker-vs-hero-wpa-raw-store-v1.service';
 import { StatlockerVsHeroWpaRepositoryV1Service } from './statlocker-vs-hero-wpa-repository-v1.service';
 import { StatlockerVsHeroWpaRowNormalizerV1Service } from './statlocker-vs-hero-wpa-row-normalizer-v1.service';
@@ -91,6 +92,7 @@ import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-
     StatlockerNormalizerService,
     StatlockerSnapshotStoreService,
     StatlockerVsHeroWpaRawStoreV1Service,
+    StatlockerVsHeroWpaPublisherV1Service,
     StatlockerVsHeroWpaRepositoryV1Service,
     StatlockerVsHeroWpaRowNormalizerV1Service,
     StatlockerRefreshService,
