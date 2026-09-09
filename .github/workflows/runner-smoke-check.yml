@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   smoke:
-    runs-on: [self-hosted, linux, ARM64, vps-arm64-runner-v3]
+    runs-on: self-hosted
     timeout-minutes: 5
     steps:
       - name: Verify runner
