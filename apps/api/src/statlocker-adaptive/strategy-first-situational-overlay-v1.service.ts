@@ -74,7 +74,7 @@ export class StrategyFirstSituationalOverlayV1Service {
             targetItemId: itemId,
             purpose,
             contextualScore: score.score,
-            statisticalSupport: exactEnemySupport(score),
+            statisticalSupport: draftMatchupSupport(score),
             confidence: score.confidence,
             effectiveCostSouls: Math.max(0, candidate.effectiveCostSouls),
             slotImpact: Math.max(0, candidate.resultingItemIds.length - input.decision.state.inventory.heldByItemId.size),
@@ -175,8 +175,8 @@ function safeScore(
   }
 }
 
-function exactEnemySupport(score: AdaptiveItemScoreV1): number {
-  const component = score.components.find((entry) => entry.key === 'exactEnemyFit');
+function draftMatchupSupport(score: AdaptiveItemScoreV1): number {
+  const component = score.components.find((entry) => entry.key === 'draftMatchupFit');
   return Math.max(0, component?.normalized ?? component?.raw ?? 0);
 }
 
