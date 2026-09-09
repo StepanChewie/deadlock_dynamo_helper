@@ -113,7 +113,7 @@ describe('AdaptiveEvidenceScorerV1Service', () => {
     expect(shrinkConfidenceV1(1000, 500)).toBeGreaterThan(shrinkConfidenceV1(100, 500));
   });
 
-  it('aggregates at most top three exact-enemy slices by weighted mean', () => {
+  it('keeps the legacy top-three helper isolated from active full-draft scoring', () => {
     const result = aggregateExactEnemyEvidenceV1(
       (evidence().byDataset.VS_HERO_WPA.payload as any).slices,
       10,
@@ -136,13 +136,30 @@ describe('AdaptiveEvidenceScorerV1Service', () => {
     }
   });
 
-  it('prevents a huge low-sample matchup delta from independently overpowering a strong core prior', () => {
-    const lowSample = evidence(11);
-    const scorer = new AdaptiveEvidenceScorerV1Service();
-    const result = scorer.scoreItem(100, { ...context, evidence: lowSample });
-    const skeleton = result.components.find((component) => component.key === 'skeletonPrior');
-    const exact = result.components.find((component) => component.key === 'exactEnemyFit');
-    expect(skeleton?.weighted ?? 0).toBeGreaterThan(Math.abs(exact?.weighted ?? 0));
+  it('uses derived full-draft matchup evidence exactly once and ignores legacy exact slices', () => {
+    const bundle = evidence(11);
+    bundle.draftMatchupByItemId = {
+      '100': {
+        raw: 0.012,
+        normalized: 0.08,
+        confidence: 0.70,
+        coverage: 1,
+        usedCount: 6,
+        contributions: [],
+      },
+    };
+
+    const result = new AdaptiveEvidenceScorerV1Service().scoreItem(100, {
+      ...context,
+      evidence: bundle,
+    });
+    const draft = result.components.find((component) => component.key === 'draftMatchupFit');
+    const legacy = result.components.find((component) => component.key === 'exactEnemyFit');
+
+    expect(draft?.raw).toBeCloseTo(0.012, 12);
+    expect(draft?.normalized).toBeCloseTo(0.08, 12);
+    expect(draft?.confidence).toBeCloseTo(0.70, 12);
+    expect(legacy).toBeUndefined();
   });
 
   it('does not derive a skeleton prior from legacy flat compatibility items', () => {
@@ -241,7 +258,7 @@ describe('AdaptiveEvidenceScorerV1Service', () => {
       'skeletonPrior',
       'baseWpa',
       'gameStateFit',
-      'exactEnemyFit',
+      'draftMatchupFit',
       'enemyCompositionFit',
       'ownBuildFit',
       'timingFit',
@@ -253,6 +270,7 @@ describe('AdaptiveEvidenceScorerV1Service', () => {
       'transaction',
       'churn',
     ]));
+    expect(keys).not.toContain('exactEnemyFit');
     expect(result.version).toBe('adaptive-evidence-scorer-v1');
     expect(ADAPTIVE_POLICY_V1_CONFIG.exactEnemyMaxMatchups).toBe(3);
   });
