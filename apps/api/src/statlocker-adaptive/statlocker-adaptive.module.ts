@@ -52,6 +52,7 @@ import { StatlockerRefreshService } from './statlocker-refresh.service';
 import { StatlockerSnapshotStoreService } from './statlocker-snapshot-store.service';
 import { StatlockerVsHeroWpaRawStoreV1Service } from './statlocker-vs-hero-wpa-raw-store-v1.service';
 import { StatlockerVsHeroWpaRepositoryV1Service } from './statlocker-vs-hero-wpa-repository-v1.service';
+import { StatlockerVsHeroWpaRowNormalizerV1Service } from './statlocker-vs-hero-wpa-row-normalizer-v1.service';
 import { StrategyFirstAdaptivePlannerFacadeV1Service } from './strategy-first-adaptive-planner-facade-v1.service';
 import { StrategyFirstBuildPlannerV1Service } from './strategy-first-build-planner-v1.service';
 import { StrategyFirstLegacyPlannerAdapterV1Service } from './strategy-first-legacy-planner-adapter-v1.service';
@@ -91,6 +92,7 @@ import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-
     StatlockerSnapshotStoreService,
     StatlockerVsHeroWpaRawStoreV1Service,
     StatlockerVsHeroWpaRepositoryV1Service,
+    StatlockerVsHeroWpaRowNormalizerV1Service,
     StatlockerRefreshService,
     StatlockerEvidenceService,
     BuildSkeletonService,
