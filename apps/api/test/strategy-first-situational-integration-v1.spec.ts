@@ -64,6 +64,16 @@ const scorer = {
 const evidence: any = {
   heroId: 1, rulesetVersion: 'r1', catalogSha256: 'a'.repeat(64), statlockerPatchId: 'p', usable: true,
   snapshotIds: [], degradedReasons: [], families: [], byDataset: {},
+  draftMatchupByItemId: {
+    '3': {
+      raw: 0.08,
+      normalized: 0.7,
+      confidence: 0.9,
+      coverage: 1,
+      usedCount: 1,
+      contributions: [],
+    },
+  },
 };
 
 describe('strategy-first situational integration v1', () => {
