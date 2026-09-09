@@ -276,4 +276,58 @@ describe('Statlocker VS_HERO_WPA RAW ingest V1', () => {
     expect(publisher.publish).not.toHaveBeenCalled();
     expect(normalizedStore.publish).not.toHaveBeenCalled();
   });
+
+  it('refreshes VS_HERO_WPA every 24 hours without slowing other global datasets and force bypasses cadence', async () => {
+    const collector = {
+      collectBatch: jest.fn(async () => ({
+        statlockerPatchId: 'test',
+        fetchedAt: '2026-09-09T10:00:00.000Z',
+        datasets: [],
+      })),
+    };
+    const service = new StatlockerRefreshService(
+      collector as never,
+      {} as never,
+      { listActive: jest.fn(() => []) } as never,
+    );
+    service.observeGameIdentity({
+      rulesetVersion: 'ruleset-test',
+      catalogSha256: 'a'.repeat(64),
+    });
+
+    await service.refreshGlobalNow(false, 0);
+    expect(datasetNames(collector.mock.calls[0]?.[0])).toEqual([
+      'WPA_PATCH_DATA',
+      'VS_HERO_WPA',
+      'T4_CHAINS',
+    ]);
+
+    await service.refreshGlobalNow(false, 31 * 60_000);
+    expect(datasetNames(collector.mock.calls[1]?.[0])).toEqual([
+      'WPA_PATCH_DATA',
+      'T4_CHAINS',
+    ]);
+
+    await service.refreshGlobalNow(false, 24 * 60 * 60_000 + 1);
+    expect(datasetNames(collector.mock.calls[2]?.[0])).toEqual([
+      'WPA_PATCH_DATA',
+      'VS_HERO_WPA',
+      'T4_CHAINS',
+    ]);
+
+    await service.refreshGlobalNow(true, 24 * 60 * 60_000 + 60_000);
+    expect(datasetNames(collector.mock.calls[3]?.[0])).toEqual([
+      'WPA_PATCH_DATA',
+      'VS_HERO_WPA',
+      'T4_CHAINS',
+    ]);
+  });
 });
+
+function datasetNames(targets: unknown): string[] {
+  if (!Array.isArray(targets)) return [];
+  return targets.map((target) => {
+    if (typeof target !== 'object' || target === null || !('dataset' in target)) return '';
+    return String(target.dataset);
+  });
+}
