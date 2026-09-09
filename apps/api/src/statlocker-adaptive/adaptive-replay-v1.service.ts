@@ -418,7 +418,7 @@ function normalizeEnemyHeroes(
 function normalizeEnemyLiveStates(
   supplied: readonly AdaptiveEnemyLiveStateV1[] | undefined,
 ): readonly AdaptiveEnemyLiveStateV1[] {
-  return cloneJson(supplied ?? [])
+  return [...cloneJson(supplied ?? [])]
     .sort((a, b) => a.heroId - b.heroId || a.steamId.localeCompare(b.steamId));
 }
 
