@@ -69,6 +69,7 @@ jobs:
             test/adaptive-economy-v1.spec.ts \
             test/adaptive-build-planner-capacity-v1.spec.ts \
             test/adaptive-decision-state-v1.spec.ts \
+            test/enemy-threat-v1.spec.ts \
             test/build-slot-planner-held-count-v1.spec.ts \
             test/build-slot-planner-v1.spec.ts \
             test/transaction-plan-invariants-v1.spec.ts \
