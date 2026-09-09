@@ -296,27 +296,27 @@ describe('Statlocker VS_HERO_WPA RAW ingest V1', () => {
     });
 
     await service.refreshGlobalNow(false, 0);
-    expect(datasetNames(collector.mock.calls[0]?.[0])).toEqual([
+    expect(datasetNames(collector.collectBatch.mock.calls[0]?.[0])).toEqual([
       'WPA_PATCH_DATA',
       'VS_HERO_WPA',
       'T4_CHAINS',
     ]);
 
     await service.refreshGlobalNow(false, 31 * 60_000);
-    expect(datasetNames(collector.mock.calls[1]?.[0])).toEqual([
+    expect(datasetNames(collector.collectBatch.mock.calls[1]?.[0])).toEqual([
       'WPA_PATCH_DATA',
       'T4_CHAINS',
     ]);
 
     await service.refreshGlobalNow(false, 24 * 60 * 60_000 + 1);
-    expect(datasetNames(collector.mock.calls[2]?.[0])).toEqual([
+    expect(datasetNames(collector.collectBatch.mock.calls[2]?.[0])).toEqual([
       'WPA_PATCH_DATA',
       'VS_HERO_WPA',
       'T4_CHAINS',
     ]);
 
     await service.refreshGlobalNow(true, 24 * 60 * 60_000 + 60_000);
-    expect(datasetNames(collector.mock.calls[3]?.[0])).toEqual([
+    expect(datasetNames(collector.collectBatch.mock.calls[3]?.[0])).toEqual([
       'WPA_PATCH_DATA',
       'VS_HERO_WPA',
       'T4_CHAINS',
