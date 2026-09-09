@@ -89,6 +89,7 @@ jobs:
             test/build-situational-resolver-v1.spec.ts \
             test/strategy-first-situational-integration-v1.spec.ts \
             test/matchup-candidate-discovery-v1.spec.ts \
+            test/whole-build-utility-v1.spec.ts \
             test/transaction-plan-invariants-v1.spec.ts \
             test/statlocker-vs-hero-wpa-raw-snapshot-v1.spec.ts \
             test/statlocker-vs-hero-wpa-raw-ingest-v1.spec.ts \
