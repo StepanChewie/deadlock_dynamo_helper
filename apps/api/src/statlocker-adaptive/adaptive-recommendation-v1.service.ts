@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import {
   DEFAULT_RECOMMENDATION_CANDIDATE_RULES,
   RecommendationCandidate,
@@ -40,6 +40,7 @@ import {
   toAdaptiveBuildContractViewV1,
   toAdaptiveStrategySessionViewV1,
 } from './adaptive-strategy-state-view-v1';
+import { DraftMatchupEvidenceV1Service } from './draft-matchup-evidence-v1.service';
 import {
   AdaptiveStrategySessionV1,
   resolveAdaptiveStrategySessionV1,
@@ -68,6 +69,10 @@ interface PlannedRecommendationV1 {
 export class AdaptiveRecommendationV1Service {
   private readonly situationalScorer = new AdaptiveEvidenceScorerV1Service();
   private readonly situationalEvaluator = new AdaptiveSituationalContextV1Service();
+
+  @Optional()
+  @Inject(DraftMatchupEvidenceV1Service)
+  private readonly draftMatchupEvidence?: DraftMatchupEvidenceV1Service;
 
   constructor(
     private readonly decisionState: AdaptiveDecisionStateV1Service,
@@ -107,17 +112,18 @@ export class AdaptiveRecommendationV1Service {
     const localEvidence = typeof getEvidence === 'function'
       ? getEvidence.call(this.evidence, evidenceRequest)
       : this.evidence.getLocalEvidence(evidenceRequest);
-    this.observability.recordEvidence(localEvidence);
+    const initialPlanningEvidence = await this.enrichDraftMatchupEvidence(localEvidence, initial);
+    this.observability.recordEvidence(initialPlanningEvidence);
 
     let plannerUnavailable = false;
     let plannedBundle: PlannedRecommendationV1 | undefined;
-    if (localEvidence.usable &&
+    if (initialPlanningEvidence.usable &&
       initial.economyRulesEvidence !== 'UNKNOWN' &&
       initial.slots?.mechanicsEvidence !== 'UNKNOWN') {
       try {
         plannedBundle = this.planWithSituational(
           initial,
-          localEvidence,
+          initialPlanningEvidence,
           previous,
           initialDelta.purchasedItemIds,
           initialDelta.soldItemIds,
@@ -126,8 +132,8 @@ export class AdaptiveRecommendationV1Service {
       } catch (error) {
         plannerUnavailable = true;
         this.observability.recordEvidence({
-          ...localEvidence,
-          degradedReasons: [...localEvidence.degradedReasons, `PLANNER_UNAVAILABLE:${error instanceof Error ? error.message : 'UNKNOWN'}`],
+          ...initialPlanningEvidence,
+          degradedReasons: [...initialPlanningEvidence.degradedReasons, `PLANNER_UNAVAILABLE:${error instanceof Error ? error.message : 'UNKNOWN'}`],
         });
       }
     }
@@ -138,11 +144,14 @@ export class AdaptiveRecommendationV1Service {
       [...fresh.state.inventory.heldByItemId.keys()],
       fresh.itemGraph,
     );
-    if (localEvidence.usable && plannedBundle && fresh.stateRevision !== initial.stateRevision) {
+    const freshPlanningEvidence = fresh.stateRevision === initial.stateRevision
+      ? initialPlanningEvidence
+      : await this.enrichDraftMatchupEvidence(localEvidence, fresh);
+    if (freshPlanningEvidence.usable && plannedBundle && fresh.stateRevision !== initial.stateRevision) {
       try {
         plannedBundle = this.planWithSituational(
           fresh,
-          localEvidence,
+          freshPlanningEvidence,
           previous,
           freshDelta.purchasedItemIds,
           freshDelta.soldItemIds,
@@ -156,7 +165,7 @@ export class AdaptiveRecommendationV1Service {
     const planned = plannedBundle?.planned;
     const situationalByTargetItemId = plannedBundle?.situationalByTargetItemId ?? new Map();
 
-    const criticalEvidenceUnavailable = !localEvidence.usable ||
+    const criticalEvidenceUnavailable = !freshPlanningEvidence.usable ||
       fresh.economyRulesEvidence === 'UNKNOWN' ||
       fresh.slots?.mechanicsEvidence === 'UNKNOWN' ||
       plannerUnavailable;
@@ -171,7 +180,7 @@ export class AdaptiveRecommendationV1Service {
         .map((candidate) => [candidate.actionId, candidate]),
     );
 
-    const blockers = new Set<string>(localEvidence.degradedReasons);
+    const blockers = new Set<string>(freshPlanningEvidence.degradedReasons);
     if (plannerUnavailable) blockers.add('STRATEGY_OUT_OF_DISTRIBUTION');
     if (fresh.economyRulesEvidence === 'UNKNOWN') blockers.add('RULESET_ECONOMY_MECHANICS_UNKNOWN');
     if (fresh.slots?.mechanicsEvidence === 'UNKNOWN') blockers.add('SLOT_MECHANICS_UNKNOWN');
@@ -182,8 +191,8 @@ export class AdaptiveRecommendationV1Service {
     let legalityFallbackReasonCodes: readonly string[] = [];
 
     if (criticalEvidenceUnavailable) {
-      if (!localEvidence.usable) blockers.add('STATLOCKER_EVIDENCE_UNAVAILABLE');
-      result = unavailableRecommendation(fresh, localEvidence, blockers);
+      if (!freshPlanningEvidence.usable) blockers.add('STATLOCKER_EVIDENCE_UNAVAILABLE');
+      result = unavailableRecommendation(fresh, freshPlanningEvidence, blockers);
     } else if (planned) {
       let freshBuild = planned.planSession
         ? planned.recommendedBuild
@@ -250,7 +259,7 @@ export class AdaptiveRecommendationV1Service {
         plannerMethod: planned.strategy ? 'STRATEGY_FIRST' : 'LEGACY_GREEDY',
         strategy: planned.strategy,
         planSession,
-        evidence: toProvenance(localEvidence),
+        evidence: toProvenance(freshPlanningEvidence),
       };
     } else {
       throw new Error('Adaptive planner did not produce a result');
@@ -268,7 +277,7 @@ export class AdaptiveRecommendationV1Service {
     result = reconcileResultWithSemanticPlan(result, semanticPlanActions);
 
     this.observability.recordRecommendationOutcome({
-      evidence: localEvidence,
+      evidence: freshPlanningEvidence,
       decision: fresh,
       previousResult: previous,
       result,
@@ -276,7 +285,7 @@ export class AdaptiveRecommendationV1Service {
       legalityFallbackReasonCodes,
     });
 
-    const replayInput = this.replay.toReplayInput(fresh, localEvidence, {
+    const replayInput = this.replay.toReplayInput(fresh, freshPlanningEvidence, {
       previousResult: previous,
       recentPurchasedItemIds: freshDelta.purchasedItemIds,
       recentSoldItemIds: freshDelta.soldItemIds,
@@ -290,6 +299,18 @@ export class AdaptiveRecommendationV1Service {
       result,
     });
     return result;
+  }
+
+  private async enrichDraftMatchupEvidence(
+    evidence: StatlockerEvidenceBundleV1,
+    decision: AdaptiveDecisionStateV1,
+  ): Promise<StatlockerEvidenceBundleV1> {
+    if (!this.draftMatchupEvidence) return evidence;
+    try {
+      return await this.draftMatchupEvidence.enrich(evidence, decision);
+    } catch {
+      return evidence;
+    }
   }
 
   private planWithSituational(
