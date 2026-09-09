@@ -18,6 +18,22 @@ describe('Statlocker VS_HERO_WPA atomic relational publication V1', () => {
     expect(index?.where).toBe(`"ingestStatus" = 'PUBLISHED'`);
   });
 
+  it('does not reinsert rows when the same immutable snapshot is already published', async () => {
+    const dataSource = new FakePublicationDataSource({
+      raw: [rawSnapshot('snapshot-b', 'PUBLISHED', '2026-09-09T10:00:00.000Z')],
+      rows: [persistedRow('snapshot-b', 2, 'rank_8')],
+    });
+    const publisher = new StatlockerVsHeroWpaPublisherV1Service(dataSource as never);
+
+    await publisher.publish({
+      snapshotId: 'snapshot-b',
+      rows: [normalizedRow('snapshot-b', 2, 'rank_8')],
+    });
+
+    expect(statusOf(dataSource.state, 'snapshot-b')).toBe('PUBLISHED');
+    expect(dataSource.state.rows.filter((row) => row.snapshotId === 'snapshot-b')).toHaveLength(1);
+  });
+
   it('atomically publishes validated rows and supersedes the previous active snapshot without deleting old rows', async () => {
     const dataSource = new FakePublicationDataSource({
       raw: [
