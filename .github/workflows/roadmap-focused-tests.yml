@@ -70,6 +70,8 @@ jobs:
             test/adaptive-economy-v1.spec.ts \
             test/adaptive-build-planner-capacity-v1.spec.ts \
             test/adaptive-build-planner-rigidity-wiring-v1.spec.ts \
+            test/adaptive-choice-resolver-v1.spec.ts \
+            test/adaptive-choice-k-of-n-v1.spec.ts \
             test/adaptive-decision-state-v1.spec.ts \
             test/enemy-threat-v1.spec.ts \
             test/enemy-threat-history-v1.spec.ts \
