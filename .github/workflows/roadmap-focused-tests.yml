@@ -106,6 +106,7 @@ jobs:
             test/build-situational-resolver-v1.spec.ts \
             test/strategy-first-build-planner-v1.spec.ts \
             test/strategy-first-situational-integration-v1.spec.ts \
+            test/strategy-first-wildcard-invariant-v1.spec.ts \
             test/strategy-first-whole-build-replacement-v1.spec.ts \
             test/matchup-candidate-discovery-v1.spec.ts \
             test/whole-build-utility-v1.spec.ts \
