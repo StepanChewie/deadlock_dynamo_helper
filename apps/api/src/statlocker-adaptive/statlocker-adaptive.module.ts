@@ -38,6 +38,7 @@ import { BuildStrategySessionV1Service } from './build-strategy-session-v1.servi
 import { BuildStrategySnapshotStoreV1Service } from './build-strategy-snapshot-store-v1.service';
 import { BuildStrategyValidatorV1Service } from './build-strategy-validator-v1.service';
 import { ConsensusStrategyFallbackV1Service } from './consensus-strategy-fallback-v1.service';
+import { EnemyThreatV1Service } from './enemy-threat-v1.service';
 import { HistoricalBuildTrajectorySourceV2Service } from './historical-build-trajectory-source-v2.service';
 import { HistoricalPlannerTrajectoryExtractorV2Service } from './historical-planner-trajectory-extractor-v2.service';
 import { PlannerTrajectoryBuilderV2Service } from './planner-trajectory-builder-v2.service';
@@ -100,6 +101,7 @@ import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-
     BuildSkeletonService,
     RecommendationEconomyRulesStoreV1Service,
     AdaptiveDecisionStateV1Service,
+    EnemyThreatV1Service,
     AdaptiveEvidenceScorerV1Service,
     AdaptivePhaseEligibilityV1Service,
     AdaptiveRecommendationObservabilityV1Service,
