@@ -24,6 +24,7 @@ export class StatlockerVsHeroWpaPublisherV1Service {
         const rowRepository = manager.getRepository(StatlockerVsHeroWpaRowV1Entity);
         const snapshot = await rawRepository.findOne({ where: { snapshotId: input.snapshotId } });
         if (!snapshot) throw new Error(`VS_HERO_WPA RAW snapshot ${input.snapshotId} not found`);
+        if (snapshot.ingestStatus === 'PUBLISHED') return;
 
         const previous = await rawRepository.findOne({
           where: {

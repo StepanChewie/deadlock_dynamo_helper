@@ -16,7 +16,9 @@ import {
   StatlockerNormalizedPayloadV1,
 } from './statlocker-adaptive.types';
 import { StatlockerSnapshotStoreService } from './statlocker-snapshot-store.service';
+import { StatlockerVsHeroWpaPublisherV1Service } from './statlocker-vs-hero-wpa-publisher-v1.service';
 import { StatlockerVsHeroWpaRawStoreV1Service } from './statlocker-vs-hero-wpa-raw-store-v1.service';
+import { StatlockerVsHeroWpaRowNormalizerV1Service } from './statlocker-vs-hero-wpa-row-normalizer-v1.service';
 
 export interface StatlockerGameIdentityV1 {
   rulesetVersion: string;
@@ -68,6 +70,8 @@ export class StatlockerRefreshService {
     @InjectRepository(RecommendationItemCatalogVersionV1)
     private readonly catalogVersionRepo?: Repository<RecommendationItemCatalogVersionV1>,
     @Optional() private readonly rawVsHeroWpaStore?: StatlockerVsHeroWpaRawStoreV1Service,
+    @Optional() private readonly vsHeroWpaRowNormalizer?: StatlockerVsHeroWpaRowNormalizerV1Service,
+    @Optional() private readonly vsHeroWpaPublisher?: StatlockerVsHeroWpaPublisherV1Service,
   ) {}
 
   observeGameIdentity(identity: StatlockerGameIdentityV1, _nowMs = Date.now()): void {
@@ -112,7 +116,7 @@ export class StatlockerRefreshService {
         ]);
         for (const dataset of result.datasets) {
           if (dataset.dataset === 'VS_HERO_WPA') {
-            await this.rawVsHeroWpaStore?.persistCollected({
+            const rawSnapshot = await this.rawVsHeroWpaStore?.persistCollected({
               fetchedAt: new Date(dataset.fetchedAt),
               sourcePath: dataset.path,
               sourceStatus: dataset.status,
@@ -122,7 +126,36 @@ export class StatlockerRefreshService {
               collectorVersion: COLLECTOR_VERSION,
               rawPayload: dataset.data,
             });
+
+            try {
+              const normalized = this.normalizeCollected(dataset, result.statlockerPatchId);
+              if (
+                rawSnapshot &&
+                rawSnapshot.ingestStatus !== 'PUBLISHED' &&
+                this.vsHeroWpaRowNormalizer &&
+                this.vsHeroWpaPublisher
+              ) {
+                const rows = this.vsHeroWpaRowNormalizer.normalize(dataset.data, {
+                  snapshotId: rawSnapshot.snapshotId,
+                  statlockerPatchId: result.statlockerPatchId,
+                  rulesetVersion: identity.rulesetVersion,
+                  catalogSha256: identity.catalogSha256,
+                });
+                await this.vsHeroWpaPublisher.publish({
+                  snapshotId: rawSnapshot.snapshotId,
+                  rows,
+                });
+              }
+              await this.publishObservation(normalized, identity, dataset);
+            } catch (error) {
+              if (rawSnapshot && this.vsHeroWpaPublisher) {
+                await this.vsHeroWpaPublisher.markFailed(rawSnapshot.snapshotId, error);
+              }
+              throw error;
+            }
+            continue;
           }
+
           const normalized = this.normalizeCollected(dataset, result.statlockerPatchId);
           await this.publishObservation(normalized, identity, dataset);
         }
