@@ -8,7 +8,7 @@ import {
   StatlockerVsHeroWpaRepositoryV1Service,
 } from './statlocker-vs-hero-wpa-repository-v1.service';
 import {
-  ThreatWeightedMatchupItemScoreV1,
+  ThreatWeightedMatchupScoreV1,
   ThreatWeightedMatchupV1Service,
 } from './threat-weighted-matchup-v1.service';
 
@@ -19,7 +19,7 @@ export interface DraftEnemyThreatV1 {
 
 export interface DraftMatchupEvidenceBundleV1 extends StatlockerEvidenceBundleV1 {
   draftMatchupSnapshotId?: string;
-  draftMatchupByItemId: Readonly<Record<string, ThreatWeightedMatchupItemScoreV1>>;
+  draftMatchupByItemId: Readonly<Record<string, ThreatWeightedMatchupScoreV1>>;
   draftEnemyThreats: readonly DraftEnemyThreatV1[];
   draftMatchupDegradedReason?: 'RELATIONAL_WPA_QUERY_FAILED';
 }
@@ -55,7 +55,7 @@ export class DraftMatchupEvidenceV1Service {
         enemyHeroIds,
       });
       const itemIds = [...new Set(rows.map((row) => row.itemId))].sort((a, b) => a - b);
-      const draftMatchupByItemId: Record<string, ThreatWeightedMatchupItemScoreV1> = {};
+      const draftMatchupByItemId: Record<string, ThreatWeightedMatchupScoreV1> = {};
       for (const itemId of itemIds) {
         draftMatchupByItemId[String(itemId)] = this.matchup.scoreItem({
           ourHeroId: decision.state.heroId,
