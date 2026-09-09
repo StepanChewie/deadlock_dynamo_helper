@@ -23,6 +23,7 @@ import {
   BuildSituationalPurposeV1,
   BuildSituationalWindowV1,
 } from './build-strategy-v1';
+import type { DraftMatchupEvidenceBundleV1 } from './draft-matchup-evidence-v1.service';
 import { MatchupCandidateDiscoveryV1Service } from './matchup-candidate-discovery-v1.service';
 import { StatlockerEvidenceBundleV1 } from './statlocker-evidence.service';
 import { StrategyFirstBuildPlannerV1Result } from './strategy-first-build-planner-v1.service';
@@ -94,6 +95,7 @@ export class StrategyFirstSituationalOverlayV1Service {
         }
       }
     }
+    const draftMatchup = input.evidence as Partial<DraftMatchupEvidenceBundleV1>;
     evidence.push(...this.discovery.discover({
       strategy: input.result.strategy,
       openWindows,
@@ -103,6 +105,7 @@ export class StrategyFirstSituationalOverlayV1Service {
       currentItemCount: input.decision.state.inventory.heldByItemId.size,
       enemyHeroIds: input.decision.enemyHeroIds,
       enemyItemIds: input.decision.enemyItemIds ?? [],
+      matchupByItemId: draftMatchup.draftMatchupByItemId ?? {},
       scoreItem: (itemId) => safeScore(this.scorer, itemId, input),
     }));
 
