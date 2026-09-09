@@ -185,11 +185,15 @@ export class AdaptiveEvidenceScorerV1Service {
       config.weights.chainFit,
     ));
 
+    // Absence from the consensus skeleton is recorded for auditability but carries no
+    // confidence by itself: the skeleton family does not assert that unlisted items are
+    // worse, and treating absence as strong negative evidence would structurally block
+    // the outside-skeleton wildcard discovery path.
     components.push(makeComponent(
       'skeletonDeviation',
       skeletonStrength === undefined ? 1 : 0,
       skeleton && skeletonStrength === undefined ? -1 : 0,
-      skeleton ? skeletonFamily.confidence : 0,
+      skeletonStrength === undefined ? 0 : skeletonFamily.confidence,
       config.weights.skeletonDeviation,
     ));
 
