@@ -694,7 +694,7 @@ export class AdaptiveBuildPlannerV1Service {
       }),
       activeGoals,
       input.decision.itemGraph,
-      { capacityExitItemIds },
+      { capacityExitItemIds, protectedGoals: strategy.goals },
     )
       .filter((candidate) => candidate.feasible)
       .filter((candidate) => candidate.recommendationEligible)
@@ -747,7 +747,6 @@ export class AdaptiveBuildPlannerV1Service {
     let score = 0;
     let confidence = 0;
     let components: readonly AdaptiveScoreComponentV1[] = [];
-
     if (targetItemId !== undefined) {
       const targetScore = this.scoreSemanticTarget(
         targetItemId,
