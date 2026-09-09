@@ -1,0 +1,88 @@
+name: Apply Roadmap 8.2 Ranking Patch
+
+on:
+  push:
+    branches:
+      - feat/threat-weighted-wpa-build
+    paths:
+      - '.github/workflows/apply-roadmap-8-2-ranking-patch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: self-hosted
+    timeout-minutes: 10
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/threat-weighted-wpa-build
+          clean: true
+
+      - name: Apply replacement ranking patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/api/src/statlocker-adaptive/strategy-first-build-planner-v1.service.ts')
+          source = path.read_text()
+
+          def replace_once(old: str, new: str) -> None:
+              global source
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(f'Expected exactly one match, got {count} for:\n{old}')
+              source = source.replace(old, new, 1)
+
+          replace_once(
+              "  WholeBuildReplacementKindV1,\n  WholeBuildUtilityContributionsV1,\n  WholeBuildUtilityV1Service,",
+              "  WholeBuildReplacementEvaluationV1,\n  WholeBuildReplacementKindV1,\n  WholeBuildUtilityContributionsV1,\n  WholeBuildUtilityV1Service,",
+          )
+          replace_once(
+              "interface ScoredStrategyCandidateV1 {\n  candidate: RecommendationCandidate;\n  score: number;\n  confidence: number;\n  components: readonly AdaptiveScoreComponentV1[];\n  reasonCodes: readonly string[];\n}",
+              "interface ScoredStrategyCandidateV1 {\n  candidate: RecommendationCandidate;\n  score: number;\n  confidence: number;\n  components: readonly AdaptiveScoreComponentV1[];\n  reasonCodes: readonly string[];\n  wholeBuildNetGain?: number;\n}",
+          )
+          replace_once(
+              "    relevant = relevant.filter((candidate) =>\n      candidate.action.type !== 'REPLACE_ITEM' ||\n      this.replacementImprovesWholeBuild(candidate, node, strategy, input, scorerContext),\n    );",
+              "    const replacementEvaluationByActionId = new Map<string, WholeBuildReplacementEvaluationV1>();\n    relevant = relevant.filter((candidate) => {\n      if (candidate.action.type !== 'REPLACE_ITEM') return true;\n      const evaluation = this.evaluateReplacementWholeBuild(candidate, node, strategy, input, scorerContext);\n      replacementEvaluationByActionId.set(candidate.actionId, evaluation);\n      return evaluation.accepted;\n    });",
+          )
+          replace_once(
+              "      const continuity = continuityAdjustment(candidate, input);\n      const waitAdjustment = candidate.action.type === 'WAIT_SAVE' ? (transactions.length === 0 ? 0.12 : -0.25) : 0;",
+              "      const continuity = continuityAdjustment(candidate, input);\n      const replacementEvaluation = replacementEvaluationByActionId.get(candidate.actionId);\n      const waitAdjustment = candidate.action.type === 'WAIT_SAVE' ? (transactions.length === 0 ? 0.12 : -0.25) : 0;",
+          )
+          replace_once(
+              "        ...candidate.recommendationSuppressionReasons,\n        ...continuity.reasonCodes,\n        ...(strategic > 0 ? ['ADVANCES_SELECTED_STRATEGY'] : []),",
+              "        ...candidate.recommendationSuppressionReasons,\n        ...continuity.reasonCodes,\n        ...(replacementEvaluation?.reasonCodes ?? []),\n        ...(strategic > 0 ? ['ADVANCES_SELECTED_STRATEGY'] : []),",
+          )
+          replace_once(
+              "        components: itemScore?.components ?? [],\n        reasonCodes: unique(reasonCodes).sort(),\n      };\n    }).sort((a, b) =>\n      b.score - a.score ||\n      b.confidence - a.confidence ||\n      a.candidate.actionId.localeCompare(b.candidate.actionId),\n    );",
+              "        components: itemScore?.components ?? [],\n        reasonCodes: unique(reasonCodes).sort(),\n        wholeBuildNetGain: replacementEvaluation?.netGain,\n      };\n    }).sort((a, b) => {\n      if (a.wholeBuildNetGain !== undefined && b.wholeBuildNetGain !== undefined &&\n        a.wholeBuildNetGain !== b.wholeBuildNetGain) {\n        return b.wholeBuildNetGain - a.wholeBuildNetGain;\n      }\n      return b.score - a.score ||\n        b.confidence - a.confidence ||\n        a.candidate.actionId.localeCompare(b.candidate.actionId);\n    });",
+          )
+          replace_once(
+              "  private replacementImprovesWholeBuild(\n    candidate: RecommendationCandidate,\n    node: StrategyNodeV1,\n    strategy: BuildStrategySpecV1,\n    input: StrategyFirstBuildPlannerV1Input,\n    scorerContext: AdaptiveItemScoreContextV1,\n  ): boolean {\n    const action = candidate.action;\n    if (action.type !== 'REPLACE_ITEM') return true;",
+              "  private evaluateReplacementWholeBuild(\n    candidate: RecommendationCandidate,\n    node: StrategyNodeV1,\n    strategy: BuildStrategySpecV1,\n    input: StrategyFirstBuildPlannerV1Input,\n    scorerContext: AdaptiveItemScoreContextV1,\n  ): WholeBuildReplacementEvaluationV1 {\n    const action = candidate.action;\n    if (action.type !== 'REPLACE_ITEM') throw new Error('Expected REPLACE_ITEM candidate');",
+          )
+          replace_once(
+              "    return evaluation.accepted;\n  }\n\n  private candidateRelevant(",
+              "    return evaluation;\n  }\n\n  private candidateRelevant(",
+          )
+
+          path.write_text(source)
+          PY
+
+          git diff --check
+          git diff -- apps/api/src/statlocker-adaptive/strategy-first-build-planner-v1.service.ts
+
+      - name: Commit ranking patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add apps/api/src/statlocker-adaptive/strategy-first-build-planner-v1.service.ts
+          git commit -m 'fix: rank accepted replacements by whole build gain'
+          git push origin HEAD:feat/threat-weighted-wpa-build
