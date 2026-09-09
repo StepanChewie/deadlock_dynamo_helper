@@ -22,7 +22,13 @@ describe('build situational resolver v1', () => {
   const service = new BuildSituationalResolverV1Service();
 
   it('does not fill a situational reservation without a contextual trigger', () => {
-    expect(service.resolve({ strategy, contract, candidates: [], continueCoreScore: 0.6 })).toBeUndefined();
+    expect(service.resolve({
+      strategy,
+      contract,
+      candidates: [],
+      continueCoreScore: 0.6,
+      minOverrideImprovement: 0.10,
+    })).toBeUndefined();
   });
 
   it('selects a supported counter only when it beats continue-core by the window threshold', () => {
@@ -50,5 +56,57 @@ describe('build situational resolver v1', () => {
     });
 
     expect(result).toBeUndefined();
+  });
+
+  it('honors a stricter candidate-specific improvement threshold', () => {
+    const result = service.resolve({
+      strategy,
+      contract,
+      continueCoreScore: 0.60,
+      minOverrideImprovement: 0.08,
+      candidates: [{
+        targetItemId: 101,
+        purpose: 'ANTI_CC',
+        enemyHeroIds: [7],
+        enemyItemIds: [],
+        contextualScore: 0.89,
+        statisticalSupport: 0.8,
+        confidence: 0.8,
+        effectiveCostSouls: 1600,
+        slotImpact: 1,
+        investmentImpact: 0,
+        coreInterruptionSouls: 800,
+        requiredImprovement: 0.30,
+        reasonCodes: ['MATCHUP_DISCOVERY_OUTSIDE_SKELETON'],
+      } as any],
+    });
+
+    expect(result).toBeUndefined();
+  });
+
+  it('accepts a candidate once it clears its stricter improvement threshold', () => {
+    const result = service.resolve({
+      strategy,
+      contract,
+      continueCoreScore: 0.60,
+      minOverrideImprovement: 0.08,
+      candidates: [{
+        targetItemId: 101,
+        purpose: 'ANTI_CC',
+        enemyHeroIds: [7],
+        enemyItemIds: [],
+        contextualScore: 0.91,
+        statisticalSupport: 0.8,
+        confidence: 0.8,
+        effectiveCostSouls: 1600,
+        slotImpact: 1,
+        investmentImpact: 0,
+        coreInterruptionSouls: 800,
+        requiredImprovement: 0.30,
+        reasonCodes: ['MATCHUP_DISCOVERY_OUTSIDE_SKELETON'],
+      } as any],
+    });
+
+    expect(result).toMatchObject({ targetItemId: 101 });
   });
 });
