@@ -60,6 +60,14 @@ jobs:
             test/recommendation-category-slot-rules.spec.ts \
             test/inventory-reducer.spec.ts
 
+      - name: Run Overwolf roadmap presentation tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          yarn workspace @deadlock-live-probe/overwolf-client test --runTestsByPath \
+            src/adaptive-decision-debug-presentation.spec.ts \
+            src/adaptive-roadmap-presentation-v1.spec.ts
+
       - name: Run API roadmap regression tests
         shell: bash
         run: |
