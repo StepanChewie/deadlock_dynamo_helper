@@ -141,6 +141,11 @@ describe('strategy-first whole-build replacement v1', () => {
     const planner = new StrategyFirstBuildPlannerV1Service(scorer);
     const result = planner.plan({ decision, evidence, strategies: [strategy], planningDepth: 1 });
 
+    expect(result.rankedImmediateCandidates[0]?.action).toMatchObject({
+      type: 'REPLACE',
+      sellItemId: 2,
+      buyItemId: 13,
+    });
     expect(result.nextAction).toMatchObject({
       type: 'REPLACE',
       sellItemId: 2,
