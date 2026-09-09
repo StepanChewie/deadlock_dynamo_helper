@@ -41,7 +41,7 @@ function decision(ownedItemIds: readonly number[], souls: number, unlockedFlexSl
       economy: { spendableSouls: observedFact(souls, 'test'), shopOpportunity: observedFact('AVAILABLE', 'test') },
     },
     itemGraph: graph, catalogVersionId: 'c', catalogSha256, rulesetId: 'r1', localSteamId: 'p',
-    allyHeroIds: [], enemyHeroIds: [9], allyItemIds: [], enemyItemIds: [],
+    allyHeroIds: [], enemyHeroIds: [9], allyItemIds: [], enemyItemIds: [], enemyLiveStates: [],
     slots: deriveAdaptiveSlotStateV1(ownedItemIds, graph, slotRules, { unlockedFlexSlots, evidence: 'OBSERVED' }),
     investment: unknownAdaptiveInvestmentStateV1(), economyRulesEvidence: 'UNKNOWN', stateRevision: 'revision-test',
   };

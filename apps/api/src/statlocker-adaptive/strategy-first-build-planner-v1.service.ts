@@ -291,9 +291,19 @@ export class StrategyFirstBuildPlannerV1Service {
         committed[branch.branchGroupId] = ownedOption;
         continue;
       }
-      const best = branch.optionGoalIds
+      const ranked = branch.optionGoalIds
         .map((goalId) => ({ goalId, score: scoreGoal(goalById.get(goalId), this.scorer, scorerContext) }))
-        .sort((a, b) => b.score - a.score || a.goalId.localeCompare(b.goalId))[0];
+        .sort((a, b) => b.score - a.score || a.goalId.localeCompare(b.goalId));
+      const best = ranked[0];
+      const previousGoalId = selected[branch.branchGroupId];
+      if (best && previousGoalId && previousGoalId !== best.goalId && branch.optionGoalIds.includes(previousGoalId)) {
+        const previousScore = scoreGoal(goalById.get(previousGoalId), this.scorer, scorerContext);
+        if (Number.isFinite(previousScore) &&
+          best.score - previousScore < ADAPTIVE_POLICY_V1_CONFIG.minPlanSwitchImprovement) {
+          selected[branch.branchGroupId] = previousGoalId;
+          continue;
+        }
+      }
       if (best) selected[branch.branchGroupId] = best.goalId;
     }
     return { selected, committed };
@@ -449,7 +459,8 @@ export class StrategyFirstBuildPlannerV1Service {
         branches,
         input,
         this.contracts,
-      ));
+      ))
+      .filter((candidate) => !isRecentPurchaseProtectedDirectSellV1(candidate, input));
     const replacementEvaluationByActionId = new Map<string, WholeBuildReplacementEvaluationV1>();
     relevant = relevant.filter((candidate) => {
       if (candidate.action.type !== 'REPLACE_ITEM') return true;
@@ -576,7 +587,8 @@ export class StrategyFirstBuildPlannerV1Service {
         ADAPTIVE_POLICY_V1_CONFIG.investment.achievedBreakpointDropPenalty,
       finalItemCount: projectedItemIds.length,
       maxItemCount: node.slots.totalCapacity ?? node.slots.baseSlots + node.slots.maxFlexSlots,
-      protectedSale: isHardCoreProtectedSaleV1(strategy, input.decision.itemGraph, action.sellItemId),
+      protectedSale: isHardCoreProtectedSaleV1(strategy, input.decision.itemGraph, action.sellItemId) ||
+        isRecentPurchaseProtectedItemV1(action.sellItemId, input),
       sellEconomicsKnown: candidate.evidence.transaction !== 'UNKNOWN',
     });
     return evaluation;
@@ -671,8 +683,6 @@ export class StrategyFirstBuildPlannerV1Service {
     for (const goal of orderedGoals) {
       const state = contract.goalStates[goal.goalId];
       if (state === 'SKIPPED' || state === 'WAIVED' || state === 'SATISFIED') continue;
-      // Soft goals stay non-mandatory: they never gate completion and never become the
-      // executable target, but the semantic build path still shows the progression.
       const optionalProgression = !goal.hard && contract.currentGoalId !== goal.goalId;
       const slotTransition = slotPlan.futureTransitions.find((entry) => entry.targetGoalId === goal.goalId);
       if (slotTransition?.requirement === 'BLOCKED') continue;
@@ -958,6 +968,21 @@ function isHardCoreProtectedSaleV1(
     .some((goal) => goal.targetItemIds.some((targetItemId) =>
       targetItemId === sellItemId || graph.isComponentAncestor(sellItemId, targetItemId),
     ));
+}
+
+function isRecentPurchaseProtectedItemV1(
+  itemId: number,
+  input: StrategyFirstBuildPlannerV1Input,
+): boolean {
+  return new Set(input.recentPurchasedItemIds ?? []).has(itemId);
+}
+
+function isRecentPurchaseProtectedDirectSellV1(
+  candidate: RecommendationCandidate,
+  input: StrategyFirstBuildPlannerV1Input,
+): boolean {
+  return candidate.action.type === 'SELL_ITEM' &&
+    isRecentPurchaseProtectedItemV1(candidate.action.itemId, input);
 }
 
 function strategicCandidateUtility(
