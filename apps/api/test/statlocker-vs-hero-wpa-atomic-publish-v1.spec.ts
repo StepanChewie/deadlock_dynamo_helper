@@ -14,8 +14,8 @@ describe('Statlocker VS_HERO_WPA atomic relational publication V1', () => {
     );
 
     expect(index?.columns).toEqual(['statlockerPatchId', 'rulesetVersion', 'catalogSha256']);
-    expect(index?.options.unique).toBe(true);
-    expect(index?.options.where).toBe(`"ingestStatus" = 'PUBLISHED'`);
+    expect(index?.unique).toBe(true);
+    expect(index?.where).toBe(`"ingestStatus" = 'PUBLISHED'`);
   });
 
   it('atomically publishes validated rows and supersedes the previous active snapshot without deleting old rows', async () => {
