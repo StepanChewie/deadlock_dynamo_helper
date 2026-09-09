@@ -32,7 +32,12 @@ const matchState: MinimalMatchState = {
       heroId: 30,
       heroName: 'Enemy Thirty',
       teamId: 2,
+      level: 12,
       souls: 5000,
+      kills: 7,
+      deaths: 2,
+      assists: 8,
+      heroDamage: 24000,
       items: [],
     },
     enemyA: {
@@ -41,7 +46,9 @@ const matchState: MinimalMatchState = {
       heroId: 20,
       heroName: 'Enemy Twenty',
       teamId: 2,
+      level: 9,
       souls: 4000,
+      kills: 1,
       items: [],
     },
   },
@@ -163,6 +170,36 @@ describe('AdaptiveDecisionStateV1Service', () => {
     expect(first.economyRulesEvidence).toBe('UNKNOWN');
     expect(first.investment.evidence).toBe('UNKNOWN');
     expect(first.stateRevision).toBe(second.stateRevision);
+  });
+
+  it('carries deterministic per-enemy live state without inventing missing metrics', async () => {
+    const result = await createService(true).service.build('match-1');
+
+    expect(result.enemyLiveStates).toEqual([
+      {
+        steamId: 'enemy-a',
+        playerName: 'Enemy A',
+        heroId: 20,
+        heroName: 'Enemy Twenty',
+        level: 9,
+        souls: 4000,
+        kills: 1,
+      },
+      {
+        steamId: 'enemy-b',
+        playerName: 'Enemy B',
+        heroId: 30,
+        heroName: 'Enemy Thirty',
+        level: 12,
+        souls: 5000,
+        kills: 7,
+        deaths: 2,
+        assists: 8,
+        heroDamage: 24000,
+      },
+    ]);
+    expect(result.enemyLiveStates.map((enemy) => enemy.steamId)).not.toContain('local');
+    expect(result.enemyLiveStates.map((enemy) => enemy.steamId)).not.toContain('ally');
   });
 
   it('uses persisted economy rules for investment while slot capacity remains canonical', async () => {
