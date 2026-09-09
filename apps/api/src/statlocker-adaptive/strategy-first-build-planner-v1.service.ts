@@ -47,6 +47,7 @@ import { StatlockerEvidenceBundleV1 } from './statlocker-evidence.service';
 import { derivePlannerInvestmentDeltaV1 } from './adaptive-planner-transition-v1';
 import { ADAPTIVE_POLICY_V1_CONFIG } from './statlocker-adaptive.config';
 import {
+  WholeBuildReplacementEvaluationV1,
   WholeBuildReplacementKindV1,
   WholeBuildUtilityContributionsV1,
   WholeBuildUtilityV1Service,
@@ -97,6 +98,7 @@ interface ScoredStrategyCandidateV1 {
   confidence: number;
   components: readonly AdaptiveScoreComponentV1[];
   reasonCodes: readonly string[];
+  wholeBuildNetGain?: number;
 }
 
 interface ContinuityAdjustmentV1 {
@@ -444,10 +446,13 @@ export class StrategyFirstBuildPlannerV1Service {
         input,
         this.contracts,
       ));
-    relevant = relevant.filter((candidate) =>
-      candidate.action.type !== 'REPLACE_ITEM' ||
-      this.replacementImprovesWholeBuild(candidate, node, strategy, input, scorerContext),
-    );
+    const replacementEvaluationByActionId = new Map<string, WholeBuildReplacementEvaluationV1>();
+    relevant = relevant.filter((candidate) => {
+      if (candidate.action.type !== 'REPLACE_ITEM') return true;
+      const evaluation = this.evaluateReplacementWholeBuild(candidate, node, strategy, input, scorerContext);
+      replacementEvaluationByActionId.set(candidate.actionId, evaluation);
+      return evaluation.accepted;
+    });
     const transactions = relevant.filter((candidate) => candidate.action.type !== 'WAIT_SAVE');
     const candidates = transactions.length > 0
       ? relevant
@@ -502,6 +507,7 @@ export class StrategyFirstBuildPlannerV1Service {
         input.decision.itemGraph,
       );
       const continuity = continuityAdjustment(candidate, input);
+      const replacementEvaluation = replacementEvaluationByActionId.get(candidate.actionId);
       const waitAdjustment = candidate.action.type === 'WAIT_SAVE' ? (transactions.length === 0 ? 0.12 : -0.25) : 0;
       const score = (itemScore?.score ?? 0) + strategic + investmentUtility * 0.45 + continuity.score + waitAdjustment;
       const reasonCodes = [
@@ -509,6 +515,7 @@ export class StrategyFirstBuildPlannerV1Service {
         ...(activeInvestmentObjective ? [`INVESTMENT_OBJECTIVE:${activeInvestmentObjective.objectiveId}`] : []),
         ...candidate.recommendationSuppressionReasons,
         ...continuity.reasonCodes,
+        ...(replacementEvaluation?.reasonCodes ?? []),
         ...(strategic > 0 ? ['ADVANCES_SELECTED_STRATEGY'] : []),
         ...(investmentUtility > 0 ? ['ADVANCES_STRATEGIC_INVESTMENT'] : []),
       ];
@@ -518,23 +525,28 @@ export class StrategyFirstBuildPlannerV1Service {
         confidence: itemScore?.confidence ?? (candidate.action.type === 'WAIT_SAVE' ? 0.5 : 0.25),
         components: itemScore?.components ?? [],
         reasonCodes: unique(reasonCodes).sort(),
+        wholeBuildNetGain: replacementEvaluation?.netGain,
       };
-    }).sort((a, b) =>
-      b.score - a.score ||
-      b.confidence - a.confidence ||
-      a.candidate.actionId.localeCompare(b.candidate.actionId),
-    );
+    }).sort((a, b) => {
+      if (a.wholeBuildNetGain !== undefined && b.wholeBuildNetGain !== undefined &&
+        a.wholeBuildNetGain !== b.wholeBuildNetGain) {
+        return b.wholeBuildNetGain - a.wholeBuildNetGain;
+      }
+      return b.score - a.score ||
+        b.confidence - a.confidence ||
+        a.candidate.actionId.localeCompare(b.candidate.actionId);
+    });
   }
 
-  private replacementImprovesWholeBuild(
+  private evaluateReplacementWholeBuild(
     candidate: RecommendationCandidate,
     node: StrategyNodeV1,
     strategy: BuildStrategySpecV1,
     input: StrategyFirstBuildPlannerV1Input,
     scorerContext: AdaptiveItemScoreContextV1,
-  ): boolean {
+  ): WholeBuildReplacementEvaluationV1 {
     const action = candidate.action;
-    if (action.type !== 'REPLACE_ITEM') return true;
+    if (action.type !== 'REPLACE_ITEM') throw new Error('Expected REPLACE_ITEM candidate');
 
     const currentItemIds = heldIds(node.decisionState);
     const projectedDecision = projectRecommendationCandidateState(
@@ -563,7 +575,7 @@ export class StrategyFirstBuildPlannerV1Service {
       protectedSale: isHardCoreProtectedSaleV1(strategy, input.decision.itemGraph, action.sellItemId),
       sellEconomicsKnown: candidate.evidence.transaction !== 'UNKNOWN',
     });
-    return evaluation.accepted;
+    return evaluation;
   }
 
   private candidateRelevant(
