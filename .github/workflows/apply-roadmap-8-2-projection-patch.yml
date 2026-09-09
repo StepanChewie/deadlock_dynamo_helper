@@ -48,62 +48,8 @@ jobs:
           )
           replace_once(
               "function applyHardInvestmentObligations(\n",
-              "function alignSlotPlanWithSelectedCandidateV1(\n  slotPlan: BuildSlotPlanV1,\n  candidate: RecommendationCandidate | undefined,\n  currentGoalId: string | undefined,\n): BuildSlotPlanV1 {\n  const action = candidate?.action;\n  if (action?.type !== 'REPLACE_ITEM') return slotPlan;\n\n  let aligned = false;\n  const futureTransitions = slotPlan.futureTransitions.map((transition) => {\n    if (transition.requirement !== 'REPLACE' ||\n      transition.targetItemId !== action.buyItemId ||\n      (currentGoalId !== undefined && transition.targetGoalId !== currentGoalId)) {\n      return transition;\n    }\n    aligned = True\n  });\n  return slotPlan;\n}\n\nfunction retainedOwnedItemIdsForCandidateV1(\n  ownedItemIds: readonly number[],\n  candidate: RecommendationCandidate | undefined,\n): number[] {\n  const action = candidate?.action;\n  if (!action) return [...ownedItemIds];\n  if (action.type === 'REPLACE_ITEM') return ownedItemIds.filter((itemId) => itemId !== action.sellItemId);\n  if (action.type === 'SELL_ITEM') return ownedItemIds.filter((itemId) => itemId !== action.itemId);\n  if (action.type === 'UPGRADE_ITEM') {\n    const consumed = new Set(action.consumedItemIds);\n    return ownedItemIds.filter((itemId) => !consumed.has(itemId));\n  }\n  return [...ownedItemIds];\n}\n\nfunction applyHardInvestmentObligations(\n",
+              "function alignSlotPlanWithSelectedCandidateV1(\n  slotPlan: BuildSlotPlanV1,\n  candidate: RecommendationCandidate | undefined,\n  currentGoalId: string | undefined,\n): BuildSlotPlanV1 {\n  const action = candidate?.action;\n  if (action?.type !== 'REPLACE_ITEM') return slotPlan;\n\n  let aligned = false;\n  const futureTransitions = slotPlan.futureTransitions.map((transition) => {\n    if (transition.requirement !== 'REPLACE' ||\n      transition.targetItemId !== action.buyItemId ||\n      (currentGoalId !== undefined && transition.targetGoalId !== currentGoalId)) {\n      return transition;\n    }\n    aligned = true;\n    return {\n      ...transition,\n      sourceItemId: action.sellItemId,\n      reasonCodes: unique([...transition.reasonCodes, 'WHOLE_BUILD_REPLACEMENT_SELECTED']).sort(),\n    };\n  });\n  if (!aligned) return slotPlan;\n  return {\n    ...slotPlan,\n    futureTransitions,\n    reasonCodes: unique([...slotPlan.reasonCodes, 'WHOLE_BUILD_REPLACEMENT_SELECTED']).sort(),\n  };\n}\n\nfunction retainedOwnedItemIdsForCandidateV1(\n  ownedItemIds: readonly number[],\n  candidate: RecommendationCandidate | undefined,\n): number[] {\n  const action = candidate?.action;\n  if (!action) return [...ownedItemIds];\n  if (action.type === 'REPLACE_ITEM') return ownedItemIds.filter((itemId) => itemId !== action.sellItemId);\n  if (action.type === 'SELL_ITEM') return ownedItemIds.filter((itemId) => itemId !== action.itemId);\n  if (action.type === 'UPGRADE_ITEM') {\n    const consumed = new Set(action.consumedItemIds);\n    return ownedItemIds.filter((itemId) => !consumed.has(itemId));\n  }\n  return [...ownedItemIds];\n}\n\nfunction applyHardInvestmentObligations(\n",
           )
-
-          bad = """function alignSlotPlanWithSelectedCandidateV1(
-  slotPlan: BuildSlotPlanV1,
-  candidate: RecommendationCandidate | undefined,
-  currentGoalId: string | undefined,
-): BuildSlotPlanV1 {
-  const action = candidate?.action;
-  if (action?.type !== 'REPLACE_ITEM') return slotPlan;
-
-  let aligned = false;
-  const futureTransitions = slotPlan.futureTransitions.map((transition) => {
-    if (transition.requirement !== 'REPLACE' ||
-      transition.targetItemId !== action.buyItemId ||
-      (currentGoalId !== undefined && transition.targetGoalId !== currentGoalId)) {
-      return transition;
-    }
-    aligned = True
-  });
-  return slotPlan;
-}
-"""
-          good = """function alignSlotPlanWithSelectedCandidateV1(
-  slotPlan: BuildSlotPlanV1,
-  candidate: RecommendationCandidate | undefined,
-  currentGoalId: string | undefined,
-): BuildSlotPlanV1 {
-  const action = candidate?.action;
-  if (action?.type !== 'REPLACE_ITEM') return slotPlan;
-
-  let aligned = false;
-  const futureTransitions = slotPlan.futureTransitions.map((transition) => {
-    if (transition.requirement !== 'REPLACE' ||
-      transition.targetItemId !== action.buyItemId ||
-      (currentGoalId !== undefined && transition.targetGoalId !== currentGoalId)) {
-      return transition;
-    }
-    aligned = true;
-    return {
-      ...transition,
-      sourceItemId: action.sellItemId,
-      reasonCodes: unique([...transition.reasonCodes, 'WHOLE_BUILD_REPLACEMENT_SELECTED']).sort(),
-    };
-  });
-  if (!aligned) return slotPlan;
-  return {
-    ...slotPlan,
-    futureTransitions,
-    reasonCodes: unique([...slotPlan.reasonCodes, 'WHOLE_BUILD_REPLACEMENT_SELECTED']).sort(),
-  };
-}
-"""
-          if bad not in source:
-              raise SystemExit('Expected temporary alignment function was not inserted')
-          source = source.replace(bad, good, 1)
 
           path.write_text(source)
           PY
