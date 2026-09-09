@@ -103,26 +103,28 @@ const strategy: BuildStrategySpecV1 = {
   terminalPolicy: { requiredGoalIds: ['target'], allowWaiveSoftGoals: true },
 };
 
-const scorer = {
-  scoreItem(itemId: number) {
-    const weighted = itemId === 1 ? 0.9 : itemId === 2 ? 0.1 : itemId === 13 ? 0.8 : 0.4;
-    return {
-      itemId,
-      score: weighted,
-      confidence: 0.9,
-      completeness: 1,
-      components: [{
-        key: 'skeletonPrior',
-        raw: weighted,
-        normalized: weighted,
+function scorerFor(overrides: Readonly<Record<number, number>> = {}): any {
+  return {
+    scoreItem(itemId: number) {
+      const weighted = overrides[itemId] ?? 0.4;
+      return {
+        itemId,
+        score: weighted,
         confidence: 0.9,
-        weight: 1,
-        weighted,
-      }],
-      version: 'adaptive-evidence-scorer-v1' as const,
-    };
-  },
-} as any;
+        completeness: 1,
+        components: [{
+          key: 'skeletonPrior',
+          raw: weighted,
+          normalized: weighted,
+          confidence: 0.9,
+          weight: 1,
+          weighted,
+        }],
+        version: 'adaptive-evidence-scorer-v1' as const,
+      };
+    },
+  };
+}
 
 const evidence: any = {
   heroId: 1,
@@ -138,7 +140,7 @@ const evidence: any = {
 
 describe('strategy-first whole-build replacement v1', () => {
   it('sells the lower-value flex item instead of the cheapest item at 12/12', () => {
-    const planner = new StrategyFirstBuildPlannerV1Service(scorer);
+    const planner = new StrategyFirstBuildPlannerV1Service(scorerFor({ 1: 0.9, 2: 0.1, 13: 0.8 }));
     const result = planner.plan({ decision, evidence, strategies: [strategy], planningDepth: 1 });
 
     expect(result.rankedImmediateCandidates[0]?.action).toMatchObject({
@@ -162,5 +164,15 @@ describe('strategy-first whole-build replacement v1', () => {
     expect(result.recommendedBuild).toHaveLength(12);
     expect(result.recommendedBuild.some((item) => item.itemId === 2)).toBe(false);
     expect(result.recommendedBuild.find((item) => item.itemId === 13)?.status).toBe('NEXT');
+  });
+
+  it('rejects a +0.15 replacement at 12/12 without projecting a thirteenth item', () => {
+    const planner = new StrategyFirstBuildPlannerV1Service(scorerFor({ 1: 0.9, 2: 0.1, 13: 0.25 }));
+    const result = planner.plan({ decision, evidence, strategies: [strategy], planningDepth: 1 });
+
+    expect(result.nextAction.type).not.toBe('REPLACE');
+    expect(result.nextAction.type).not.toBe('BUY');
+    expect(result.recommendedBuild.length).toBeLessThanOrEqual(12);
+    expect(result.recommendedBuild.some((item) => item.itemId === 13)).toBe(false);
   });
 });
