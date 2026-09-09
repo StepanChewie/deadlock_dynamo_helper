@@ -194,13 +194,17 @@ export class StrategyFirstBuildPlannerV1Service {
       input.decision.investment,
       transactionSelected ? 'TRANSACTION' : 'WAIT',
     );
-    const slotPlan = this.slots.plan({
-      strategy,
-      contract: investmentAwareContract,
-      itemGraph: input.decision.itemGraph,
-      ownedItemIds,
-      slots: input.decision.slots,
-    });
+    const slotPlan = alignSlotPlanWithSelectedCandidateV1(
+      this.slots.plan({
+        strategy,
+        contract: investmentAwareContract,
+        itemGraph: input.decision.itemGraph,
+        ownedItemIds,
+        slots: input.decision.slots,
+      }),
+      first?.candidate,
+      investmentAwareContract.currentGoalId,
+    );
     const effectiveContract = slotPlan.feasible
       ? investmentAwareContract
       : {
@@ -632,7 +636,8 @@ export class StrategyFirstBuildPlannerV1Service {
     nextAction: AdaptiveActionV1,
     nextCandidate: RecommendationCandidate | undefined,
   ): readonly AdaptivePlannedItemV1[] {
-    const owned = heldIds(input.decision.state);
+    const currentOwned = heldIds(input.decision.state);
+    const owned = retainedOwnedItemIdsForCandidateV1(currentOwned, nextCandidate);
     const rows: AdaptivePlannedItemV1[] = owned.map((itemId, index) => ({
       itemId,
       position: index + 1,
@@ -723,6 +728,51 @@ export class StrategyFirstBuildPlannerV1Service {
       enemyCompositionKey: [...input.decision.enemyHeroIds].sort((a, b) => a - b).join(','),
     };
   }
+}
+
+function alignSlotPlanWithSelectedCandidateV1(
+  slotPlan: BuildSlotPlanV1,
+  candidate: RecommendationCandidate | undefined,
+  currentGoalId: string | undefined,
+): BuildSlotPlanV1 {
+  const action = candidate?.action;
+  if (action?.type !== 'REPLACE_ITEM') return slotPlan;
+
+  let aligned = false;
+  const futureTransitions = slotPlan.futureTransitions.map((transition) => {
+    if (transition.requirement !== 'REPLACE' ||
+      transition.targetItemId !== action.buyItemId ||
+      (currentGoalId !== undefined && transition.targetGoalId !== currentGoalId)) {
+      return transition;
+    }
+    aligned = true;
+    return {
+      ...transition,
+      sourceItemId: action.sellItemId,
+      reasonCodes: unique([...transition.reasonCodes, 'WHOLE_BUILD_REPLACEMENT_SELECTED']).sort(),
+    };
+  });
+  if (!aligned) return slotPlan;
+  return {
+    ...slotPlan,
+    futureTransitions,
+    reasonCodes: unique([...slotPlan.reasonCodes, 'WHOLE_BUILD_REPLACEMENT_SELECTED']).sort(),
+  };
+}
+
+function retainedOwnedItemIdsForCandidateV1(
+  ownedItemIds: readonly number[],
+  candidate: RecommendationCandidate | undefined,
+): number[] {
+  const action = candidate?.action;
+  if (!action) return [...ownedItemIds];
+  if (action.type === 'REPLACE_ITEM') return ownedItemIds.filter((itemId) => itemId !== action.sellItemId);
+  if (action.type === 'SELL_ITEM') return ownedItemIds.filter((itemId) => itemId !== action.itemId);
+  if (action.type === 'UPGRADE_ITEM') {
+    const consumed = new Set(action.consumedItemIds);
+    return ownedItemIds.filter((itemId) => !consumed.has(itemId));
+  }
+  return [...ownedItemIds];
 }
 
 function applyHardInvestmentObligations(
