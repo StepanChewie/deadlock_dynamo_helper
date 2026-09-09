@@ -89,7 +89,7 @@ function score(itemId: number, confidence = 0.9): AdaptiveItemScoreV1 {
   };
 }
 
-function input(legal: RecommendationCandidate, coverage: number): any {
+function input(legal: RecommendationCandidate, coverage: number, matchupConfidence = 0.9): any {
   return {
     strategy,
     openWindows: strategy.situationalWindows,
@@ -103,7 +103,7 @@ function input(legal: RecommendationCandidate, coverage: number): any {
       '3': {
         raw: 0.08,
         normalized: 0.7,
-        confidence: 0.9,
+        confidence: matchupConfidence,
         coverage,
         usedCount: 1,
         contributions: [],
@@ -128,6 +128,12 @@ describe('matchup candidate discovery v1', () => {
 
   it('rejects an outside-skeleton counter when matchup coverage is below the discovery threshold', () => {
     const result = service.discover(input(candidate({ type: 'BUY_ITEM', itemId: 3 }, [1, 3]), 0.05));
+
+    expect(result).toEqual([]);
+  });
+
+  it('rejects an outside-skeleton counter when matchup confidence is below the situational threshold', () => {
+    const result = service.discover(input(candidate({ type: 'BUY_ITEM', itemId: 3 }, [1, 3]), 0.8, 0.2));
 
     expect(result).toEqual([]);
   });
