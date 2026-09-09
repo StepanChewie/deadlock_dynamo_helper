@@ -361,6 +361,7 @@ describe('AdaptiveRecommendationV1Service', () => {
       'AdaptiveBuildPlannerV1Service',
       'AdaptiveReplayV1Service',
       'AdaptiveRecommendationObservabilityV1Service',
+      'StrategyFirstPromotionGateV1Service',
     ]);
     expect(names.join('|')).not.toMatch(/BrowserCollector|RecommendationRealtime|RecommendationEngine|Behavioral|Value|Policy/);
   });
