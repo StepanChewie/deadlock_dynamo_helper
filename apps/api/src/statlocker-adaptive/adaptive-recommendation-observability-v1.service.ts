@@ -51,6 +51,24 @@ export interface AdaptiveRecommendationObservabilityCountersV1 {
   transactionPlanUnblockedStepCount: number;
   transactionPlanReplacementPairCount: number;
   transactionPlanValidationFailureCount: number;
+  threatWeightedShadowComparisonCount: number;
+  threatWeightedShadowFailureCount: number;
+  threatWeightedWouldSwitchCount: number;
+  threatWeightedBranchDifferenceCount: number;
+  threatWeightedWildcardActivationCount: number;
+  threatWeightedReplacementActivationCount: number;
+  threatWeightedDisagreementCount: number;
+  threatWeightedStaleEvidenceFallbackCount: number;
+  threatWeightedLowMatchupConfidenceCount: number;
+  threatWeightedHardCoreViolationAttemptCount: number;
+  threatWeightedInventoryViolationCount: number;
+  wpaQueryCount: number;
+  wpaQueryLatencyMsTotal: number;
+  wpaQueryLatencyMsMax: number;
+  wpaIngestCount: number;
+  wpaIngestFailureCount: number;
+  wpaIngestRowCountTotal: number;
+  wpaIngestLatencyMsTotal: number;
 }
 
 export interface TransactionPlanProjectedSlotUsageV1 {
@@ -78,6 +96,31 @@ export interface TransactionPlanObservabilitySnapshotV1 {
   validatorViolationCodes: readonly string[];
 }
 
+export interface ThreatWeightedShadowComparisonV1 {
+  decisionId: string;
+  stateRevision: string;
+  currentPlanFingerprint: string;
+  challengerPlanFingerprint: string;
+  currentNextActionKey: string;
+  challengerNextActionKey: string;
+  nextItemDifference: boolean;
+  branchDifference: boolean;
+  wildcardActivation: boolean;
+  replacementActivation: boolean;
+  sellSource?: number;
+  matchupConfidence?: number;
+  utilityImprovement: number;
+  wouldSwitch: boolean;
+  reasonCodes: readonly string[];
+}
+
+export interface WpaIngestObservationV1 {
+  dataset: 'VS_HERO_WPA';
+  durationMs: number;
+  rowCount: number;
+  failure?: string;
+}
+
 export interface AdaptiveRecommendationObservabilityStatusV1 {
   updatedAt: string;
   plannerLatencyMs: AdaptiveRecommendationObservabilityLatencyV1;
@@ -85,6 +128,8 @@ export interface AdaptiveRecommendationObservabilityStatusV1 {
   strategyFirstRelease: StrategyFirstInvariantSummaryV1;
   transactionPlanRelease: TransactionPlanInvariantSummaryV1;
   latestTransactionPlan?: TransactionPlanObservabilitySnapshotV1;
+  latestThreatWeightedShadow?: ThreatWeightedShadowComparisonV1;
+  latestWpaIngest?: WpaIngestObservationV1;
   reasonCodeCounts: Record<string, number>;
 }
 
@@ -143,6 +188,8 @@ export class AdaptiveRecommendationObservabilityV1Service {
   private evaluatedStrategyDecisions = 0;
   private evaluatedTransactionPlanDecisions = 0;
   private latestTransactionPlan?: TransactionPlanObservabilitySnapshotV1;
+  private latestThreatWeightedShadow?: ThreatWeightedShadowComparisonV1;
+  private latestWpaIngest?: WpaIngestObservationV1;
   private readonly status = {
     updatedAt: new Date(0).toISOString(),
     plannerLatencyMs: {
@@ -177,6 +224,24 @@ export class AdaptiveRecommendationObservabilityV1Service {
       transactionPlanUnblockedStepCount: 0,
       transactionPlanReplacementPairCount: 0,
       transactionPlanValidationFailureCount: 0,
+      threatWeightedShadowComparisonCount: 0,
+      threatWeightedShadowFailureCount: 0,
+      threatWeightedWouldSwitchCount: 0,
+      threatWeightedBranchDifferenceCount: 0,
+      threatWeightedWildcardActivationCount: 0,
+      threatWeightedReplacementActivationCount: 0,
+      threatWeightedDisagreementCount: 0,
+      threatWeightedStaleEvidenceFallbackCount: 0,
+      threatWeightedLowMatchupConfidenceCount: 0,
+      threatWeightedHardCoreViolationAttemptCount: 0,
+      threatWeightedInventoryViolationCount: 0,
+      wpaQueryCount: 0,
+      wpaQueryLatencyMsTotal: 0,
+      wpaQueryLatencyMsMax: 0,
+      wpaIngestCount: 0,
+      wpaIngestFailureCount: 0,
+      wpaIngestRowCountTotal: 0,
+      wpaIngestLatencyMsTotal: 0,
     } satisfies AdaptiveRecommendationObservabilityCountersV1,
     reasonCodeCounts: {} as Record<string, number>,
   };
@@ -232,6 +297,9 @@ export class AdaptiveRecommendationObservabilityV1Service {
   recordStrategyInvariantCheck(check: StrategyFirstInvariantCheckV1): void {
     this.evaluatedStrategyDecisions += 1;
     const codes = new Set(check.violations.map((violation) => violation.code));
+    if (codes.has('MANDATORY_GOAL_LOST') || codes.has('CORE_WITHOUT_EXIT_SLOT')) {
+      this.status.counters.threatWeightedHardCoreViolationAttemptCount += 1;
+    }
     for (const code of codes) {
       this.invariantViolationDecisionCounts.set(code, (this.invariantViolationDecisionCounts.get(code) ?? 0) + 1);
     }
@@ -242,6 +310,9 @@ export class AdaptiveRecommendationObservabilityV1Service {
   recordTransactionPlanInvariantCheck(check: TransactionPlanInvariantCheckV1): void {
     this.evaluatedTransactionPlanDecisions += 1;
     const codes = new Set(check.violations.map((violation) => violation.code));
+    if (codes.has('PROJECTED_SLOT_VIOLATION')) {
+      this.status.counters.threatWeightedInventoryViolationCount += 1;
+    }
     for (const code of codes) {
       this.transactionInvariantViolationDecisionCounts.set(
         code,
@@ -355,6 +426,62 @@ export class AdaptiveRecommendationObservabilityV1Service {
     );
   }
 
+  recordThreatWeightedShadowComparison(
+    comparison: ThreatWeightedShadowComparisonV1,
+  ): void {
+    this.status.counters.threatWeightedShadowComparisonCount += 1;
+    if (comparison.wouldSwitch) this.status.counters.threatWeightedWouldSwitchCount += 1;
+    if (comparison.branchDifference) this.status.counters.threatWeightedBranchDifferenceCount += 1;
+    if (comparison.wildcardActivation) this.status.counters.threatWeightedWildcardActivationCount += 1;
+    if (comparison.replacementActivation) this.status.counters.threatWeightedReplacementActivationCount += 1;
+    if (comparison.currentPlanFingerprint !== comparison.challengerPlanFingerprint) {
+      this.status.counters.threatWeightedDisagreementCount += 1;
+    }
+    if ((comparison.matchupConfidence ?? 1) < 0.4) {
+      this.status.counters.threatWeightedLowMatchupConfidenceCount += 1;
+    }
+    this.latestThreatWeightedShadow = { ...comparison, reasonCodes: comparison.reasonCodes.slice(0, 12) };
+    this.recordReasonCodes(comparison.reasonCodes.slice(0, 12));
+    this.touch();
+    this.logger.debug(`threat-weighted-shadow ${JSON.stringify(this.latestThreatWeightedShadow)}`);
+  }
+
+  recordThreatWeightedShadowFailure(decisionId: string, error: unknown): void {
+    this.status.counters.threatWeightedShadowFailureCount += 1;
+    this.touch();
+    this.logger.debug(`threat-weighted-shadow-failure ${JSON.stringify({
+      decisionId,
+      error: error instanceof Error ? error.message : String(error),
+    })}`);
+  }
+
+  recordThreatWeightedStaleEvidenceFallback(): void {
+    this.status.counters.threatWeightedStaleEvidenceFallbackCount += 1;
+    this.touch();
+  }
+
+  recordWpaQueryLatency(durationMs: number): void {
+    const bounded = Number.isFinite(durationMs) ? Math.max(0, durationMs) : 0;
+    this.status.counters.wpaQueryCount += 1;
+    this.status.counters.wpaQueryLatencyMsTotal += bounded;
+    this.status.counters.wpaQueryLatencyMsMax = Math.max(this.status.counters.wpaQueryLatencyMsMax, bounded);
+  }
+
+  recordWpaIngestOutcome(observation: WpaIngestObservationV1): void {
+    const bounded = Number.isFinite(observation.durationMs) ? Math.max(0, observation.durationMs) : 0;
+    this.status.counters.wpaIngestCount += 1;
+    this.status.counters.wpaIngestLatencyMsTotal += bounded;
+    this.status.counters.wpaIngestRowCountTotal += Number.isInteger(observation.rowCount) ? observation.rowCount : 0;
+    if (observation.failure) this.status.counters.wpaIngestFailureCount += 1;
+    this.latestWpaIngest = {
+      dataset: observation.dataset,
+      durationMs: bounded,
+      rowCount: observation.rowCount,
+      ...(observation.failure ? { failure: observation.failure.slice(0, 200) } : {}),
+    };
+    this.touch();
+  }
+
   getStatus(): AdaptiveRecommendationObservabilityStatusV1 {
     return {
       updatedAt: this.status.updatedAt,
@@ -365,6 +492,10 @@ export class AdaptiveRecommendationObservabilityV1Service {
       latestTransactionPlan: this.latestTransactionPlan
         ? cloneTransactionSnapshot(this.latestTransactionPlan)
         : undefined,
+      latestThreatWeightedShadow: this.latestThreatWeightedShadow
+        ? { ...this.latestThreatWeightedShadow }
+        : undefined,
+      latestWpaIngest: this.latestWpaIngest ? { ...this.latestWpaIngest } : undefined,
       reasonCodeCounts: { ...this.status.reasonCodeCounts },
     };
   }

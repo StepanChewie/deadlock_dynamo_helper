@@ -35,6 +35,8 @@ export interface StatlockerRefreshStatusV1 {
 }
 
 const MINUTE = 60_000;
+import { AdaptiveRecommendationObservabilityV1Service } from './adaptive-recommendation-observability-v1.service';
+
 const HOUR = 60 * MINUTE;
 const GLOBAL_REFRESH_TTL_MS = 30 * MINUTE;
 const VS_HERO_WPA_REFRESH_TTL_MS = 24 * HOUR;
@@ -73,6 +75,7 @@ export class StatlockerRefreshService {
     @Optional() private readonly rawVsHeroWpaStore?: StatlockerVsHeroWpaRawStoreV1Service,
     @Optional() private readonly vsHeroWpaRowNormalizer?: StatlockerVsHeroWpaRowNormalizerV1Service,
     @Optional() private readonly vsHeroWpaPublisher?: StatlockerVsHeroWpaPublisherV1Service,
+    @Optional() private readonly observability?: AdaptiveRecommendationObservabilityV1Service,
   ) {}
 
   observeGameIdentity(identity: StatlockerGameIdentityV1, _nowMs = Date.now()): void {
@@ -138,6 +141,7 @@ export class StatlockerRefreshService {
             }
             if (rawSnapshot.ingestStatus === 'PUBLISHED') continue;
 
+            const ingestStartedAt = Date.now();
             try {
               if (!this.vsHeroWpaRowNormalizer || !this.vsHeroWpaPublisher) {
                 throw new Error('VS_HERO_WPA relational ingest dependencies are unavailable');
@@ -152,7 +156,18 @@ export class StatlockerRefreshService {
                 snapshotId: rawSnapshot.snapshotId,
                 rows,
               });
+              this.observability?.recordWpaIngestOutcome({
+                dataset: 'VS_HERO_WPA',
+                durationMs: Date.now() - ingestStartedAt,
+                rowCount: rows.length,
+              });
             } catch (error) {
+              this.observability?.recordWpaIngestOutcome({
+                dataset: 'VS_HERO_WPA',
+                durationMs: Date.now() - ingestStartedAt,
+                rowCount: 0,
+                failure: error instanceof Error ? error.message : String(error),
+              });
               if (this.vsHeroWpaPublisher) {
                 await this.vsHeroWpaPublisher.markFailed(rawSnapshot.snapshotId, error);
               }

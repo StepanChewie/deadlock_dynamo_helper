@@ -116,7 +116,9 @@ jobs:
             test/statlocker-vs-hero-wpa-roadmap-fixture-v1.spec.ts \
             test/statlocker-vs-hero-wpa-atomic-publish-v1.spec.ts \
             test/situational-threshold-config-v1.spec.ts \
-            test/statlocker-vs-hero-wpa-row-v1.spec.ts
+            test/statlocker-vs-hero-wpa-row-v1.spec.ts \
+            test/threat-weighted-wpa-golden-replay-v1.spec.ts \
+            test/threat-weighted-serving-policy-v1.spec.ts
 
       - name: Build API
         shell: bash

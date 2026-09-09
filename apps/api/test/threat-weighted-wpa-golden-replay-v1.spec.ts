@@ -339,7 +339,9 @@ function goldenWpaPatchDataPayload() {
       meanWpa: 0.05,
       wpaConfidence: 0.9,
       gameState: { ahead: 0.05, even: 0.05, behind: 0.05 },
-      purchaseTiming: { medianPurchaseSec: 200 + (index % SKELETON_ITEM_IDS.length) * 150 },
+      // Non-skeleton items share one timing profile so only the relational
+      // VS_HERO_WPA matchup evidence can separate them from skeleton items.
+      purchaseTiming: { medianPurchaseSec: index < SKELETON_ITEM_IDS.length ? 200 + index * 150 : 900 },
       laneWpa: 0.05,
       postLaneWpa: 0.05,
     })),
@@ -381,7 +383,7 @@ interface GoldenWpaRowSpec {
   rankBucket?: string;
 }
 
-function goldenRows(specs: readonly GoldenWpaRowSpec[]): StatlockerVsHeroWpaAggregateSourceV1[] {
+export function goldenRows(specs: readonly GoldenWpaRowSpec[]): StatlockerVsHeroWpaAggregateSourceV1[] {
   return specs.map((spec) => ({
     heroId: OUR_HERO,
     enemyHeroId: spec.enemyHeroId,

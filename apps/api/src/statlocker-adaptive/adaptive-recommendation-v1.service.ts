@@ -44,6 +44,10 @@ import {
 } from './adaptive-strategy-state-view-v1';
 import { DraftMatchupEvidenceV1Service } from './draft-matchup-evidence-v1.service';
 import {
+  StrategyFirstPromotionGateV1Service,
+  ThreatWeightedServingModeV1,
+} from './strategy-first-promotion-gate-v1.service';
+import {
   AdaptiveStrategySessionV1,
   resolveAdaptiveStrategySessionV1,
 } from './strategy-session-v1';
@@ -77,13 +81,18 @@ export class AdaptiveRecommendationV1Service {
   @Inject(DraftMatchupEvidenceV1Service)
   private readonly draftMatchupEvidence?: DraftMatchupEvidenceV1Service;
 
+  private readonly promotionGate?: StrategyFirstPromotionGateV1Service;
+
   constructor(
     private readonly decisionState: AdaptiveDecisionStateV1Service,
     private readonly evidence: StatlockerEvidenceService,
     private readonly planner: AdaptiveBuildPlannerV1Service,
     private readonly replay: AdaptiveReplayV1Service,
     private readonly observability: AdaptiveRecommendationObservabilityV1Service = new AdaptiveRecommendationObservabilityV1Service(),
-  ) {}
+    promotionGate?: StrategyFirstPromotionGateV1Service,
+  ) {
+    this.promotionGate = promotionGate;
+  }
 
   async recommend(request: AdaptiveRecommendationRequestV1): Promise<AdaptiveRecommendationResultV1> {
     validateRequest(request);
@@ -115,28 +124,39 @@ export class AdaptiveRecommendationV1Service {
     const localEvidence = typeof getEvidence === 'function'
       ? getEvidence.call(this.evidence, evidenceRequest)
       : this.evidence.getLocalEvidence(evidenceRequest);
-    const initialPlanningEvidence = await this.enrichDraftMatchupEvidence(localEvidence, initial);
-    this.observability.recordEvidence(initialPlanningEvidence);
+    const { serving: initialServingEvidence, challenger: initialChallengerEvidence } =
+      await this.resolveServingEvidence(localEvidence, initial);
+    this.observability.recordEvidence(initialServingEvidence);
 
     let plannerUnavailable = false;
     let plannedBundle: PlannedRecommendationV1 | undefined;
-    if (initialPlanningEvidence.usable &&
+    if (initialServingEvidence.usable &&
       initial.economyRulesEvidence !== 'UNKNOWN' &&
       initial.slots?.mechanicsEvidence !== 'UNKNOWN') {
       try {
         plannedBundle = this.planWithSituational(
           initial,
-          initialPlanningEvidence,
+          initialServingEvidence,
           previous,
           initialDelta.purchasedItemIds,
           initialDelta.soldItemIds,
           false,
         );
+        if (initialChallengerEvidence && plannedBundle) {
+          this.planShadowChallenger(
+            initial,
+            initialChallengerEvidence,
+            plannedBundle.planned,
+            previous,
+            initialDelta.purchasedItemIds,
+            initialDelta.soldItemIds,
+          );
+        }
       } catch (error) {
         plannerUnavailable = true;
         this.observability.recordEvidence({
-          ...initialPlanningEvidence,
-          degradedReasons: [...initialPlanningEvidence.degradedReasons, `PLANNER_UNAVAILABLE:${error instanceof Error ? error.message : 'UNKNOWN'}`],
+          ...initialServingEvidence,
+          degradedReasons: [...initialServingEvidence.degradedReasons, `PLANNER_UNAVAILABLE:${error instanceof Error ? error.message : 'UNKNOWN'}`],
         });
       }
     }
@@ -147,14 +167,14 @@ export class AdaptiveRecommendationV1Service {
       [...fresh.state.inventory.heldByItemId.keys()],
       fresh.itemGraph,
     );
-    const freshPlanningEvidence = fresh.stateRevision === initial.stateRevision
-      ? initialPlanningEvidence
-      : await this.enrichDraftMatchupEvidence(localEvidence, fresh);
-    if (freshPlanningEvidence.usable && plannedBundle && fresh.stateRevision !== initial.stateRevision) {
+    const freshServingEvidence = fresh.stateRevision === initial.stateRevision
+      ? initialServingEvidence
+      : (await this.resolveServingEvidence(localEvidence, fresh)).serving;
+    if (freshServingEvidence.usable && plannedBundle && fresh.stateRevision !== initial.stateRevision) {
       try {
         plannedBundle = this.planWithSituational(
           fresh,
-          freshPlanningEvidence,
+          freshServingEvidence,
           previous,
           freshDelta.purchasedItemIds,
           freshDelta.soldItemIds,
@@ -168,7 +188,7 @@ export class AdaptiveRecommendationV1Service {
     const planned = plannedBundle?.planned;
     const situationalByTargetItemId = plannedBundle?.situationalByTargetItemId ?? new Map();
 
-    const criticalEvidenceUnavailable = !freshPlanningEvidence.usable ||
+    const criticalEvidenceUnavailable = !freshServingEvidence.usable ||
       fresh.economyRulesEvidence === 'UNKNOWN' ||
       fresh.slots?.mechanicsEvidence === 'UNKNOWN' ||
       plannerUnavailable;
@@ -183,7 +203,7 @@ export class AdaptiveRecommendationV1Service {
         .map((candidate) => [candidate.actionId, candidate]),
     );
 
-    const blockers = new Set<string>(freshPlanningEvidence.degradedReasons);
+    const blockers = new Set<string>(freshServingEvidence.degradedReasons);
     if (plannerUnavailable) blockers.add('STRATEGY_OUT_OF_DISTRIBUTION');
     if (fresh.economyRulesEvidence === 'UNKNOWN') blockers.add('RULESET_ECONOMY_MECHANICS_UNKNOWN');
     if (fresh.slots?.mechanicsEvidence === 'UNKNOWN') blockers.add('SLOT_MECHANICS_UNKNOWN');
@@ -194,8 +214,8 @@ export class AdaptiveRecommendationV1Service {
     let legalityFallbackReasonCodes: readonly string[] = [];
 
     if (criticalEvidenceUnavailable) {
-      if (!freshPlanningEvidence.usable) blockers.add('STATLOCKER_EVIDENCE_UNAVAILABLE');
-      result = unavailableRecommendation(fresh, freshPlanningEvidence, blockers);
+      if (!freshServingEvidence.usable) blockers.add('STATLOCKER_EVIDENCE_UNAVAILABLE');
+      result = unavailableRecommendation(fresh, freshServingEvidence, blockers);
     } else if (planned) {
       let freshBuild = planned.planSession
         ? planned.recommendedBuild
@@ -263,7 +283,7 @@ export class AdaptiveRecommendationV1Service {
         strategy: planned.strategy,
         planSession,
         decisionTrace: planned.decisionTrace,
-        evidence: toProvenance(freshPlanningEvidence),
+        evidence: toProvenance(freshServingEvidence),
       };
     } else {
       throw new Error('Adaptive planner did not produce a result');
@@ -287,7 +307,7 @@ export class AdaptiveRecommendationV1Service {
     if (reconciledDecisionTrace) result = { ...result, decisionTrace: reconciledDecisionTrace };
 
     this.observability.recordRecommendationOutcome({
-      evidence: freshPlanningEvidence,
+      evidence: freshServingEvidence,
       decision: fresh,
       previousResult: previous,
       result,
@@ -295,7 +315,7 @@ export class AdaptiveRecommendationV1Service {
       legalityFallbackReasonCodes,
     });
 
-    const replayInput = this.replay.toReplayInput(fresh, freshPlanningEvidence, {
+    const replayInput = this.replay.toReplayInput(fresh, freshServingEvidence, {
       previousResult: previous,
       recentPurchasedItemIds: freshDelta.purchasedItemIds,
       recentSoldItemIds: freshDelta.soldItemIds,
@@ -320,6 +340,83 @@ export class AdaptiveRecommendationV1Service {
       return await this.draftMatchupEvidence.enrich(evidence, decision);
     } catch {
       return evidence;
+    }
+  }
+
+  private resolveThreatWeightedServingMode(): ThreatWeightedServingModeV1 {
+    // Without a configured gate the path keeps its historical threat-weighted behavior;
+    // the production module always provides the policy gate. The EFFECTIVE mode enforces
+    // the fail-closed downgrade of a blocked ACTIVE configuration to shadow serving.
+    return this.promotionGate?.threatWeightedEffectiveMode() ?? 'THREAT_WEIGHTED_ACTIVE';
+  }
+
+  private async resolveServingEvidence(
+    evidence: StatlockerEvidenceBundleV1,
+    decision: AdaptiveDecisionStateV1,
+  ): Promise<{ serving: StatlockerEvidenceBundleV1; challenger?: StatlockerEvidenceBundleV1 }> {
+    const mode = this.resolveThreatWeightedServingMode();
+    if (mode === 'CURRENT' || !this.draftMatchupEvidence) return { serving: evidence };
+    const startedAt = Date.now();
+    const enriched = await this.enrichDraftMatchupEvidence(evidence, decision);
+    this.observability.recordWpaQueryLatency(Date.now() - startedAt);
+    if ((enriched as { draftMatchupDegradedReason?: string }).draftMatchupDegradedReason) {
+      this.observability.recordThreatWeightedStaleEvidenceFallback();
+    }
+    if (mode === 'THREAT_WEIGHTED_SHADOW') return { serving: evidence, challenger: enriched };
+    return { serving: enriched };
+  }
+
+  private planShadowChallenger(
+    decision: AdaptiveDecisionStateV1,
+    challengerEvidence: StatlockerEvidenceBundleV1,
+    serving: AdaptivePlannerRuntimeResultV1,
+    previous: AdaptiveRecommendationResultV1 | undefined,
+    recentPurchasedItemIds: readonly number[],
+    recentSoldItemIds: readonly number[],
+  ): void {
+    try {
+      const challenger = this.planWithSituational(
+        decision,
+        challengerEvidence,
+        previous,
+        recentPurchasedItemIds,
+        recentSoldItemIds,
+        true,
+      ).planned;
+      const fingerprint = (result: AdaptivePlannerRuntimeResultV1): string => [
+        result.nextAction.actionKey,
+        ...result.recommendedBuild.filter((row) => row.status !== 'OWNED').map((row) => row.itemId),
+      ].join(':');
+      const selectedMatchupConfidence = (result: AdaptivePlannerRuntimeResultV1): number | undefined => {
+        const selected = result.decisionTrace?.candidates.find((candidate) => candidate.selected);
+        return selected?.matchup?.confidence;
+      };
+      const currentWildcard = serving.decisionTrace?.candidates.some((candidate) => candidate.selected && candidate.source !== 'SKELETON' && candidate.source !== 'BRANCH') ?? false;
+      const challengerWildcard = challenger.decisionTrace?.candidates.some((candidate) => candidate.selected && candidate.source !== 'SKELETON' && candidate.source !== 'BRANCH') ?? false;
+      this.observability.recordThreatWeightedShadowComparison({
+        decisionId: decision.state.decisionId,
+        stateRevision: decision.stateRevision,
+        currentPlanFingerprint: fingerprint(serving),
+        challengerPlanFingerprint: fingerprint(challenger),
+        currentNextActionKey: serving.nextAction.actionKey,
+        challengerNextActionKey: challenger.nextAction.actionKey,
+        nextItemDifference: (firstNextTargetItemId(challenger) ?? -1) !== (firstNextTargetItemId(serving) ?? -1),
+        branchDifference: JSON.stringify(serving.decisionTrace?.branchChoices ?? {}) !== JSON.stringify(challenger.decisionTrace?.branchChoices ?? {}),
+        wildcardActivation: challengerWildcard && !currentWildcard,
+        replacementActivation: challenger.nextAction.type === 'REPLACE' && serving.nextAction.type !== 'REPLACE',
+        ...(challenger.nextAction.type === 'REPLACE' && challenger.nextAction.sellItemId !== undefined
+          ? { sellSource: challenger.nextAction.sellItemId }
+          : {}),
+        ...(selectedMatchupConfidence(challenger) !== undefined
+          ? { matchupConfidence: selectedMatchupConfidence(challenger) }
+          : {}),
+        utilityImprovement: Number(((challenger.totalScore ?? 0) - (serving.totalScore ?? 0)).toFixed(6)),
+        wouldSwitch: serving.nextAction.actionKey !== challenger.nextAction.actionKey ||
+          fingerprint(serving) !== fingerprint(challenger),
+        reasonCodes: (challenger.nextAction.reasonCodes ?? []).slice(0, 12),
+      });
+    } catch (error) {
+      this.observability.recordThreatWeightedShadowFailure(decision.state.decisionId, error);
     }
   }
 
@@ -409,6 +506,10 @@ function resolveStrategySession(
     irreversibleBranchInvestment: planned.buildContract.committedChoiceItemIdsByGroup.size > 0,
     meaningfulUserDivergence: planned.buildContract.temporaryItemIds.size > 0,
   });
+}
+
+function firstNextTargetItemId(result: AdaptivePlannerRuntimeResultV1): number | undefined {
+  return result.recommendedBuild.find((row) => row.status === 'NEXT')?.itemId;
 }
 
 function optionalTargetItemIds(
