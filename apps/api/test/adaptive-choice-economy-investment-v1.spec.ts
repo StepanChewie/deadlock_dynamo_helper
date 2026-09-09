@@ -78,6 +78,15 @@ const economyRules: RecommendationEconomyRulesV1 = {
   },
 };
 
+const investmentRules: RecommendationEconomyRulesV1 = {
+  ...economyRules,
+  investmentBreakpoints: {
+    weapon: [1600],
+    vitality: [4000],
+    spirit: [1600],
+  },
+};
+
 function family(dataset: string, payload: unknown) {
   return {
     dataset,
@@ -196,8 +205,8 @@ describe('AdaptiveChoiceResolverV1Service economy and investment', () => {
       itemGraph,
       ownedItemIds,
       decisionState: decisionState(ownedItemIds, 5000),
-      investment: deriveAdaptiveInvestmentStateV1(ownedItemIds, itemGraph, economyRules),
-      economyRules,
+      investment: deriveAdaptiveInvestmentStateV1(ownedItemIds, itemGraph, investmentRules),
+      economyRules: investmentRules,
     } as any);
 
     expect(result.selectedItemId).toBe(20);
