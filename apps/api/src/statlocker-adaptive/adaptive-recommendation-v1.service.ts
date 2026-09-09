@@ -7,6 +7,7 @@ import {
 } from '@deadlock-live-probe/build-domain';
 import {
   AdaptiveActionV1,
+  AdaptiveDecisionTraceV1,
   AdaptivePlanSessionV1,
   AdaptivePlanActionV1,
   AdaptiveRecommendationRequestV1,
@@ -23,6 +24,7 @@ import {
   AdaptiveDecisionStateV1,
   AdaptiveDecisionStateV1Service,
 } from './adaptive-decision-state-v1.service';
+import { reconcileAdaptiveDecisionTraceFinalSelectionV1 } from './adaptive-decision-trace-v1.service';
 import { AdaptiveEvidenceScorerV1Service } from './adaptive-evidence-scorer-v1.service';
 import {
   buildAdaptivePlanActionsV1,
@@ -58,6 +60,7 @@ const SCORER_VERSION = 'adaptive-evidence-scorer-v1';
 type AdaptivePlannerRuntimeResultV1 = ReturnType<AdaptiveBuildPlannerV1Service['plan']> & {
   strategy?: AdaptiveRecommendationStrategyV1;
   planSession?: AdaptivePlanSessionV1;
+  decisionTrace?: AdaptiveDecisionTraceV1;
 };
 
 interface PlannedRecommendationV1 {
@@ -259,6 +262,7 @@ export class AdaptiveRecommendationV1Service {
         plannerMethod: planned.strategy ? 'STRATEGY_FIRST' : 'LEGACY_GREEDY',
         strategy: planned.strategy,
         planSession,
+        decisionTrace: planned.decisionTrace,
         evidence: toProvenance(freshPlanningEvidence),
       };
     } else {
@@ -275,6 +279,12 @@ export class AdaptiveRecommendationV1Service {
           situationalByTargetItemId,
         });
     result = reconcileResultWithSemanticPlan(result, semanticPlanActions);
+    const reconciledDecisionTrace = reconcileAdaptiveDecisionTraceFinalSelectionV1(
+      result.decisionTrace,
+      result.nextAction,
+      legalityFallback || fresh.stateRevision !== initial.stateRevision,
+    );
+    if (reconciledDecisionTrace) result = { ...result, decisionTrace: reconciledDecisionTrace };
 
     this.observability.recordRecommendationOutcome({
       evidence: freshPlanningEvidence,

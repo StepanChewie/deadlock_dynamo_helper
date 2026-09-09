@@ -16,6 +16,7 @@ import { StatlockerVsHeroWpaRowV1Entity } from '../deadlock-live/entities/statlo
 import { AdaptiveBuildPlannerV1Service } from './adaptive-build-planner-v1.service';
 import { AdaptiveChoiceResolverV1Service } from './adaptive-choice-resolver-v1.service';
 import { AdaptiveDecisionStateV1Service } from './adaptive-decision-state-v1.service';
+import { AdaptiveDecisionTraceV1Service } from './adaptive-decision-trace-v1.service';
 import { AdaptiveEvidenceScorerV1Service } from './adaptive-evidence-scorer-v1.service';
 import { AdaptivePhaseEligibilityV1Service } from './adaptive-phase-eligibility-v1.service';
 import { AdaptivePlannerServingRouterV1Service } from './adaptive-planner-serving-router-v1.service';
@@ -109,6 +110,7 @@ import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-
     ThreatWeightedMatchupV1Service,
     DraftMatchupEvidenceV1Service,
     AdaptiveEvidenceScorerV1Service,
+    AdaptiveDecisionTraceV1Service,
     AdaptivePhaseEligibilityV1Service,
     AdaptiveRecommendationObservabilityV1Service,
     AdaptiveChoiceResolverV1Service,

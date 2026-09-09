@@ -113,7 +113,7 @@ const decisionTrace: any = {
 };
 
 describe('AdaptiveRecommendationV1Service decision trace wiring', () => {
-  it('returns and persists the planner trace', async () => {
+  it('returns and persists the planner trace reconciled to the final executable action', async () => {
     const built = decision();
     const decisionState = { build: jest.fn().mockResolvedValue(built) };
     const planningEvidence = evidence();
@@ -149,9 +149,11 @@ describe('AdaptiveRecommendationV1Service decision trace wiring', () => {
 
     const result = await service.recommend({ matchId: built.state.matchId, localSteamId: built.localSteamId });
 
-    expect((result as any).decisionTrace).toEqual(decisionTrace);
+    expect(result.decisionTrace).toBeDefined();
+    expect(result.decisionTrace?.finalSelection.action).toEqual(result.nextAction);
+    expect(result.decisionTrace?.finalSelection.legalityRecheckChanged).toBe(true);
     expect(replay.persist).toHaveBeenCalledWith(expect.objectContaining({
-      result: expect.objectContaining({ decisionTrace }),
+      result: expect.objectContaining({ decisionTrace: result.decisionTrace }),
     }));
   });
 });
