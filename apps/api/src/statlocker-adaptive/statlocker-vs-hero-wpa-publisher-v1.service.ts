@@ -35,7 +35,7 @@ export class StatlockerVsHeroWpaPublisherV1Service {
           order: { fetchedAt: 'DESC' },
         });
 
-        await rowRepository.insert(input.rows);
+        await rowRepository.insert([...input.rows]);
 
         if (previous && previous.snapshotId !== snapshot.snapshotId) {
           await rawRepository.update(
