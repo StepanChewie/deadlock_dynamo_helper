@@ -1,6 +1,7 @@
 // RED contract: relational row implementation must satisfy this shape and index policy.
 import { getMetadataArgsStorage } from 'typeorm';
 import { StatlockerVsHeroWpaRowV1Entity } from '../src/deadlock-live/entities/statlocker-vs-hero-wpa-row-v1.entity';
+import { StatlockerVsHeroWpaRepositoryV1Service } from '../src/statlocker-adaptive/statlocker-vs-hero-wpa-repository-v1.service';
 
 describe('Statlocker VS_HERO_WPA relational row V1 contract', () => {
   it('maps the required relational row shape', () => {
@@ -46,5 +47,65 @@ describe('Statlocker VS_HERO_WPA relational row V1 contract', () => {
         columns: ['snapshotId', 'rankBucket', 'heroId', 'enemyHeroId', 'itemId'],
       },
     ]));
+  });
+
+  it('queries one explicit immutable snapshot and requested enemy set without collapsing rank rows', async () => {
+    const repository = {
+      find: jest.fn(async () => []),
+    };
+    const service = new StatlockerVsHeroWpaRepositoryV1Service(repository as never);
+
+    await service.findForSnapshot({
+      snapshotId: 'snapshot-a',
+      statlockerPatchId: 'patch-a',
+      rulesetVersion: 'ruleset-a',
+      catalogSha256: 'A'.repeat(64),
+      ourHeroId: 1,
+      enemyHeroIds: [3, 2, 3],
+    });
+
+    expect(repository.find).toHaveBeenCalledWith({
+      where: [
+        {
+          snapshotId: 'snapshot-a',
+          statlockerPatchId: 'patch-a',
+          rulesetVersion: 'ruleset-a',
+          catalogSha256: 'a'.repeat(64),
+          heroId: 1,
+          enemyHeroId: 2,
+        },
+        {
+          snapshotId: 'snapshot-a',
+          statlockerPatchId: 'patch-a',
+          rulesetVersion: 'ruleset-a',
+          catalogSha256: 'a'.repeat(64),
+          heroId: 1,
+          enemyHeroId: 3,
+        },
+      ],
+      order: {
+        itemId: 'ASC',
+        enemyHeroId: 'ASC',
+        rankBucket: 'ASC',
+      },
+    });
+  });
+
+  it('does not query storage when the enemy set is empty', async () => {
+    const repository = {
+      find: jest.fn(async () => []),
+    };
+    const service = new StatlockerVsHeroWpaRepositoryV1Service(repository as never);
+
+    await expect(service.findForSnapshot({
+      snapshotId: 'snapshot-a',
+      statlockerPatchId: 'patch-a',
+      rulesetVersion: 'ruleset-a',
+      catalogSha256: 'a'.repeat(64),
+      ourHeroId: 1,
+      enemyHeroIds: [],
+    })).resolves.toEqual([]);
+
+    expect(repository.find).not.toHaveBeenCalled();
   });
 });
