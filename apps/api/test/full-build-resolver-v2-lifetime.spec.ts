@@ -1,4 +1,5 @@
 import {
+  RecommendationCandidate,
   RecommendationItemDefinition,
   createRecommendationItemGraph,
 } from '@deadlock-live-probe/build-domain';
@@ -10,6 +11,7 @@ import { BuildDecisionTraceCollectorV2 } from '../src/statlocker-adaptive/build-
 import { BuildItemUtilityV2Service } from '../src/statlocker-adaptive/build-item-utility-v2.service';
 import { EnemyThreatScoreV1 } from '../src/statlocker-adaptive/enemy-threat-v1.service';
 import { FullBuildResolverV2Service } from '../src/statlocker-adaptive/full-build-resolver-v2.service';
+import { MatchupCandidateDiscoveryV2Service } from '../src/statlocker-adaptive/matchup-candidate-discovery-v2.service';
 import { ThreatWeightedMatchupV1Service } from '../src/statlocker-adaptive/threat-weighted-matchup-v1.service';
 
 const HERO_ID = 72;
@@ -18,11 +20,12 @@ const B = 22;
 const D = 33;
 const E = 44;
 const F = 55;
+const OUTSIDE = 66;
 const ENEMY_A = 27;
 const ENEMY_B = 6;
 
 const graph = createRecommendationItemGraph(
-  [A, B, D, E, F].map((itemId): RecommendationItemDefinition => ({
+  [A, B, D, E, F, OUTSIDE].map((itemId): RecommendationItemDefinition => ({
     itemId,
     name: `Item ${itemId}`,
     slotType: 'weapon',
@@ -89,6 +92,16 @@ function archetype(): BuildArchetypeV2 {
   };
 }
 
+function outsideOnlyArchetype(): BuildArchetypeV2 {
+  return {
+    ...archetype(),
+    archetypeId: 'archetype:outside-base',
+    items: [buildItem(A, 'CORE', 'EARLY', 120)],
+    groups: [],
+    orderEdges: [],
+  };
+}
+
 function threat(heroId: number): EnemyThreatScoreV1 {
   const component = { weight: 0, contribution: 0, observed: false };
   return {
@@ -112,6 +125,32 @@ function service(): FullBuildResolverV2Service {
   return new FullBuildResolverV2Service(
     new BuildItemUtilityV2Service(new ThreatWeightedMatchupV1Service()),
   );
+}
+
+function discoveryService(): MatchupCandidateDiscoveryV2Service {
+  const matchup = new ThreatWeightedMatchupV1Service();
+  return new MatchupCandidateDiscoveryV2Service(new BuildItemUtilityV2Service(matchup), matchup);
+}
+
+function outsideBuyCandidate(): RecommendationCandidate {
+  return {
+    actionId: `BUY_ITEM:${OUTSIDE}`,
+    action: { type: 'BUY_ITEM', itemId: OUTSIDE },
+    feasible: true,
+    reasons: ['FEASIBLE'],
+    recommendationEligible: true,
+    recommendationSuppressionReasons: [],
+    effectiveCostSouls: 500,
+    spendableSoulsAfter: 4500,
+    resultingItemIds: [A, OUTSIDE],
+    evidence: {
+      spendableSouls: 'OBSERVED',
+      shopOpportunity: 'OBSERVED',
+      ruleset: 'RECONSTRUCTED',
+      inventory: 'OBSERVED',
+      transaction: 'RECONSTRUCTED',
+    },
+  };
 }
 
 function lifetimeInput() {
@@ -169,5 +208,47 @@ describe('FullBuildResolverV2Service lifetime planning', () => {
     expect(choice.payload.groups[0].candidates[0].score)
       .toBeGreaterThan(choice.payload.groups[0].candidates[1].score!);
     expect(trace.stages().some((entry) => entry.stage === 'FINAL_PLAN')).toBe(true);
+  });
+
+  it('continues lifetime search with an accepted Statlocker-backed candidate outside the locked archetype', () => {
+    const build = outsideOnlyArchetype();
+    const rows = [
+      { heroId: HERO_ID, enemyHeroId: ENEMY_A, itemId: OUTSIDE, count: 100_000, deltaWpa: 0.40 },
+      { heroId: HERO_ID, enemyHeroId: ENEMY_B, itemId: OUTSIDE, count: 100_000, deltaWpa: 0.40 },
+    ];
+    const enemyThreats = [threat(ENEMY_A), threat(ENEMY_B)];
+    const outsideCandidates = discoveryService().discover({
+      heroId: HERO_ID,
+      archetype: build,
+      legalByTarget: new Map([[OUTSIDE, outsideBuyCandidate()]]),
+      itemGraph: graph,
+      gameTimeSec: 600,
+      ownedItemIds: [A],
+      projectedItemIds: [],
+      enemyHeroIds: [ENEMY_A, ENEMY_B],
+      enemyThreats,
+      vsHeroRows: rows,
+    });
+
+    expect(outsideCandidates).toHaveLength(1);
+    const result = service().resolve({
+      matchId: 'match-outside',
+      stateRevision: 'state-outside-1',
+      heroId: HERO_ID,
+      rulesetId: 'ruleset-a',
+      archetype: build,
+      itemGraph: graph,
+      capacity: 12,
+      gameTimeSec: 600,
+      currentInventoryItemIds: [A],
+      enemyHeroIds: [ENEMY_A, ENEMY_B],
+      enemyThreats,
+      vsHeroRows: rows,
+      outsideCandidates,
+    });
+
+    expect(result.steps.map((step) => step.buyItemId)).toEqual([OUTSIDE]);
+    expect(result.steps[0].reasonCodes).toContain('MATCHUP_DISCOVERY_OUTSIDE_ARCHETYPE');
+    expect(result.validation.valid).toBe(true);
   });
 });
