@@ -186,10 +186,17 @@ describe('MatchupCandidateDiscoveryV2Service', () => {
   });
 
   it('rejects an outside-archetype candidate when enemy-roster coverage is below the discovery floor', () => {
-    const result = service().discover(input(
-      candidate({ type: 'BUY_ITEM', itemId: COUNTER_ITEM_ID }, [CORE_ITEM_ID, FLEX_ITEM_ID, COUNTER_ITEM_ID]),
-      { includeEnemyB: false },
-    ));
+    const legal = candidate(
+      { type: 'BUY_ITEM', itemId: COUNTER_ITEM_ID },
+      [CORE_ITEM_ID, FLEX_ITEM_ID, COUNTER_ITEM_ID],
+    );
+    const base = input(legal, { includeEnemyB: false });
+    const lowCoverageEnemyHeroIds = [ENEMY_A, ENEMY_B, 7, 8, 9, 10];
+    const result = service().discover({
+      ...base,
+      enemyHeroIds: lowCoverageEnemyHeroIds,
+      enemyThreats: lowCoverageEnemyHeroIds.map((heroId) => threat(heroId, 1)),
+    });
 
     expect(result).toEqual([]);
   });
