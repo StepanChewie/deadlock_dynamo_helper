@@ -29,7 +29,7 @@ jobs:
           sudo docker build -t "$image" .
           echo "CAPTURE_IMAGE=$image" >> "$GITHUB_ENV"
 
-      - name: Resolve Billy match from indexed production state and capture fixture
+      - name: Resolve Billy match from live production telemetry and capture fixture
         shell: bash
         run: |
           set -euo pipefail
@@ -42,6 +42,13 @@ jobs:
 
           match_id="$(cd "$prod_dir" && sudo docker compose exec -T api node <<'NODE'
           const { Client } = require('pg');
+
+          function completeEnemyRoster(decision) {
+            const enemyHeroIds = Array.isArray(decision?.enemyHeroIds)
+              ? [...new Set(decision.enemyHeroIds.filter((value) => Number.isSafeInteger(value) && value > 0))]
+              : [];
+            return enemyHeroIds.length === 6;
+          }
 
           async function main() {
             const client = new Client({
@@ -58,34 +65,58 @@ jobs:
               await client.query("SET LOCAL statement_timeout = '10s'");
 
               const schema = await client.query(`
-                SELECT
-                  to_regclass('public.build_archetype_match_locks_v2')::text AS "lockTable",
-                  to_regclass('public.recommendation_telemetry_events')::text AS "telemetryTable"
+                SELECT to_regclass('public.recommendation_telemetry_events')::text AS "telemetryTable"
               `);
-              const lockTable = schema.rows[0]?.lockTable;
-              if (!lockTable) {
-                throw new Error(`Indexed Billy match lock table is unavailable; telemetry=${schema.rows[0]?.telemetryTable ?? 'missing'}`);
+              if (!schema.rows[0]?.telemetryTable) {
+                throw new Error('Live recommendation telemetry table is unavailable');
               }
 
-              const locks = await client.query(`
-                SELECT "matchId", "enemyHeroIds", "lockedAt"
-                FROM build_archetype_match_locks_v2
-                WHERE "heroId" = 72
-                ORDER BY "lockedAt" DESC
-                LIMIT 50
+              const telemetry = await client.query(`
+                SELECT "matchId", "sourceOccurredAt", source, payload->>'heroId' AS "heroId"
+                FROM recommendation_telemetry_events
+                WHERE "sourceOccurredAt" >= NOW() - INTERVAL '14 days'
+                  AND "eventType" = 'PLAYER_STATE'
+                ORDER BY "sourceOccurredAt" DESC
+                LIMIT 10000
               `);
-              for (const row of locks.rows) {
-                const enemyHeroIds = Array.isArray(row.enemyHeroIds)
-                  ? [...new Set(row.enemyHeroIds.filter((value) => Number.isSafeInteger(value) && value > 0))]
-                  : [];
+
+              const candidates = [];
+              const seen = new Set();
+              for (const row of telemetry.rows) {
+                if (String(row.heroId) !== '72') continue;
                 const matchId = String(row.matchId ?? '');
-                if (!/^\d+$/.test(matchId) || enemyHeroIds.length !== 6) continue;
-                process.stderr.write(`Resolved indexed Billy lock: match=${matchId} enemies=${enemyHeroIds.length} lockedAt=${row.lockedAt?.toISOString?.() ?? row.lockedAt}\n`);
-                process.stdout.write(matchId);
-                await client.query('ROLLBACK');
-                return;
+                if (!/^\d+$/.test(matchId) || seen.has(matchId)) continue;
+                seen.add(matchId);
+                candidates.push({ matchId, source: row.source, sourceOccurredAt: row.sourceOccurredAt });
               }
-              throw new Error(`No complete Billy match lock found; rows=${locks.rowCount ?? locks.rows.length}`);
+              if (candidates.length === 0) {
+                throw new Error(`No Billy PLAYER_STATE match IDs found in recent live telemetry; scanned=${telemetry.rowCount ?? telemetry.rows.length}`);
+              }
+
+              for (const candidate of candidates.slice(0, 50)) {
+                const replay = await client.query(`
+                  SELECT "decisionId", "replayInput", "decidedAt"
+                  FROM adaptive_recommendation_decisions_v1
+                  WHERE "matchId" = $1
+                  ORDER BY "decidedAt" DESC, "decisionId" DESC
+                  LIMIT 100
+                `, [candidate.matchId]);
+
+                for (const row of replay.rows) {
+                  const decision = row?.replayInput?.decision;
+                  if (decision?.state?.heroId !== 72) continue;
+                  if (String(decision?.state?.matchId) !== candidate.matchId) continue;
+                  if (!completeEnemyRoster(decision)) continue;
+                  process.stderr.write(
+                    `Resolved live Billy replay: match=${candidate.matchId} telemetrySource=${candidate.source} telemetryAt=${candidate.sourceOccurredAt?.toISOString?.() ?? candidate.sourceOccurredAt} decision=${row.decisionId}\n`,
+                  );
+                  process.stdout.write(candidate.matchId);
+                  await client.query('ROLLBACK');
+                  return;
+                }
+              }
+
+              throw new Error(`Billy live telemetry found ${candidates.length} match IDs, but none has a complete saved adaptive replay`);
             } finally {
               await client.end();
             }
