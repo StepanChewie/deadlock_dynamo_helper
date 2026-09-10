@@ -73,7 +73,10 @@ export class MatchupCandidateDiscoveryV2Service {
       if (!candidate || !candidate.feasible || !candidate.recommendationEligible) continue;
       if (candidate.evidence.transaction === 'UNKNOWN') continue;
 
-      const replacement = candidate.action.type === 'REPLACE_ITEM';
+      const replacementAction = candidate.action.type === 'REPLACE_ITEM'
+        ? candidate.action
+        : undefined;
+      const replacement = replacementAction !== undefined;
       const matchup = this.matchup.scoreItem({
         ourHeroId: input.heroId,
         itemId: targetItemId,
@@ -107,8 +110,8 @@ export class MatchupCandidateDiscoveryV2Service {
         t4Chains: input.t4Chains,
       });
 
-      const soldRole = replacement
-        ? archetypeRoleForItem(candidate.action.sellItemId, input.archetype, input.itemGraph)
+      const soldRole = replacementAction
+        ? archetypeRoleForItem(replacementAction.sellItemId, input.archetype, input.itemGraph)
         : undefined;
       const requiredImprovement = replacement
         ? soldRole === 'CORE'
@@ -130,7 +133,7 @@ export class MatchupCandidateDiscoveryV2Service {
         utility,
         replacement,
         requiredImprovement,
-        ...(replacement ? { sellItemId: candidate.action.sellItemId } : {}),
+        ...(replacementAction ? { sellItemId: replacementAction.sellItemId } : {}),
         reasonCodes,
       });
     }
