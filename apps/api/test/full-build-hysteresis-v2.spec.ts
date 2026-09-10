@@ -22,6 +22,32 @@ function plan(planRevision: string, buyItemId: number): ResolvedFullBuildPlanV2 
   };
 }
 
+function multiStepPlan(planRevision: string, buyItemIds: readonly number[]): ResolvedFullBuildPlanV2 {
+  let inventory: number[] = [];
+  return {
+    planRevision,
+    matchId: 'match-1',
+    heroId: 72,
+    archetypeId: 'archetype-1',
+    stateRevision: 'state-1',
+    steps: buyItemIds.map((buyItemId, index) => {
+      const inventoryBefore = [...inventory];
+      inventory = [...inventory, buyItemId];
+      return {
+        sequence: index + 1,
+        action: 'BUY' as const,
+        buyItemId,
+        consumedItemIds: [],
+        inventoryBefore,
+        inventoryAfter: [...inventory],
+        reasonCodes: [],
+      };
+    }),
+    degradedReasons: [],
+    validation: { valid: true, reasonCodes: [] },
+  };
+}
+
 describe('FullBuildHysteresisV2Service', () => {
   const service = new FullBuildHysteresisV2Service();
   const previous = plan('previous', 1);
@@ -77,5 +103,25 @@ describe('FullBuildHysteresisV2Service', () => {
 
     expect(result.action).toBe('KEEP_PREVIOUS');
     expect(result.reasonCodes).toContain('RECENT_PURCHASE_PROTECTED');
+  });
+
+  it('protects a changed near-term committed step more strongly than the same distant change', () => {
+    const baseline = multiStepPlan('baseline', [10, 20, 30, 40]);
+    const nearTermChange = multiStepPlan('near-term', [11, 20, 30, 40]);
+    const distantChange = multiStepPlan('distant', [10, 20, 30, 41]);
+    const context = {
+      improvement: 0.12,
+      coreReplacement: false,
+      recentPurchaseProtected: false,
+    };
+
+    const nearTerm = service.choose(baseline, nearTermChange, context);
+    const distant = service.choose(baseline, distantChange, context);
+
+    expect(nearTerm.action).toBe('KEEP_PREVIOUS');
+    expect(nearTerm.reasonCodes).toContain('NEAR_TERM_PLAN_COMMITMENT_PROTECTED');
+    expect(distant.action).toBe('SWITCH_TO_CANDIDATE');
+    expect(distant.reasonCodes).not.toContain('NEAR_TERM_PLAN_COMMITMENT_PROTECTED');
+    expect(nearTerm.requiredImprovement).toBeGreaterThan(distant.requiredImprovement);
   });
 });
