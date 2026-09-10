@@ -1,9 +1,11 @@
+import { createHash } from 'crypto';
 import { Injectable } from '@nestjs/common';
 import {
   RecommendationCandidate,
   RecommendationItemGraph,
 } from '@deadlock-live-probe/build-domain';
 import {
+  BuildArchetypeGroupV2,
   BuildArchetypeRoleV2,
   BuildArchetypeV2,
 } from './build-archetype-v2';
@@ -13,6 +15,11 @@ import {
   BuildTransitionCostV2,
 } from './build-item-utility-v2.service';
 import { EnemyThreatScoreV1 } from './enemy-threat-v1.service';
+import {
+  FullBuildTransitionIntentV2,
+  ResolvedFullBuildPlanV2,
+} from './full-build-plan-v2';
+import { simulateFullBuildInventoryV2 } from './full-build-inventory-simulator-v2';
 import {
   StatlockerT4ChainsV1,
   StatlockerWpaPatchDataV1,
@@ -42,6 +49,25 @@ export interface FullBuildResolverV2Input {
   transitionCostsByActionId?: ReadonlyMap<string, Partial<BuildTransitionCostV2>>;
 }
 
+export interface FullBuildLifetimeResolverV2Input {
+  matchId: string;
+  stateRevision: string;
+  heroId: number;
+  rulesetId: string;
+  archetype: BuildArchetypeV2;
+  itemGraph: RecommendationItemGraph;
+  capacity: number;
+  gameTimeSec: number;
+  currentInventoryItemIds: readonly number[];
+  enemyHeroIds: readonly number[];
+  enemyThreats: readonly EnemyThreatScoreV1[];
+  vsHeroRows: readonly StatlockerVsHeroWpaAggregateSourceV1[];
+  wpaPatchData?: StatlockerWpaPatchDataV1;
+  t4Chains?: StatlockerT4ChainsV1;
+  recentPurchases?: readonly FullBuildRecentPurchaseV2[];
+  maxSteps?: number;
+}
+
 export interface FullBuildInventoryUtilityV2 {
   total: number;
   confidence: number;
@@ -68,12 +94,34 @@ export interface FullBuildResolutionV2 {
   selectionReasonCodes: readonly string[];
 }
 
+interface LifetimeSemanticOptionV2 {
+  targetItemId: number;
+  group?: BuildArchetypeGroupV2;
+  utility: BuildItemUtilityV2;
+}
+
+interface LifetimePlanningStateV2 {
+  inventoryItemIds: number[];
+  completedSemanticItemIds: Set<number>;
+  groupSelections: Map<string, Set<number>>;
+  actions: FullBuildTransitionIntentV2[];
+}
+
 @Injectable()
 export class FullBuildResolverV2Service {
   constructor(private readonly itemUtility: BuildItemUtilityV2Service) {}
 
-  resolve(input: FullBuildResolverV2Input): FullBuildResolutionV2 {
-    validateInput(input);
+  resolve(input: FullBuildLifetimeResolverV2Input): ResolvedFullBuildPlanV2;
+  resolve(input: FullBuildResolverV2Input): FullBuildResolutionV2;
+  resolve(
+    input: FullBuildLifetimeResolverV2Input | FullBuildResolverV2Input,
+  ): ResolvedFullBuildPlanV2 | FullBuildResolutionV2 {
+    if (isLifetimeInput(input)) return this.resolveLifetime(input);
+    return this.evaluateTransitions(input);
+  }
+
+  evaluateTransitions(input: FullBuildResolverV2Input): FullBuildResolutionV2 {
+    validateTransitionInput(input);
     const currentState = this.scoreInventory(input.currentInventoryItemIds, input);
     const evaluations = dedupeCandidates(input.candidates)
       .map((candidate) => this.evaluateCandidate(candidate, currentState, input))
@@ -112,6 +160,166 @@ export class FullBuildResolverV2Service {
       evaluations,
       selectionReasonCodes: ['PLAN_HYSTERESIS_SWITCHED'],
     };
+  }
+
+  private resolveLifetime(input: FullBuildLifetimeResolverV2Input): ResolvedFullBuildPlanV2 {
+    validateLifetimeInput(input);
+    const state = initializeLifetimeState(input);
+    const maxSteps = input.maxSteps ?? Math.max(32, input.archetype.items.length * 4);
+    const degradedReasons = new Set<string>();
+    if (input.vsHeroRows.length === 0) degradedReasons.add('MATCHUP_WPA_UNAVAILABLE');
+    if (!input.t4Chains) degradedReasons.add('T4_CHAINS_UNAVAILABLE');
+
+    for (let iteration = 0; iteration < maxSteps; iteration += 1) {
+      const options = this.readySemanticOptions(input, state);
+      if (options.length === 0) break;
+      const selected = options.sort(compareLifetimeOptions)[0];
+      const action = this.transitionForSemanticTarget(input, state, selected);
+      if (!action) {
+        degradedReasons.add('LIFETIME_PROGRESS_BLOCKED');
+        break;
+      }
+
+      const simulation = simulateFullBuildInventoryV2({
+        rulesetId: input.rulesetId,
+        itemGraph: input.itemGraph,
+        capacity: input.capacity,
+        initialInventoryItemIds: state.inventoryItemIds,
+        actions: [action],
+      });
+      const simulatedStep = simulation.steps[0];
+      state.actions.push(action);
+      state.inventoryItemIds = [...simulation.finalInventoryItemIds];
+
+      const semanticReached = input.itemGraph.isTargetSatisfied(
+        selected.targetItemId,
+        state.inventoryItemIds,
+      );
+      if (semanticReached) {
+        state.completedSemanticItemIds.add(selected.targetItemId);
+        if (selected.group) {
+          const selections = state.groupSelections.get(selected.group.groupId) ?? new Set<number>();
+          selections.add(selected.targetItemId);
+          state.groupSelections.set(selected.group.groupId, selections);
+        }
+      }
+
+      if (!simulatedStep) {
+        degradedReasons.add('LIFETIME_SIMULATION_EMPTY');
+        break;
+      }
+    }
+
+    const finalSimulation = simulateFullBuildInventoryV2({
+      rulesetId: input.rulesetId,
+      itemGraph: input.itemGraph,
+      capacity: input.capacity,
+      initialInventoryItemIds: input.currentInventoryItemIds,
+      actions: state.actions,
+    });
+    const planRevision = lifetimePlanRevision(input, state.actions);
+    return {
+      planRevision,
+      matchId: input.matchId,
+      heroId: input.heroId,
+      archetypeId: input.archetype.archetypeId,
+      stateRevision: input.stateRevision,
+      steps: finalSimulation.steps,
+      degradedReasons: [...degradedReasons].sort(),
+      validation: finalSimulation.validation,
+    };
+  }
+
+  private readySemanticOptions(
+    input: FullBuildLifetimeResolverV2Input,
+    state: LifetimePlanningStateV2,
+  ): LifetimeSemanticOptionV2[] {
+    const groupsByItemId = groupByCandidateItemId(input.archetype.groups);
+    const options: LifetimeSemanticOptionV2[] = [];
+
+    for (const item of input.archetype.items) {
+      if (state.completedSemanticItemIds.has(item.itemId)) continue;
+      const group = groupsByItemId.get(item.itemId);
+      if (group && groupSatisfied(group, state.groupSelections)) continue;
+      if (!hardPredecessorsSatisfied(item.itemId, input.archetype, state)) continue;
+      if (input.itemGraph.isTargetSatisfied(item.itemId, state.inventoryItemIds)) {
+        state.completedSemanticItemIds.add(item.itemId);
+        if (group) {
+          const selections = state.groupSelections.get(group.groupId) ?? new Set<number>();
+          selections.add(item.itemId);
+          state.groupSelections.set(group.groupId, selections);
+        }
+        continue;
+      }
+
+      const utility = this.itemUtility.scoreItem({
+        heroId: input.heroId,
+        itemId: item.itemId,
+        archetype: input.archetype,
+        gameTimeSec: input.gameTimeSec,
+        ownedItemIds: state.inventoryItemIds,
+        projectedItemIds: [],
+        enemyHeroIds: input.enemyHeroIds,
+        enemyThreats: input.enemyThreats,
+        vsHeroRows: input.vsHeroRows,
+        wpaPatchData: input.wpaPatchData,
+        t4Chains: input.t4Chains,
+      });
+      options.push({ targetItemId: item.itemId, group, utility });
+    }
+
+    return options;
+  }
+
+  private transitionForSemanticTarget(
+    input: FullBuildLifetimeResolverV2Input,
+    state: LifetimePlanningStateV2,
+    selected: LifetimeSemanticOptionV2,
+  ): FullBuildTransitionIntentV2 | undefined {
+    const item = input.itemGraph.getItem(selected.targetItemId);
+    if (!item) return undefined;
+    const reasonCodes = [
+      selected.group ? 'CHOICE_SELECTED' : 'ARCHETYPE_PROGRESSION',
+      'SEMANTIC_PARTIAL_ORDER_READY',
+    ];
+
+    const executableRecipe = item.upgradeRecipes.find((recipe) =>
+      recipe.consumedItemIds.every((componentItemId) => state.inventoryItemIds.includes(componentItemId)),
+    );
+    if (executableRecipe) {
+      return {
+        action: 'UPGRADE',
+        buyItemId: selected.targetItemId,
+        recipeId: executableRecipe.recipeId,
+        reasonCodes,
+      };
+    }
+
+    if (item.directPurchaseCost !== undefined && state.inventoryItemIds.length < input.capacity) {
+      return {
+        action: 'BUY',
+        buyItemId: selected.targetItemId,
+        reasonCodes,
+      };
+    }
+
+    if (item.directPurchaseCost === undefined) {
+      const componentItemId = firstMissingPurchasableComponent(
+        selected.targetItemId,
+        state.inventoryItemIds,
+        input.itemGraph,
+        input.rulesetId,
+      );
+      if (componentItemId !== undefined && state.inventoryItemIds.length < input.capacity) {
+        return {
+          action: 'BUY',
+          buyItemId: componentItemId,
+          reasonCodes: [...reasonCodes, 'PREPARE_UPGRADE'],
+        };
+      }
+    }
+
+    return undefined;
   }
 
   private evaluateCandidate(
@@ -203,6 +411,118 @@ export class FullBuildResolverV2Service {
   }
 }
 
+function initializeLifetimeState(input: FullBuildLifetimeResolverV2Input): LifetimePlanningStateV2 {
+  const completedSemanticItemIds = new Set<number>();
+  const groupSelections = new Map<string, Set<number>>();
+  const groupsByItemId = groupByCandidateItemId(input.archetype.groups);
+  for (const item of input.archetype.items) {
+    if (!input.itemGraph.isTargetSatisfied(item.itemId, input.currentInventoryItemIds)) continue;
+    completedSemanticItemIds.add(item.itemId);
+    const group = groupsByItemId.get(item.itemId);
+    if (!group) continue;
+    const selections = groupSelections.get(group.groupId) ?? new Set<number>();
+    selections.add(item.itemId);
+    groupSelections.set(group.groupId, selections);
+  }
+  return {
+    inventoryItemIds: [...input.currentInventoryItemIds].sort((a, b) => a - b),
+    completedSemanticItemIds,
+    groupSelections,
+    actions: [],
+  };
+}
+
+function groupByCandidateItemId(
+  groups: readonly BuildArchetypeGroupV2[],
+): Map<number, BuildArchetypeGroupV2> {
+  const result = new Map<number, BuildArchetypeGroupV2>();
+  for (const group of groups) {
+    for (const itemId of group.candidateItemIds) {
+      if (!result.has(itemId)) result.set(itemId, group);
+    }
+  }
+  return result;
+}
+
+function groupSatisfied(
+  group: BuildArchetypeGroupV2,
+  selections: ReadonlyMap<string, Set<number>>,
+): boolean {
+  const selected = selections.get(group.groupId)?.size ?? 0;
+  if (group.type === 'OPTIONAL' && group.minSelect === 0) return selected > 0;
+  return selected >= group.minSelect;
+}
+
+function hardPredecessorsSatisfied(
+  itemId: number,
+  archetype: BuildArchetypeV2,
+  state: LifetimePlanningStateV2,
+): boolean {
+  const groupsByItemId = groupByCandidateItemId(archetype.groups);
+  const predecessors = archetype.orderEdges.filter((edge) =>
+    edge.afterItemId === itemId && edge.strength === 'HARD',
+  );
+  return predecessors.every((edge) => {
+    if (state.completedSemanticItemIds.has(edge.beforeItemId)) return true;
+    const predecessorGroup = groupsByItemId.get(edge.beforeItemId);
+    return predecessorGroup ? groupSatisfied(predecessorGroup, state.groupSelections) : false;
+  });
+}
+
+function firstMissingPurchasableComponent(
+  targetItemId: number,
+  inventoryItemIds: readonly number[],
+  itemGraph: RecommendationItemGraph,
+  rulesetId: string,
+): number | undefined {
+  const target = itemGraph.getItem(targetItemId);
+  if (!target) return undefined;
+  const candidates = itemGraph.getTransitiveComponentIds(targetItemId)
+    .filter((itemId) => !itemGraph.isTargetSatisfied(itemId, inventoryItemIds))
+    .map((itemId) => itemGraph.getItem(itemId))
+    .filter((item): item is NonNullable<ReturnType<RecommendationItemGraph['getItem']>> =>
+      item !== undefined &&
+      item.directPurchaseCost !== undefined &&
+      item.availableRulesetIds.includes(rulesetId),
+    )
+    .sort((left, right) =>
+      (left.directPurchaseCost ?? 0) - (right.directPurchaseCost ?? 0) || left.itemId - right.itemId,
+    );
+  return candidates[0]?.itemId;
+}
+
+function compareLifetimeOptions(left: LifetimeSemanticOptionV2, right: LifetimeSemanticOptionV2): number {
+  return right.utility.total - left.utility.total ||
+    right.utility.confidence - left.utility.confidence ||
+    left.targetItemId - right.targetItemId;
+}
+
+function lifetimePlanRevision(
+  input: FullBuildLifetimeResolverV2Input,
+  actions: readonly FullBuildTransitionIntentV2[],
+): string {
+  const semantic = actions.map((action) =>
+    action.action === 'REPLACE'
+      ? `${action.action}:${action.sellItemId}->${action.buyItemId}`
+      : `${action.action}:${action.buyItemId}`,
+  );
+  return createHash('sha256')
+    .update(JSON.stringify({
+      matchId: input.matchId,
+      stateRevision: input.stateRevision,
+      archetypeId: input.archetype.archetypeId,
+      semantic,
+    }))
+    .digest('hex')
+    .slice(0, 24);
+}
+
+function isLifetimeInput(
+  input: FullBuildLifetimeResolverV2Input | FullBuildResolverV2Input,
+): input is FullBuildLifetimeResolverV2Input {
+  return 'matchId' in input;
+}
+
 function strategicTargetItemId(candidate: RecommendationCandidate): number | undefined {
   const action = candidate.action;
   if (action.type === 'BUY_ITEM' || action.type === 'UPGRADE_ITEM') return action.itemId;
@@ -277,7 +597,7 @@ function compareEvaluations(
     left.actionId.localeCompare(right.actionId);
 }
 
-function validateInput(input: FullBuildResolverV2Input): void {
+function validateTransitionInput(input: FullBuildResolverV2Input): void {
   if (!Number.isInteger(input.heroId) || input.heroId <= 0) {
     throw new Error('Full build resolver v2: heroId must be a positive integer');
   }
@@ -292,6 +612,32 @@ function validateInput(input: FullBuildResolverV2Input): void {
       throw new Error(`Full build resolver v2: current inventory item ${itemId} is not in the catalog`);
     }
   }
+}
+
+function validateLifetimeInput(input: FullBuildLifetimeResolverV2Input): void {
+  if (!input.matchId) throw new Error('Full build resolver v2: matchId is required');
+  if (!input.stateRevision) throw new Error('Full build resolver v2: stateRevision is required');
+  if (!input.rulesetId) throw new Error('Full build resolver v2: rulesetId is required');
+  if (!Number.isInteger(input.capacity) || input.capacity <= 0) {
+    throw new Error('Full build resolver v2: capacity must be a positive integer');
+  }
+  if (input.maxSteps !== undefined && (!Number.isInteger(input.maxSteps) || input.maxSteps <= 0)) {
+    throw new Error('Full build resolver v2: maxSteps must be a positive integer');
+  }
+  validateTransitionInput({
+    heroId: input.heroId,
+    archetype: input.archetype,
+    itemGraph: input.itemGraph,
+    gameTimeSec: input.gameTimeSec,
+    currentInventoryItemIds: input.currentInventoryItemIds,
+    candidates: [],
+    enemyHeroIds: input.enemyHeroIds,
+    enemyThreats: input.enemyThreats,
+    vsHeroRows: input.vsHeroRows,
+    wpaPatchData: input.wpaPatchData,
+    t4Chains: input.t4Chains,
+    recentPurchases: input.recentPurchases,
+  });
 }
 
 function roundUtility(value: number): number {
