@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
   buildStatlockerBuildV2Fixture,
   parseCaptureStatlockerBuildV2FixtureArgs,
@@ -6,11 +8,12 @@ import {
 } from '../src/scripts/capture-statlocker-build-v2-fixture';
 
 const HERO_ID = 72;
-const MATCH_ID = '676255623445218601';
+const MATCH_ID = 'statlocker-billy-real-request';
 const RULESET_VERSION = 'ruleset-a';
 const PATCH_ID = 'patch-a';
 const CATALOG_SHA = 'a'.repeat(64);
 const CATALOG_VERSION_ID = 'catalog-a';
+const ENEMY_HERO_IDS = [6, 10, 13, 27, 31, 35];
 
 function proBuild(accountId: string, itemId: number) {
   return {
@@ -27,6 +30,32 @@ function proBuild(accountId: string, itemId: number) {
   };
 }
 
+function realRequest() {
+  return {
+    matchId: MATCH_ID,
+    heroId: HERO_ID,
+    gameTimeSec: 620,
+    ownedItemIds: [101],
+    spendableSouls: 3200,
+    allyHeroIds: [1, 2, 3, 4, 5],
+    enemyHeroIds: [...ENEMY_HERO_IDS],
+    enemyLiveStates: ENEMY_HERO_IDS.map((heroId, index) => ({
+      heroId,
+      level: 10 + index,
+      souls: 5000 + index * 100,
+      kills: index,
+      deaths: 1,
+      assists: 2,
+      heroDamage: 4000 + index * 200,
+    })),
+    allyItemIds: [],
+    enemyItemIds: [],
+    unlockedFlexSlots: 4,
+    totalCapacity: 12,
+    stateRevision: 'request-state-real',
+  };
+}
+
 function sourceInput() {
   const rankedAccounts = Array.from({ length: 11 }, (_, index) => ({
     accountId: `account-${index + 1}`,
@@ -36,11 +65,9 @@ function sourceInput() {
   const proBuildAnalyses = rankedAccounts
     .map((entry, index) => proBuild(entry.accountId, 100 + index))
     .reverse();
-  const enemyHeroIds = [6, 10, 13, 27, 31, 35];
 
   return {
-    heroId: HERO_ID,
-    requestedMatchId: MATCH_ID,
+    request: realRequest(),
     identity: {
       rulesetVersion: RULESET_VERSION,
       catalogSha256: CATALOG_SHA,
@@ -85,70 +112,11 @@ function sourceInput() {
         { catalogVersionId: CATALOG_VERSION_ID, parentItemId: 102, componentItemId: 101, componentOrder: 0 },
       ],
     },
-    liveReplay: {
-      decisionId: 'decision-real',
-      matchId: MATCH_ID,
-      decidedAt: '2026-09-10T20:00:00.000Z',
-      replayInput: {
-        decision: {
-          state: {
-            decisionId: 'decision-real',
-            matchId: MATCH_ID,
-            playerSlot: 0,
-            gameTimeSec: 620,
-            rulesetId: RULESET_VERSION,
-            heroId: HERO_ID,
-            ownedItemIds: [101],
-            spendableSouls: { value: 3200, evidence: 'OBSERVED', source: 'OVERWOLF_GEP' },
-            shopOpportunity: { evidence: 'UNKNOWN', source: 'OVERWOLF_GEP' },
-          },
-          itemDefinitions: [],
-          catalogVersionId: CATALOG_VERSION_ID,
-          catalogSha256: CATALOG_SHA,
-          rulesetId: RULESET_VERSION,
-          localSteamId: 'local-player',
-          allyHeroIds: [1, 2, 3, 4, 5],
-          enemyHeroIds,
-          enemyHeroes: enemyHeroIds.map((heroId) => ({ heroId })),
-          enemyLiveStates: enemyHeroIds.map((heroId, index) => ({
-            steamId: `enemy-${heroId}`,
-            heroId,
-            level: 10 + index,
-            souls: 5000 + index * 100,
-            kills: index,
-            deaths: 1,
-            assists: 2,
-            heroDamage: 4000 + index * 200,
-          })),
-          allyItemIds: [],
-          enemyItemIds: [],
-          slots: { totalCapacity: 12, evidence: 'OBSERVED' },
-          investment: { evidence: 'RECONSTRUCTED', tracks: {} },
-          economyRulesEvidence: 'RECONSTRUCTED',
-          stateRevision: 'state-real',
-        },
-      },
-    },
   };
 }
 
 describe('capture Statlocker Build V2 fixture', () => {
-  it('parses the explicit CLI contract', () => {
-    expect(parseCaptureStatlockerBuildV2FixtureArgs([
-      '--heroId', '72',
-      '--matchId', MATCH_ID,
-      '--out', 'test/fixtures/statlocker-build-v2/billy-real.fixture.json',
-    ])).toEqual({
-      heroId: HERO_ID,
-      matchId: MATCH_ID,
-      out: 'test/fixtures/statlocker-build-v2/billy-real.fixture.json',
-    });
-
-    expect(() => parseCaptureStatlockerBuildV2FixtureArgs(['--heroId', '72']))
-      .toThrow('matchId');
-  });
-
-  it('accepts a real request fixture as the live context source without a saved replay lookup', () => {
+  it('accepts only request-file live context plus an output path', () => {
     expect(parseCaptureStatlockerBuildV2FixtureArgs([
       '--request', 'test/fixtures/statlocker-build-v2/billy-real.request.json',
       '--out', 'test/fixtures/statlocker-build-v2/billy-real.fixture.json',
@@ -156,6 +124,24 @@ describe('capture Statlocker Build V2 fixture', () => {
       request: 'test/fixtures/statlocker-build-v2/billy-real.request.json',
       out: 'test/fixtures/statlocker-build-v2/billy-real.fixture.json',
     });
+
+    expect(() => parseCaptureStatlockerBuildV2FixtureArgs([
+      '--heroId', '72',
+      '--matchId', '676255623445218601',
+      '--out', 'test/fixtures/statlocker-build-v2/billy-real.fixture.json',
+    ])).toThrow('requires --request');
+  });
+
+  it('has no saved recommendation or Overwolf dependency in the capture source', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/scripts/capture-statlocker-build-v2-fixture.ts'),
+      'utf8',
+    );
+
+    expect(source).not.toContain('AdaptiveRecommendationDecisionV1Entity');
+    expect(source).not.toContain('adaptive_recommendation_decisions_v1');
+    expect(source).not.toContain('loadLiveReplay');
+    expect(source).not.toContain('OVERWOLF');
   });
 
   it('uses normalized Statlocker snapshot scopes and deduplicated catalog content identity', () => {
@@ -186,15 +172,17 @@ describe('capture Statlocker Build V2 fixture', () => {
     })).toBe('catalog-canonical');
   });
 
-  it('captures exactly the ranked top 10 profiles and deterministic relevant evidence', () => {
+  it('captures request live context plus exactly the ranked Statlocker top 10 and relevant evidence', () => {
     const fixture = buildStatlockerBuildV2Fixture(sourceInput());
 
     expect(fixture.metadata).toMatchObject({
       heroId: HERO_ID,
-      requestedMatchId: MATCH_ID,
       matchId: MATCH_ID,
-      source: 'EXISTING_DATABASE',
+      source: 'STATLOCKER_ONLY',
+      buildEvidenceSource: 'STATLOCKER_ONLY',
+      liveContextSource: 'REQUEST',
     });
+    expect(fixture.request).toEqual(realRequest());
     expect(fixture.leaderboard.profiles.map((entry) => entry.rank)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     expect(fixture.proBuildAnalyses).toHaveLength(10);
     expect(fixture.proBuildAnalyses.map((entry) => entry.accountId)).toEqual(
@@ -208,8 +196,6 @@ describe('capture Statlocker Build V2 fixture', () => {
       [10, 102],
     ]);
     expect(fixture.catalog.items.map((entry) => entry.itemId)).toEqual([101, 102]);
-    expect(fixture.liveState.enemyHeroIds).toEqual([6, 10, 13, 27, 31, 35]);
-    expect(fixture.liveState.state.heroId).toBe(HERO_ID);
   });
 
   it('fails fast instead of weakening top-10 provenance', () => {
@@ -220,9 +206,9 @@ describe('capture Statlocker Build V2 fixture', () => {
       .toThrow('exactly 10 ranked PRO_BUILD_ANALYSIS profiles');
   });
 
-  it('fails fast when a complete enemy roster cannot be proven from the saved replay', () => {
+  it('fails fast when the request does not contain a complete enemy roster', () => {
     const input = sourceInput();
-    input.liveReplay.replayInput.decision.enemyHeroIds = [6, 10, 13, 27, 31];
+    input.request.enemyHeroIds = [6, 10, 13, 27, 31];
 
     expect(() => buildStatlockerBuildV2Fixture(input))
       .toThrow('complete enemy roster');
