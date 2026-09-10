@@ -21,6 +21,23 @@ const graph = createRecommendationItemGraph([
     directPurchaseCost: 1250,
     upgradeRecipes: [],
   },
+  {
+    itemId: 100,
+    name: 'Item 100',
+    slotType: 'weapon',
+    active: false,
+    availableRulesetIds: ['r1'],
+    directPurchaseCost: 500,
+    upgradeRecipes: [],
+  },
+  {
+    itemId: 200,
+    name: 'Item 200',
+    slotType: 'weapon',
+    active: false,
+    availableRulesetIds: ['r1'],
+    upgradeRecipes: [{ recipeId: '100-to-200', consumedItemIds: [100], soulsCost: 1250 }],
+  },
 ]);
 
 const analysis: StatlockerProBuildAnalysisV1 = {
@@ -61,5 +78,24 @@ describe('Statlocker build profile v2', () => {
     });
     expect(Object.keys(profile)).not.toContain('transactions');
     expect(Object.keys(profile)).not.toContain('orderedItemIds');
+  });
+
+  it('canonicalizes an upgraded item to the same semantic family as its component', () => {
+    const upgraded: StatlockerProBuildAnalysisV1 = {
+      accountId: 'upgrade-profile',
+      heroId: 72,
+      items: [{
+        itemId: 200,
+        purchaseRate: 0.8,
+        medianBuyTimeS: 900,
+        frequencyTier: 'CORE',
+        phase: 'MID',
+        relationships: [],
+      }],
+    };
+
+    const profile = toStatlockerBuildProfileV2(upgraded, graph);
+
+    expect(profile.items[0].familyId).toBe(100);
   });
 });
