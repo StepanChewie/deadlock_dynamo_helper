@@ -107,6 +107,15 @@ interface LifetimePlanningStateV2 {
   actions: FullBuildTransitionIntentV2[];
 }
 
+interface LifetimeReplacementOptionV2 {
+  sellItemId: number;
+  action: FullBuildTransitionIntentV2;
+  resultingState: FullBuildInventoryUtilityV2;
+  marginalGain: number;
+  requiredImprovement: number;
+  soldRole?: BuildArchetypeRoleV2;
+}
+
 @Injectable()
 export class FullBuildResolverV2Service {
   constructor(private readonly itemUtility: BuildItemUtilityV2Service) {}
@@ -295,31 +304,132 @@ export class FullBuildResolverV2Service {
       };
     }
 
-    if (item.directPurchaseCost !== undefined && state.inventoryItemIds.length < input.capacity) {
+    if (item.directPurchaseCost !== undefined) {
+      if (state.inventoryItemIds.length < input.capacity) {
+        return {
+          action: 'BUY',
+          buyItemId: selected.targetItemId,
+          reasonCodes,
+        };
+      }
+      return this.replacementForSemanticTarget(input, state, selected, reasonCodes);
+    }
+
+    const componentItemId = firstMissingPurchasableComponent(
+      selected.targetItemId,
+      state.inventoryItemIds,
+      input.itemGraph,
+      input.rulesetId,
+    );
+    if (componentItemId !== undefined && state.inventoryItemIds.length < input.capacity) {
       return {
         action: 'BUY',
-        buyItemId: selected.targetItemId,
-        reasonCodes,
+        buyItemId: componentItemId,
+        reasonCodes: [...reasonCodes, 'PREPARE_UPGRADE'],
       };
     }
 
-    if (item.directPurchaseCost === undefined) {
-      const componentItemId = firstMissingPurchasableComponent(
-        selected.targetItemId,
-        state.inventoryItemIds,
-        input.itemGraph,
-        input.rulesetId,
-      );
-      if (componentItemId !== undefined && state.inventoryItemIds.length < input.capacity) {
-        return {
-          action: 'BUY',
-          buyItemId: componentItemId,
-          reasonCodes: [...reasonCodes, 'PREPARE_UPGRADE'],
-        };
+    return undefined;
+  }
+
+  private replacementForSemanticTarget(
+    input: FullBuildLifetimeResolverV2Input,
+    state: LifetimePlanningStateV2,
+    selected: LifetimeSemanticOptionV2,
+    baseReasonCodes: readonly string[],
+  ): FullBuildTransitionIntentV2 | undefined {
+    const currentState = this.scoreLifetimeInventory(state.inventoryItemIds, input);
+    const options: LifetimeReplacementOptionV2[] = [];
+
+    for (const sellItemId of [...new Set(state.inventoryItemIds)].sort((a, b) => a - b)) {
+      const soldItem = input.itemGraph.getItem(sellItemId);
+      if (!soldItem?.sellTransition) continue;
+      if (isRecentPurchaseProtected(sellItemId, input.recentPurchases ?? [])) continue;
+
+      const soldRole = archetypeRoleForItem(sellItemId, input.archetype, input.itemGraph);
+      const requiredImprovement = lifetimeReplacementThreshold(soldRole);
+      const action: FullBuildTransitionIntentV2 = {
+        action: 'REPLACE',
+        sellItemId,
+        buyItemId: selected.targetItemId,
+        reasonCodes: [
+          ...baseReasonCodes,
+          'WHOLE_INVENTORY_REPLACEMENT_SELECTED',
+          ...(soldRole === 'CORE' ? ['CORE_REPLACEMENT_HIGHER_THRESHOLD'] : []),
+        ],
+      };
+
+      let resultingInventory: readonly number[];
+      try {
+        resultingInventory = simulateFullBuildInventoryV2({
+          rulesetId: input.rulesetId,
+          itemGraph: input.itemGraph,
+          capacity: input.capacity,
+          initialInventoryItemIds: state.inventoryItemIds,
+          actions: [action],
+        }).finalInventoryItemIds;
+      } catch {
+        continue;
       }
+
+      const resultingState = this.scoreLifetimeInventory(
+        resultingInventory,
+        input,
+        selected.targetItemId,
+        { replacementPenalty: 1 },
+      );
+      const marginalGain = roundUtility(resultingState.total - currentState.total);
+      if (marginalGain < requiredImprovement) continue;
+      options.push({
+        sellItemId,
+        action,
+        resultingState,
+        marginalGain,
+        requiredImprovement,
+        soldRole,
+      });
     }
 
-    return undefined;
+    return options.sort(compareLifetimeReplacements)[0]?.action;
+  }
+
+  private scoreLifetimeInventory(
+    itemIds: readonly number[],
+    input: FullBuildLifetimeResolverV2Input,
+    transitionTargetItemId?: number,
+    transition?: Partial<BuildTransitionCostV2>,
+  ): FullBuildInventoryUtilityV2 {
+    const normalizedItemIds = [...itemIds].sort((a, b) => a - b);
+    const itemUtilities: BuildItemUtilityV2[] = [];
+    let transitionApplied = false;
+    for (const itemId of normalizedItemIds) {
+      const applyTransition = !transitionApplied && itemId === transitionTargetItemId;
+      const utility = this.itemUtility.scoreItem({
+        heroId: input.heroId,
+        itemId,
+        archetype: input.archetype,
+        gameTimeSec: input.gameTimeSec,
+        ownedItemIds: normalizedItemIds,
+        projectedItemIds: [],
+        enemyHeroIds: input.enemyHeroIds,
+        enemyThreats: input.enemyThreats,
+        vsHeroRows: input.vsHeroRows,
+        wpaPatchData: input.wpaPatchData,
+        t4Chains: input.t4Chains,
+        ...(applyTransition && transition ? { transition } : {}),
+      });
+      if (applyTransition) transitionApplied = true;
+      itemUtilities.push(utility);
+    }
+    return {
+      total: roundUtility(itemUtilities.reduce((sum, utility) => sum + utility.total, 0)),
+      confidence: itemUtilities.length === 0
+        ? 0
+        : roundUtility(
+            itemUtilities.reduce((sum, utility) => sum + utility.confidence, 0) / itemUtilities.length,
+          ),
+      itemUtilities,
+    };
   }
 
   private evaluateCandidate(
@@ -495,6 +605,23 @@ function compareLifetimeOptions(left: LifetimeSemanticOptionV2, right: LifetimeS
   return right.utility.total - left.utility.total ||
     right.utility.confidence - left.utility.confidence ||
     left.targetItemId - right.targetItemId;
+}
+
+function compareLifetimeReplacements(
+  left: LifetimeReplacementOptionV2,
+  right: LifetimeReplacementOptionV2,
+): number {
+  return right.resultingState.total - left.resultingState.total ||
+    right.marginalGain - left.marginalGain ||
+    right.resultingState.confidence - left.resultingState.confidence ||
+    left.sellItemId - right.sellItemId;
+}
+
+function lifetimeReplacementThreshold(soldRole: BuildArchetypeRoleV2 | undefined): number {
+  const config = STATLOCKER_BUILD_V2_CONFIG.fullBuildResolver;
+  return soldRole === 'CORE'
+    ? config.coreReplacementMinImprovement
+    : config.replacementMinImprovement;
 }
 
 function lifetimePlanRevision(
