@@ -25,6 +25,8 @@ import { AdaptivePlannerServingRouterV1Service } from './adaptive-planner-servin
 import { AdaptiveRecommendationObservabilityV1Service } from './adaptive-recommendation-observability-v1.service';
 import { AdaptiveRecommendationV1Controller } from './adaptive-recommendation-v1.controller';
 import { AdaptiveRecommendationV1Service } from './adaptive-recommendation-v1.service';
+import { AdaptiveRecommendationV2Controller } from './adaptive-recommendation-v2.controller';
+import { AdaptiveRecommendationV2Service } from './adaptive-recommendation-v2.service';
 import { AdaptiveReplayV1Service } from './adaptive-replay-v1.service';
 import { BuildArchetypeCompilerV2Service } from './build-archetype-compiler-v2.service';
 import { BuildArchetypeMinerV1Service } from './build-archetype-miner-v1.service';
@@ -35,7 +37,9 @@ import { BuildArchetypeSelectorV2Service } from './build-archetype-selector-v2.s
 import { BuildArchetypeSessionV2Service } from './build-archetype-session-v2.service';
 import { BuildArchetypeSnapshotStoreV2Service } from './build-archetype-snapshot-store-v2.service';
 import { BuildContractV1Service } from './build-contract-v1.service';
+import { BuildDebugTraceStoreV2Service } from './build-debug-trace-store-v2.service';
 import { BuildInvestmentPolicyV1Service } from './build-investment-policy-v1.service';
+import { BuildItemUtilityV2Service } from './build-item-utility-v2.service';
 import { BuildSituationalResolverV1Service } from './build-situational-resolver-v1.service';
 import { BuildSkeletonService } from './build-skeleton.service';
 import { BuildSlotPlannerV1Service } from './build-slot-planner-v1.service';
@@ -51,8 +55,10 @@ import { ConsensusStrategyFallbackV1Service } from './consensus-strategy-fallbac
 import { DraftMatchupEvidenceV1Service } from './draft-matchup-evidence-v1.service';
 import { EnemyThreatHistoryV1Service } from './enemy-threat-history-v1.service';
 import { EnemyThreatV1Service } from './enemy-threat-v1.service';
+import { FullBuildResolverV2Service } from './full-build-resolver-v2.service';
 import { HistoricalBuildTrajectorySourceV2Service } from './historical-build-trajectory-source-v2.service';
 import { HistoricalPlannerTrajectoryExtractorV2Service } from './historical-planner-trajectory-extractor-v2.service';
+import { MatchupCandidateDiscoveryV2Service } from './matchup-candidate-discovery-v2.service';
 import { PlannerTrajectoryBuilderV2Service } from './planner-trajectory-builder-v2.service';
 import { RecommendationEconomyRulesStoreV1Service } from './recommendation-economy-rules-store-v1.service';
 import {
@@ -98,7 +104,7 @@ import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-
       MatchPlayer,
     ]),
   ],
-  controllers: [AdaptiveRecommendationV1Controller],
+  controllers: [AdaptiveRecommendationV1Controller, AdaptiveRecommendationV2Controller],
   providers: [
     {
       provide: STATLOCKER_BROWSER_LAUNCHER_V1,
@@ -120,6 +126,11 @@ import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-
     BuildArchetypeRefreshV2Service,
     BuildArchetypeSelectorV2Service,
     BuildArchetypeSessionV2Service,
+    BuildDebugTraceStoreV2Service,
+    BuildItemUtilityV2Service,
+    MatchupCandidateDiscoveryV2Service,
+    FullBuildResolverV2Service,
+    AdaptiveRecommendationV2Service,
     StatlockerRefreshService,
     RecommendationEconomyRulesStoreV1Service,
     AdaptiveDecisionStateV1Service,
@@ -169,7 +180,9 @@ import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-
   ],
   exports: [
     AdaptiveRecommendationV1Service,
+    AdaptiveRecommendationV2Service,
     AdaptiveRecommendationObservabilityV1Service,
+    BuildDebugTraceStoreV2Service,
     StatlockerRefreshService,
     StatlockerEvidenceService,
     RecommendationEconomyRulesStoreV1Service,
