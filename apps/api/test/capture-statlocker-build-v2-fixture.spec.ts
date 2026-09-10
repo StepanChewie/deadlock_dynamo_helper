@@ -1,6 +1,8 @@
 import {
   buildStatlockerBuildV2Fixture,
   parseCaptureStatlockerBuildV2FixtureArgs,
+  resolveFixtureCatalogContentVersionId,
+  statlockerFixtureScope,
 } from '../src/scripts/capture-statlocker-build-v2-fixture';
 
 const HERO_ID = 72;
@@ -144,6 +146,34 @@ describe('capture Statlocker Build V2 fixture', () => {
 
     expect(() => parseCaptureStatlockerBuildV2FixtureArgs(['--heroId', '72']))
       .toThrow('matchId');
+  });
+
+  it('uses normalized Statlocker snapshot scopes and deduplicated catalog content identity', () => {
+    expect(statlockerFixtureScope('WPA_PATCH_DATA', {
+      heroId: HERO_ID,
+      statlockerPatchId: PATCH_ID,
+    })).toBe(`patch:${PATCH_ID}`);
+    expect(statlockerFixtureScope('T4_CHAINS', {
+      heroId: HERO_ID,
+      statlockerPatchId: PATCH_ID,
+    })).toBe('global');
+    expect(statlockerFixtureScope('HERO_LEADERBOARD', {
+      heroId: HERO_ID,
+      statlockerPatchId: PATCH_ID,
+    })).toBe(`hero:${HERO_ID}`);
+    expect(statlockerFixtureScope('PRO_BUILD_ANALYSIS', {
+      heroId: HERO_ID,
+      statlockerPatchId: PATCH_ID,
+      accountId: 'account-1',
+    })).toBe(`hero:${HERO_ID}:account:account-1`);
+
+    expect(resolveFixtureCatalogContentVersionId({
+      catalogVersionId: 'catalog-alias',
+      contentCatalogVersionId: 'catalog-content',
+    })).toBe('catalog-content');
+    expect(resolveFixtureCatalogContentVersionId({
+      catalogVersionId: 'catalog-canonical',
+    })).toBe('catalog-canonical');
   });
 
   it('captures exactly the ranked top 10 profiles and deterministic relevant evidence', () => {
