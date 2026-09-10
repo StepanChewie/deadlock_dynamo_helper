@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { BuildDebugV2Module } from './build-debug-v2/build-debug-v2.module';
 import { databaseOptions } from './database/data-source';
 import { DeadlockLiveModule } from './deadlock-live/deadlock-live.module';
 import { RecommendationDatasetV5Module } from './deadlock-live/recommendation-dataset-v5.module';
@@ -24,6 +25,7 @@ import { StatlockerProbeModule } from './statlocker-probe/statlocker-probe.modul
     RecommendationPolicyV6EvaluationModule,
     StatlockerAdaptiveModule,
     StatlockerProbeModule,
+    BuildDebugV2Module,
   ],
 })
 export class AppModule {}
