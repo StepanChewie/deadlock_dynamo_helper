@@ -45,19 +45,11 @@ jobs:
           const { readdir, readFile, stat } = require('node:fs/promises');
           const { basename, join } = require('node:path');
 
-          function positiveHeroIds(values) {
-            return Array.isArray(values)
-              ? [...new Set(values.filter((value) => Number.isSafeInteger(value) && value > 0))]
-              : [];
-          }
-
           function eventContainsBilly(event) {
             if (!event || typeof event !== 'object') return false;
-            if (typeof event.key === 'string' && event.key.startsWith('roster')) {
-              const payload = event.payload;
-              if (payload && typeof payload === 'object' && Number(payload.hero_id ?? payload.heroId) === 72) return true;
-            }
-            return false;
+            if (typeof event.key !== 'string' || !event.key.startsWith('roster')) return false;
+            const payload = event.payload;
+            return Boolean(payload && typeof payload === 'object' && Number(payload.hero_id ?? payload.heroId) === 72);
           }
 
           async function liveStateCandidates() {
@@ -99,10 +91,9 @@ jobs:
 
             const candidates = [];
             for (const file of files) {
-              const filePath = join(dir, file.name);
               let text;
               try {
-                text = await readFile(filePath, 'utf8');
+                text = await readFile(join(dir, file.name), 'utf8');
               } catch {
                 continue;
               }
@@ -121,12 +112,17 @@ jobs:
                 }
               }
               if (!containsBilly) continue;
-              const filenameMatchId = basename(file.name, '.ndjson');
-              const matchId = explicitMatchId ?? filenameMatchId;
+              const matchId = explicitMatchId ?? basename(file.name, '.ndjson');
               if (/^\d+$/.test(matchId)) candidates.push(matchId);
             }
             process.stderr.write(`Raw live logs inspected: files=${files.length} BillyCandidates=${candidates.length}\n`);
             return candidates;
+          }
+
+          function hasCompleteEnemyRoster(value) {
+            if (!Array.isArray(value)) return false;
+            const ids = [...new Set(value.filter((heroId) => Number.isSafeInteger(heroId) && heroId > 0))];
+            return ids.length === 6;
           }
 
           async function main() {
@@ -152,23 +148,35 @@ jobs:
               }
 
               for (const matchId of candidates) {
-                const replay = await client.query(`
-                  SELECT "decisionId", "replayInput", "decidedAt"
+                const players = await client.query(`
+                  SELECT DISTINCT "playerKey"
                   FROM adaptive_recommendation_decisions_v1
                   WHERE "matchId" = $1
-                  ORDER BY "decidedAt" DESC, "decisionId" DESC
-                  LIMIT 100
                 `, [matchId]);
 
-                for (const row of replay.rows) {
-                  const decision = row?.replayInput?.decision;
-                  if (decision?.state?.heroId !== 72) continue;
-                  if (String(decision?.state?.matchId) !== matchId) continue;
-                  if (positiveHeroIds(decision?.enemyHeroIds).length !== 6) continue;
-                  process.stderr.write(`Resolved Billy replay from Overwolf live state: match=${matchId} decision=${row.decisionId}\n`);
-                  process.stdout.write(matchId);
-                  await client.query('ROLLBACK');
-                  return;
+                for (const player of players.rows) {
+                  const replay = await client.query(`
+                    SELECT
+                      "decisionId",
+                      "decidedAt",
+                      "replayInput" #>> '{decision,state,heroId}' AS "heroId",
+                      "replayInput" #>> '{decision,state,matchId}' AS "decisionMatchId",
+                      "replayInput" #> '{decision,enemyHeroIds}' AS "enemyHeroIds"
+                    FROM adaptive_recommendation_decisions_v1
+                    WHERE "matchId" = $1 AND "playerKey" = $2
+                    ORDER BY "decidedAt" DESC
+                    LIMIT 100
+                  `, [matchId, player.playerKey]);
+
+                  for (const row of replay.rows) {
+                    if (Number(row.heroId) !== 72) continue;
+                    if (String(row.decisionMatchId) !== matchId) continue;
+                    if (!hasCompleteEnemyRoster(row.enemyHeroIds)) continue;
+                    process.stderr.write(`Resolved Billy replay from Overwolf live state: match=${matchId} decision=${row.decisionId}\n`);
+                    process.stdout.write(matchId);
+                    await client.query('ROLLBACK');
+                    return;
+                  }
                 }
               }
 
