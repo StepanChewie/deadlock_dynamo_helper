@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   MessageEvent,
   NotFoundException,
   Param,
@@ -16,6 +17,8 @@ import { Observable, map } from 'rxjs';
 import { BuildDebugTraceStoreV2Service } from '../statlocker-adaptive/build-debug-trace-store-v2.service';
 import { BuildDebugAuthV2Guard } from './build-debug-auth-v2.guard';
 import { BuildDebugAuthV2Service } from './build-debug-auth-v2.service';
+import { BUILD_DEBUG_V2_CLIENT_JS } from './build-debug-v2.client';
+import { BUILD_DEBUG_V2_HTML } from './build-debug-v2.ui';
 
 interface HeaderResponseV2 {
   setHeader(name: string, value: string): void;
@@ -31,6 +34,20 @@ export class BuildDebugV2Controller {
     private readonly auth: BuildDebugAuthV2Service,
     private readonly traces: BuildDebugTraceStoreV2Service,
   ) {}
+
+  @Get()
+  @Header('Content-Type', 'text/html; charset=utf-8')
+  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  ui(): string {
+    return BUILD_DEBUG_V2_HTML;
+  }
+
+  @Get('client.js')
+  @Header('Content-Type', 'application/javascript; charset=utf-8')
+  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  client(): string {
+    return BUILD_DEBUG_V2_CLIENT_JS;
+  }
 
   @Post('login')
   login(
