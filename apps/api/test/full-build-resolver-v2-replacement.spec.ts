@@ -6,6 +6,7 @@ import {
   BuildArchetypeItemV2,
   BuildArchetypeV2,
 } from '../src/statlocker-adaptive/build-archetype-v2';
+import { BuildDecisionTraceCollectorV2 } from '../src/statlocker-adaptive/build-decision-trace-v2';
 import { BuildItemUtilityV2Service } from '../src/statlocker-adaptive/build-item-utility-v2.service';
 import { EnemyThreatScoreV1 } from '../src/statlocker-adaptive/enemy-threat-v1.service';
 import { FullBuildResolverV2Service } from '../src/statlocker-adaptive/full-build-resolver-v2.service';
@@ -101,6 +102,7 @@ function service(): FullBuildResolverV2Service {
 
 describe('FullBuildResolverV2Service lifetime replacement search', () => {
   it('sells the lowest whole-inventory utility item instead of the cheapest item', () => {
+    const trace = new BuildDecisionTraceCollectorV2();
     const result = service().resolve({
       matchId: 'match-replacement',
       stateRevision: 'state-1',
@@ -117,6 +119,7 @@ describe('FullBuildResolverV2Service lifetime replacement search', () => {
         { heroId: HERO_ID, enemyHeroId: ENEMY, itemId: C, count: 100_000, deltaWpa: -0.40 },
         { heroId: HERO_ID, enemyHeroId: ENEMY, itemId: M, count: 100_000, deltaWpa: 0.40 },
       ],
+      trace,
     });
 
     expect(result.steps).toHaveLength(1);
@@ -129,5 +132,11 @@ describe('FullBuildResolverV2Service lifetime replacement search', () => {
     expect(result.steps[0].inventoryAfter).toEqual([A, B, M]);
     expect(result.steps[0].reasonCodes).toContain('WHOLE_INVENTORY_REPLACEMENT_SELECTED');
     expect(result.validation.valid).toBe(true);
+    expect(trace.stages().map((entry) => entry.stage)).toEqual(expect.arrayContaining([
+      'ITEM_SCORING',
+      'PLAN_SEARCH',
+      'REPLACEMENT_SEARCH',
+      'FINAL_PLAN',
+    ]));
   });
 });
