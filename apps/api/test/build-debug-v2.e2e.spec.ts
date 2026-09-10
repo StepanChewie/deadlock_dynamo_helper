@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { BuildDebugAuthV2Guard } from '../src/build-debug-v2/build-debug-auth-v2.guard';
 import { BuildDebugAuthV2Service } from '../src/build-debug-v2/build-debug-auth-v2.service';
 import { BuildDebugV2Controller } from '../src/build-debug-v2/build-debug-v2.controller';
+import { BUILD_DEBUG_V2_CLIENT_JS } from '../src/build-debug-v2/build-debug-v2.client';
 import { BuildDebugTraceStoreV2Service } from '../src/statlocker-adaptive/build-debug-trace-store-v2.service';
 import { BuildDecisionTraceV2 } from '../src/statlocker-adaptive/build-decision-trace-v2';
 
@@ -27,6 +28,294 @@ function trace(revision = 1): BuildDecisionTraceV2 {
         validationReasonCodes: [],
       },
     }],
+  };
+}
+
+function renderFixtureTrace(revision = 7): BuildDecisionTraceV2 {
+  return {
+    matchId: MATCH_ID,
+    revision,
+    stateRevision: `fixture-state-${revision}`,
+    generatedAt: new Date(1_700_001_000_000 + revision * 1000).toISOString(),
+    stages: [
+      {
+        stage: 'SOURCE',
+        reasonCodes: [],
+        payload: {
+          heroId: 72,
+          statlockerPatchId: 'patch-fixture',
+          profileAccountIds: Array.from({ length: 10 }, (_, index) => `profile-${index + 1}`),
+          profileCount: 10,
+          wpaRowCount: 48,
+          t4Available: false,
+        },
+      },
+      {
+        stage: 'ARCHETYPE_MINING',
+        reasonCodes: [],
+        payload: {
+          candidates: [
+            {
+              candidateId: 'gun-core',
+              profileAccountIds: ['profile-1', 'profile-2', 'profile-3', 'profile-4', 'profile-5', 'profile-6'],
+              support: 0.6,
+              coherence: 0.91,
+              separation: 0.37,
+              disposition: 'SELECTED',
+              reasonCodes: ['COHERENT_CLUSTER'],
+            },
+            {
+              candidateId: 'spirit-control',
+              profileAccountIds: ['profile-7', 'profile-8', 'profile-9', 'profile-10'],
+              support: 0.4,
+              coherence: 0.73,
+              separation: 0.31,
+              disposition: 'REJECTED',
+              reasonCodes: ['LOW_CLUSTER_COHERENCE'],
+            },
+          ],
+        },
+      },
+      {
+        stage: 'ARCHETYPE_QUALITY_GATE',
+        reasonCodes: [],
+        payload: {
+          results: [
+            { archetypeId: 'gun-core', accepted: true, reasonCodes: ['QUALITY_GATE_PASS'] },
+            { archetypeId: 'spirit-control', accepted: false, reasonCodes: ['QUALITY_GATE_LOW_SUPPORT'] },
+          ],
+        },
+      },
+      {
+        stage: 'ARCHETYPE_SELECTION',
+        reasonCodes: ['IMMUTABLE_MATCH_LOCK'],
+        payload: {
+          enemyHeroIds: [1, 2, 3, 4, 5, 6],
+          wpaQueryCount: 42,
+          candidates: [
+            {
+              candidateId: 'gun-core',
+              archetypeId: 'gun-core',
+              score: 0.32,
+              confidence: 0.88,
+              coverage: 0.83,
+              sampleCount: 190,
+              disposition: 'SELECTED',
+              reasonCodes: ['BEST_MATCHUP_WPA'],
+            },
+            {
+              candidateId: 'spirit-control',
+              archetypeId: 'spirit-control',
+              score: 0.17,
+              confidence: 0.66,
+              coverage: 0.67,
+              sampleCount: 102,
+              disposition: 'REJECTED',
+              reasonCodes: ['MATCHUP_SCORE_BELOW_SELECTED'],
+            },
+          ],
+          selectedArchetypeId: 'gun-core',
+          fallbackUsed: false,
+        },
+      },
+      {
+        stage: 'LIVE_CONTEXT',
+        reasonCodes: [],
+        payload: {
+          gameTimeSec: 915,
+          inventoryItemIds: [11, 22, 33],
+          capacity: 12,
+          enemyThreats: [
+            { heroId: 1, threatMultiplier: 1.31, completeness: 1, reasonCodes: ['HIGH_SOULS_THREAT'] },
+            { heroId: 2, threatMultiplier: 0.91, completeness: 0.8, reasonCodes: [] },
+          ],
+        },
+      },
+      {
+        stage: 'CANDIDATE_DISCOVERY',
+        reasonCodes: [],
+        payload: {
+          candidates: [
+            {
+              candidateId: 'inside-101',
+              itemId: 101,
+              score: 0.61,
+              confidence: 0.84,
+              insideLockedArchetype: true,
+              disposition: 'SELECTED',
+              reasonCodes: ['LOCKED_ARCHETYPE_MEMBER'],
+            },
+            {
+              candidateId: 'outside-909',
+              itemId: 909,
+              score: 0.19,
+              confidence: 0.44,
+              insideLockedArchetype: false,
+              disposition: 'REJECTED',
+              reasonCodes: ['OUTSIDE_ARCHETYPE_IMPROVEMENT_TOO_LOW'],
+            },
+          ],
+        },
+      },
+      {
+        stage: 'CHOICE_RESOLUTION',
+        reasonCodes: [],
+        payload: {
+          groups: [{
+            groupId: 'A_OR_B',
+            minSelect: 1,
+            maxSelect: 1,
+            candidates: [
+              {
+                candidateId: 'A',
+                itemId: 101,
+                score: 0.72,
+                confidence: 0.82,
+                disposition: 'SELECTED',
+                reasonCodes: ['BEST_CHOICE_MATCHUP'],
+              },
+              {
+                candidateId: 'B',
+                itemId: 202,
+                score: 0.49,
+                confidence: 0.78,
+                disposition: 'REJECTED',
+                reasonCodes: ['MATCHUP_SCORE_BELOW_SELECTED'],
+              },
+            ],
+            selectedItemIds: [101],
+          }],
+        },
+      },
+      {
+        stage: 'ITEM_SCORING',
+        reasonCodes: [],
+        payload: {
+          items: [
+            {
+              itemId: 101,
+              total: 1.34,
+              confidence: 0.87,
+              layers: { structure: 0.7, matchup: 0.42, progression: 0.35, transition: 0.13 },
+              reasonCodes: ['CORE_STRUCTURE', 'EXACT_ENEMY_WPA'],
+            },
+            {
+              itemId: 404,
+              total: 1.1,
+              confidence: 0.81,
+              layers: { structure: 0.41, matchup: 0.54, progression: 0.31, transition: 0.16 },
+              reasonCodes: ['OUTSIDE_MATCHUP_SUPPORTED'],
+            },
+          ],
+        },
+      },
+      {
+        stage: 'PLAN_SEARCH',
+        reasonCodes: [],
+        payload: {
+          branches: [
+            {
+              sequence: 1,
+              targetItemId: 101,
+              action: 'BUY',
+              score: 1.34,
+              disposition: 'SELECTED',
+              reasonCodes: ['BEST_PLAN_BRANCH'],
+            },
+            {
+              sequence: 1,
+              targetItemId: 202,
+              action: 'BUY',
+              score: 1.29,
+              disposition: 'SUPPRESSED_BY_HYSTERESIS',
+              reasonCodes: ['PLAN_SWITCH_MARGIN_NOT_MET'],
+            },
+          ],
+          hysteresis: {
+            action: 'KEEP_PREVIOUS',
+            improvement: 0.05,
+            requiredImprovement: 0.12,
+            reasonCodes: ['PLAN_SWITCH_MARGIN_NOT_MET'],
+          },
+        },
+      },
+      {
+        stage: 'REPLACEMENT_SEARCH',
+        reasonCodes: [],
+        payload: {
+          targetItemId: 404,
+          candidates: [
+            {
+              sellItemId: 11,
+              buyItemId: 404,
+              marginalGain: 0.27,
+              requiredImprovement: 0.2,
+              disposition: 'SELECTED',
+              reasonCodes: ['REPLACEMENT_BEST'],
+            },
+            {
+              sellItemId: 22,
+              buyItemId: 404,
+              marginalGain: 0.08,
+              requiredImprovement: 0.2,
+              disposition: 'REJECTED',
+              reasonCodes: ['REPLACEMENT_THRESHOLD_NOT_MET'],
+            },
+          ],
+        },
+      },
+      {
+        stage: 'FINAL_PLAN',
+        reasonCodes: ['T4_CHAINS_UNAVAILABLE'],
+        payload: {
+          planRevision: `fixture-plan-${revision}`,
+          stepCount: 3,
+          degradedReasons: ['T4_CHAINS_UNAVAILABLE'],
+          valid: true,
+          validationReasonCodes: ['INVENTORY_SIMULATION_PASS'],
+        },
+      },
+    ],
+    finalPlan: {
+      planRevision: `fixture-plan-${revision}`,
+      matchId: MATCH_ID,
+      heroId: 72,
+      archetypeId: 'gun-core',
+      stateRevision: `fixture-state-${revision}`,
+      steps: [
+        {
+          sequence: 1,
+          action: 'BUY',
+          buyItemId: 101,
+          consumedItemIds: [],
+          inventoryBefore: [11, 22, 33],
+          inventoryAfter: [11, 22, 33, 101],
+          reasonCodes: ['CORE_PROGRESS'],
+        },
+        {
+          sequence: 2,
+          action: 'UPGRADE',
+          buyItemId: 303,
+          recipeId: 'recipe-303',
+          consumedItemIds: [101],
+          inventoryBefore: [11, 22, 33, 101],
+          inventoryAfter: [11, 22, 33, 303],
+          reasonCodes: ['RECIPE_UPGRADE'],
+        },
+        {
+          sequence: 3,
+          action: 'REPLACE',
+          sellItemId: 11,
+          buyItemId: 404,
+          consumedItemIds: [],
+          inventoryBefore: [11, 22, 33, 303],
+          inventoryAfter: [22, 33, 303, 404],
+          reasonCodes: ['MATCHUP_REPLACEMENT'],
+        },
+      ],
+      degradedReasons: ['T4_CHAINS_UNAVAILABLE'],
+      validation: { valid: true, reasonCodes: ['INVENTORY_SIMULATION_PASS'] },
+    },
   };
 }
 
@@ -157,6 +446,72 @@ describe('Build debugger V2 HTTP API', () => {
     expect(body).toContain('"revision":2');
   });
 
+  it('renders the complete trace fixture after snapshot-first match selection and updates from SSE', async () => {
+    const fixture = renderFixtureTrace(7);
+    const harness = createBrowserHarness(fixture);
+    const matchSelect = harness.element('activeMatchSelect');
+    matchSelect.value = MATCH_ID;
+
+    await matchSelect.dispatch('change');
+    await flushMicrotasks();
+
+    expect(harness.operations.slice(0, 2)).toEqual([
+      `fetch:/debug/build-v2/matches/${MATCH_ID}`,
+      `sse:/debug/build-v2/matches/${MATCH_ID}/stream`,
+    ]);
+
+    const traceHtml = harness.element('traceStages').innerHTML;
+    const buildHtml = harness.element('fullBuildPanel').innerHTML;
+    const navigationHtml = harness.element('stageNavigation').innerHTML;
+
+    expect(navigationHtml).toContain('SOURCE');
+    expect(navigationHtml).toContain('ARCHETYPE_SELECTION');
+    expect(navigationHtml).toContain('FINAL_PLAN');
+    expect(traceHtml).toContain('profile-10');
+    expect(traceHtml).toContain('gun-core');
+    expect(traceHtml).toContain('spirit-control');
+    expect(traceHtml).toContain('A OR B');
+    expect(traceHtml).toContain('OUTSIDE_ARCHETYPE_IMPROVEMENT_TOO_LOW');
+    expect(traceHtml).toContain('REPLACEMENT_BEST');
+    expect(traceHtml).toContain('SUPPRESSED_BY_HYSTERESIS');
+    expect(traceHtml).toContain('PLAN_SWITCH_MARGIN_NOT_MET');
+    expect(traceHtml).toContain('STRUCTURE');
+    expect(traceHtml).toContain('MATCHUP');
+    expect(traceHtml).toContain('PROGRESSION');
+    expect(traceHtml).toContain('TRANSITION');
+    expect(traceHtml).toContain('T4_CHAINS_UNAVAILABLE');
+    expect(buildHtml).toContain('BUY');
+    expect(buildHtml).toContain('UPGRADE');
+    expect(buildHtml).toContain('REPLACE');
+    expect(buildHtml).toContain('SELL 11');
+    expect(buildHtml).toContain('BUY 404');
+    expect(buildHtml).toContain('Inventory simulation: PASS');
+    expect(harness.element('traceRevision').textContent).toContain('revision: 7');
+
+    harness.streams[0].emitTrace(renderFixtureTrace(8));
+    await flushMicrotasks();
+    expect(harness.element('traceRevision').textContent).toContain('revision: 8');
+    expect(harness.element('fullBuildPanel').innerHTML).toContain('fixture-plan-8');
+  });
+
+  it('bounds SSE reconnect attempts instead of reconnecting forever', async () => {
+    const harness = createBrowserHarness(renderFixtureTrace(9));
+    const matchSelect = harness.element('activeMatchSelect');
+    matchSelect.value = MATCH_ID;
+    await matchSelect.dispatch('change');
+    await flushMicrotasks();
+
+    for (let index = 0; index < 12; index += 1) {
+      const current = harness.streams[harness.streams.length - 1];
+      current.fail();
+      harness.runNextTimer();
+      await flushMicrotasks();
+    }
+
+    expect(harness.streams.length).toBeLessThanOrEqual(6);
+    expect(harness.element('debugStatus').textContent).toContain('reconnect limit');
+  });
+
   it('invalidates the server-side session on logout', async () => {
     const { cookie } = await login();
     expect((await fetch(`${baseUrl}/debug/build-v2/matches`, { headers: { cookie } })).status).toBe(200);
@@ -182,6 +537,162 @@ describe('Build debugger V2 HTTP API', () => {
     return { response, cookie: setCookie.split(';')[0] };
   }
 });
+
+interface FakeBrowserEvent {
+  data?: string;
+  preventDefault(): void;
+}
+
+type FakeBrowserListener = (event: FakeBrowserEvent) => void | Promise<void>;
+
+class FakeBrowserElement {
+  value = '';
+  textContent = '';
+  innerHTML = '';
+  disabled = false;
+  open = false;
+  readonly children: FakeBrowserElement[] = [];
+  private readonly listeners = new Map<string, FakeBrowserListener[]>();
+
+  constructor(readonly id: string) {}
+
+  addEventListener(type: string, listener: FakeBrowserListener): void {
+    const listeners = this.listeners.get(type) ?? [];
+    listeners.push(listener);
+    this.listeners.set(type, listeners);
+  }
+
+  appendChild(child: FakeBrowserElement): void {
+    this.children.push(child);
+  }
+
+  async dispatch(type: string, data?: string): Promise<void> {
+    const event: FakeBrowserEvent = { data, preventDefault: () => undefined };
+    for (const listener of this.listeners.get(type) ?? []) await listener(event);
+  }
+}
+
+class FakeBrowserEventSource {
+  onopen?: () => void;
+  onerror?: () => void;
+  closed = false;
+  private readonly listeners = new Map<string, FakeBrowserListener[]>();
+
+  constructor(readonly url: string) {}
+
+  addEventListener(type: string, listener: FakeBrowserListener): void {
+    const listeners = this.listeners.get(type) ?? [];
+    listeners.push(listener);
+    this.listeners.set(type, listeners);
+  }
+
+  emitTrace(traceValue: BuildDecisionTraceV2): void {
+    const event: FakeBrowserEvent = {
+      data: JSON.stringify(traceValue),
+      preventDefault: () => undefined,
+    };
+    for (const listener of this.listeners.get('trace') ?? []) void listener(event);
+  }
+
+  fail(): void {
+    this.onerror?.();
+  }
+
+  close(): void {
+    this.closed = true;
+  }
+}
+
+function createBrowserHarness(snapshot: BuildDecisionTraceV2): {
+  element: (id: string) => FakeBrowserElement;
+  operations: string[];
+  streams: FakeBrowserEventSource[];
+  runNextTimer: () => void;
+} {
+  const ids = [
+    'debugLoginForm',
+    'debugPassword',
+    'debugStatus',
+    'activeMatchSelect',
+    'refreshMatches',
+    'stageNavigation',
+    'traceStages',
+    'fullBuildPanel',
+    'traceRevision',
+  ];
+  const elements = new Map(ids.map((id) => [id, new FakeBrowserElement(id)]));
+  const operations: string[] = [];
+  const streams: FakeBrowserEventSource[] = [];
+  const timers: Array<() => void> = [];
+
+  const documentStub = {
+    getElementById: (id: string) => elements.get(id),
+    createElement: (tagName: string) => new FakeBrowserElement(tagName),
+    querySelectorAll: () => [],
+  };
+
+  const fetchStub = async (input: string): Promise<Response> => {
+    const pathname = new URL(input, 'http://debug.test').pathname;
+    operations.push(`fetch:${pathname}`);
+    if (pathname === `/debug/build-v2/matches/${MATCH_ID}`) {
+      return new Response(JSON.stringify(snapshot), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (pathname === '/debug/build-v2/matches') {
+      return new Response(JSON.stringify([{ matchId: MATCH_ID, revision: snapshot.revision }]), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    throw new Error(`Unexpected browser fetch ${pathname}`);
+  };
+
+  class HarnessEventSource extends FakeBrowserEventSource {
+    constructor(url: string) {
+      super(url);
+      operations.push(`sse:${new URL(url, 'http://debug.test').pathname}`);
+      streams.push(this);
+    }
+  }
+
+  const setTimeoutStub = (callback: () => void): number => {
+    timers.push(callback);
+    return timers.length;
+  };
+  const clearTimeoutStub = (_timerId: number): void => undefined;
+
+  const execute = new Function(
+    'document',
+    'fetch',
+    'EventSource',
+    'setTimeout',
+    'clearTimeout',
+    BUILD_DEBUG_V2_CLIENT_JS,
+  );
+  execute(documentStub, fetchStub, HarnessEventSource, setTimeoutStub, clearTimeoutStub);
+
+  return {
+    element: (id: string) => {
+      const element = elements.get(id);
+      if (!element) throw new Error(`Unknown fake browser element ${id}`);
+      return element;
+    },
+    operations,
+    streams,
+    runNextTimer: () => {
+      const timer = timers.shift();
+      if (timer) timer();
+    },
+  };
+}
+
+async function flushMicrotasks(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+}
 
 function restoreEnv(name: string, previous: string | undefined): void {
   if (previous === undefined) delete process.env[name];
