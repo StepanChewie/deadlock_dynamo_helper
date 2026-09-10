@@ -70,6 +70,8 @@ export interface FullBuildResolverV2Config {
   coreReplacementMinImprovement: number;
   recentPurchaseProtectionS: number;
   minPlanSwitchImprovement: number;
+  nearTermProtectedStepCount: number;
+  nearTermPlanSwitchMinImprovement: number;
 }
 
 export interface StatlockerBuildV2Config {
@@ -186,5 +188,7 @@ export const STATLOCKER_BUILD_V2_CONFIG: Readonly<StatlockerBuildV2Config> = Obj
     coreReplacementMinImprovement: 0.45,
     recentPurchaseProtectionS: 120,
     minPlanSwitchImprovement: 0.08,
+    nearTermProtectedStepCount: 2,
+    nearTermPlanSwitchMinImprovement: 0.16,
   }),
 });
