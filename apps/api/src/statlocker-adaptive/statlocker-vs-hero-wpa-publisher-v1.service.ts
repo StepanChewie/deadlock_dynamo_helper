@@ -36,7 +36,11 @@ export class StatlockerVsHeroWpaPublisherV1Service {
           order: { fetchedAt: 'DESC' },
         });
 
-        await rowRepository.insert([...input.rows]);
+        const ROW_BATCH_SIZE = 1_000;
+        for (let index = 0; index < input.rows.length; index += ROW_BATCH_SIZE) {
+          const batch = input.rows.slice(index, index + ROW_BATCH_SIZE);
+          await rowRepository.insert([...batch]);
+        }
 
         if (previous && previous.snapshotId !== snapshot.snapshotId) {
           await rawRepository.update(
