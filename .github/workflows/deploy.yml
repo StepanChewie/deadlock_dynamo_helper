@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   deploy:
-    runs-on: [self-hosted, linux, ARM64, vps-arm64-runner-v3]
+    runs-on: [self-hosted, Linux, Arm64]
     timeout-minutes: 60
     env:
       ADAPTIVE_PRODUCTION_IMAGE: deadlock-adaptive-production:${{ github.sha }}

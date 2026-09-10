@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   debug:
-    runs-on: [self-hosted, linux, ARM64, vps-arm64-runner-v3]
+    runs-on: [self-hosted, Linux, Arm64]
     timeout-minutes: 10
     steps:
       - name: Capture adaptive production evidence
