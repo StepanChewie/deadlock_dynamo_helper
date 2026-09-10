@@ -463,7 +463,7 @@ async function loadExactStatlockerIdentity(input: {
   }
 
   return {
-    request,
+    request: input.request,
     identity,
     leaderboard,
     proBuildAnalyses,
