@@ -1,3 +1,4 @@
+import { BuildDecisionTraceCollectorV2 } from '../src/statlocker-adaptive/build-decision-trace-v2';
 import { BuildArchetypeMinerV2Service } from '../src/statlocker-adaptive/build-archetype-miner-v2.service';
 import { StatlockerBuildProfileItemV2, StatlockerBuildProfileV2 } from '../src/statlocker-adaptive/build-archetype-v2';
 
@@ -78,15 +79,24 @@ describe('BuildArchetypeMinerV2Service', () => {
     expect(result.accepted.every((entry) => entry.separation >= 0.2)).toBe(true);
   });
 
-  it('does not publish a one-profile outlier archetype', () => {
+  it('does not publish a one-profile outlier archetype and traces accepted/rejected mining candidates', () => {
+    const trace = new BuildDecisionTraceCollectorV2();
     const result = miner.mine([
       ...coherentProfiles(9),
       profile('outlier', [X, Y, Z]),
-    ]);
+    ], {}, trace);
 
     expect(result.accepted).toHaveLength(1);
     expect(result.accepted[0].profileAccountIds).toHaveLength(10);
     expect(result.accepted.some((entry) => entry.profileAccountIds.length === 1)).toBe(false);
     expect(result.rejected.some((entry) => entry.reasonCodes.includes('CLUSTER_TOO_SMALL'))).toBe(true);
+
+    const stage = trace.stages().find((entry) => entry.stage === 'ARCHETYPE_MINING');
+    expect(stage?.stage).toBe('ARCHETYPE_MINING');
+    if (stage?.stage !== 'ARCHETYPE_MINING') throw new Error('Missing ARCHETYPE_MINING trace');
+    expect(stage.payload.candidates.some((candidate) => candidate.disposition === 'SELECTED')).toBe(true);
+    expect(stage.payload.candidates.some((candidate) =>
+      candidate.disposition === 'REJECTED' && candidate.reasonCodes.includes('CLUSTER_TOO_SMALL'),
+    )).toBe(true);
   });
 });
