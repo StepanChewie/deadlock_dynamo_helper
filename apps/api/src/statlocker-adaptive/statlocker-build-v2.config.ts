@@ -14,6 +14,46 @@ export interface BuildArchetypeSelectionRoleWeightsV2 {
   FLEX: number;
 }
 
+export interface BuildItemUtilityV2Config {
+  layerWeights: {
+    structure: number;
+    matchup: number;
+    progression: number;
+    transition: number;
+  };
+  rolePriors: BuildArchetypeSelectionRoleWeightsV2;
+  outsideArchetypePrior: number;
+  structureWeights: {
+    role: number;
+    structuralPriority: number;
+    profileCoverage: number;
+    purchaseRate: number;
+  };
+  matchupWeights: {
+    exactEnemy: number;
+    baseWpa: number;
+  };
+  progressionWeights: {
+    timing: number;
+    phase: number;
+    order: number;
+    relationship: number;
+    chain: number;
+  };
+  transitionPenaltyWeights: {
+    transaction: number;
+    churn: number;
+    recentPurchase: number;
+    replacement: number;
+  };
+  baseWpaSamplePrior: number;
+  chainSamplePrior: number;
+  wpaNormalizationScale: number;
+  timingScaleS: number;
+  phaseMidMinTimeS: number;
+  phaseLateMinTimeS: number;
+}
+
 export interface StatlockerBuildV2Config {
   profileLinkSimilarity: number;
   minClusterSize: number;
@@ -33,6 +73,7 @@ export interface StatlockerBuildV2Config {
   archetypeSelectionRoleWeights: BuildArchetypeSelectionRoleWeightsV2;
   offlineArchetypeSupportWeight: number;
   offlineArchetypeCoherenceWeight: number;
+  itemUtility: BuildItemUtilityV2Config;
 }
 
 export const STATLOCKER_BUILD_V2_CONFIG: Readonly<StatlockerBuildV2Config> = Object.freeze({
@@ -66,4 +107,48 @@ export const STATLOCKER_BUILD_V2_CONFIG: Readonly<StatlockerBuildV2Config> = Obj
   }),
   offlineArchetypeSupportWeight: 0.60,
   offlineArchetypeCoherenceWeight: 0.40,
+  itemUtility: Object.freeze({
+    layerWeights: Object.freeze({
+      structure: 1,
+      matchup: 0.9,
+      progression: 0.65,
+      transition: 1,
+    }),
+    rolePriors: Object.freeze({
+      CORE: 1,
+      FREQUENT: 0.75,
+      SITUATIONAL: 0.35,
+      FLEX: 0.20,
+    }),
+    outsideArchetypePrior: -0.08,
+    structureWeights: Object.freeze({
+      role: 0.35,
+      structuralPriority: 0.35,
+      profileCoverage: 0.15,
+      purchaseRate: 0.15,
+    }),
+    matchupWeights: Object.freeze({
+      exactEnemy: 0.8,
+      baseWpa: 0.2,
+    }),
+    progressionWeights: Object.freeze({
+      timing: 0.25,
+      phase: 0.15,
+      order: 0.25,
+      relationship: 0.15,
+      chain: 0.20,
+    }),
+    transitionPenaltyWeights: Object.freeze({
+      transaction: 0.35,
+      churn: 0.30,
+      recentPurchase: 0.20,
+      replacement: 0.15,
+    }),
+    baseWpaSamplePrior: 200,
+    chainSamplePrior: 200,
+    wpaNormalizationScale: 0.15,
+    timingScaleS: 900,
+    phaseMidMinTimeS: 600,
+    phaseLateMinTimeS: 1500,
+  }),
 });
