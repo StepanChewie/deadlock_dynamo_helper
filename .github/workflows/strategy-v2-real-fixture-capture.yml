@@ -29,7 +29,7 @@ jobs:
           sudo docker build -t "$image" .
           echo "CAPTURE_IMAGE=$image" >> "$GITHUB_ENV"
 
-      - name: Resolve Billy match from live production telemetry and capture fixture
+      - name: Resolve Billy match from raw Overwolf live state and capture fixture
         shell: bash
         run: |
           set -euo pipefail
@@ -42,12 +42,91 @@ jobs:
 
           match_id="$(cd "$prod_dir" && sudo docker compose exec -T api node <<'NODE'
           const { Client } = require('pg');
+          const { readdir, readFile, stat } = require('node:fs/promises');
+          const { basename, join } = require('node:path');
 
-          function completeEnemyRoster(decision) {
-            const enemyHeroIds = Array.isArray(decision?.enemyHeroIds)
-              ? [...new Set(decision.enemyHeroIds.filter((value) => Number.isSafeInteger(value) && value > 0))]
+          function positiveHeroIds(values) {
+            return Array.isArray(values)
+              ? [...new Set(values.filter((value) => Number.isSafeInteger(value) && value > 0))]
               : [];
-            return enemyHeroIds.length === 6;
+          }
+
+          function eventContainsBilly(event) {
+            if (!event || typeof event !== 'object') return false;
+            if (typeof event.key === 'string' && event.key.startsWith('roster')) {
+              const payload = event.payload;
+              if (payload && typeof payload === 'object' && Number(payload.hero_id ?? payload.heroId) === 72) return true;
+            }
+            return false;
+          }
+
+          async function liveStateCandidates() {
+            try {
+              const response = await fetch('http://127.0.0.1:3000/deadlock/live/states');
+              if (!response.ok) return [];
+              const states = await response.json();
+              if (!Array.isArray(states)) return [];
+              return states
+                .filter((state) => {
+                  const players = state?.playersBySteamId && typeof state.playersBySteamId === 'object'
+                    ? Object.values(state.playersBySteamId)
+                    : [];
+                  return players.some((player) => Number(player?.heroId) === 72);
+                })
+                .map((state) => String(state.matchId ?? ''))
+                .filter((matchId) => /^\d+$/.test(matchId));
+            } catch {
+              return [];
+            }
+          }
+
+          async function rawLogCandidates() {
+            const dir = process.env.DEADLOCK_LIVE_RAW_LOG_DIR?.trim()
+              || join(process.cwd(), 'storage', 'deadlock-live');
+            let names;
+            try {
+              names = (await readdir(dir)).filter((name) => name.endsWith('.ndjson'));
+            } catch (error) {
+              process.stderr.write(`Raw live log directory unavailable: ${dir}: ${error?.message || error}\n`);
+              return [];
+            }
+
+            const files = await Promise.all(names.map(async (name) => ({
+              name,
+              mtimeMs: (await stat(join(dir, name))).mtimeMs,
+            })));
+            files.sort((a, b) => b.mtimeMs - a.mtimeMs || a.name.localeCompare(b.name));
+
+            const candidates = [];
+            for (const file of files) {
+              const filePath = join(dir, file.name);
+              let text;
+              try {
+                text = await readFile(filePath, 'utf8');
+              } catch {
+                continue;
+              }
+              let containsBilly = false;
+              let explicitMatchId;
+              for (const line of text.split('\n')) {
+                if (!line.trim()) continue;
+                try {
+                  const event = JSON.parse(line);
+                  if (eventContainsBilly(event)) containsBilly = true;
+                  if (!explicitMatchId && typeof event.matchId === 'string' && /^\d+$/.test(event.matchId)) {
+                    explicitMatchId = event.matchId;
+                  }
+                } catch {
+                  continue;
+                }
+              }
+              if (!containsBilly) continue;
+              const filenameMatchId = basename(file.name, '.ndjson');
+              const matchId = explicitMatchId ?? filenameMatchId;
+              if (/^\d+$/.test(matchId)) candidates.push(matchId);
+            }
+            process.stderr.write(`Raw live logs inspected: files=${files.length} BillyCandidates=${candidates.length}\n`);
+            return candidates;
           }
 
           async function main() {
@@ -64,59 +143,36 @@ jobs:
               await client.query('BEGIN TRANSACTION READ ONLY');
               await client.query("SET LOCAL statement_timeout = '10s'");
 
-              const schema = await client.query(`
-                SELECT to_regclass('public.recommendation_telemetry_events')::text AS "telemetryTable"
-              `);
-              if (!schema.rows[0]?.telemetryTable) {
-                throw new Error('Live recommendation telemetry table is unavailable');
-              }
-
-              const telemetry = await client.query(`
-                SELECT "matchId", "sourceOccurredAt", source, payload->>'heroId' AS "heroId"
-                FROM recommendation_telemetry_events
-                WHERE "sourceOccurredAt" >= NOW() - INTERVAL '14 days'
-                  AND "eventType" = 'PLAYER_STATE'
-                ORDER BY "sourceOccurredAt" DESC
-                LIMIT 10000
-              `);
-
-              const candidates = [];
-              const seen = new Set();
-              for (const row of telemetry.rows) {
-                if (String(row.heroId) !== '72') continue;
-                const matchId = String(row.matchId ?? '');
-                if (!/^\d+$/.test(matchId) || seen.has(matchId)) continue;
-                seen.add(matchId);
-                candidates.push({ matchId, source: row.source, sourceOccurredAt: row.sourceOccurredAt });
-              }
+              const candidates = [...new Set([
+                ...(await liveStateCandidates()),
+                ...(await rawLogCandidates()),
+              ])];
               if (candidates.length === 0) {
-                throw new Error(`No Billy PLAYER_STATE match IDs found in recent live telemetry; scanned=${telemetry.rowCount ?? telemetry.rows.length}`);
+                throw new Error('No Billy match IDs found in current in-memory or retained raw Overwolf live state');
               }
 
-              for (const candidate of candidates.slice(0, 50)) {
+              for (const matchId of candidates) {
                 const replay = await client.query(`
                   SELECT "decisionId", "replayInput", "decidedAt"
                   FROM adaptive_recommendation_decisions_v1
                   WHERE "matchId" = $1
                   ORDER BY "decidedAt" DESC, "decisionId" DESC
                   LIMIT 100
-                `, [candidate.matchId]);
+                `, [matchId]);
 
                 for (const row of replay.rows) {
                   const decision = row?.replayInput?.decision;
                   if (decision?.state?.heroId !== 72) continue;
-                  if (String(decision?.state?.matchId) !== candidate.matchId) continue;
-                  if (!completeEnemyRoster(decision)) continue;
-                  process.stderr.write(
-                    `Resolved live Billy replay: match=${candidate.matchId} telemetrySource=${candidate.source} telemetryAt=${candidate.sourceOccurredAt?.toISOString?.() ?? candidate.sourceOccurredAt} decision=${row.decisionId}\n`,
-                  );
-                  process.stdout.write(candidate.matchId);
+                  if (String(decision?.state?.matchId) !== matchId) continue;
+                  if (positiveHeroIds(decision?.enemyHeroIds).length !== 6) continue;
+                  process.stderr.write(`Resolved Billy replay from Overwolf live state: match=${matchId} decision=${row.decisionId}\n`);
+                  process.stdout.write(matchId);
                   await client.query('ROLLBACK');
                   return;
                 }
               }
 
-              throw new Error(`Billy live telemetry found ${candidates.length} match IDs, but none has a complete saved adaptive replay`);
+              throw new Error(`Found ${candidates.length} Billy Overwolf match IDs, but none has a complete saved adaptive replay`);
             } finally {
               await client.end();
             }
