@@ -6,6 +6,7 @@ import {
   BuildArchetypeItemV2,
   BuildArchetypeV2,
 } from '../src/statlocker-adaptive/build-archetype-v2';
+import { BuildDecisionTraceCollectorV2 } from '../src/statlocker-adaptive/build-decision-trace-v2';
 import { BuildItemUtilityV2Service } from '../src/statlocker-adaptive/build-item-utility-v2.service';
 import { EnemyThreatScoreV1 } from '../src/statlocker-adaptive/enemy-threat-v1.service';
 import { FullBuildResolverV2Service } from '../src/statlocker-adaptive/full-build-resolver-v2.service';
@@ -113,27 +114,31 @@ function service(): FullBuildResolverV2Service {
   );
 }
 
+function lifetimeInput() {
+  return {
+    matchId: 'match-lifetime',
+    stateRevision: 'state-1',
+    heroId: HERO_ID,
+    rulesetId: 'ruleset-a',
+    archetype: archetype(),
+    itemGraph: graph,
+    capacity: 12,
+    gameTimeSec: 600,
+    currentInventoryItemIds: [],
+    enemyHeroIds: [ENEMY_A, ENEMY_B],
+    enemyThreats: [threat(ENEMY_A), threat(ENEMY_B)],
+    vsHeroRows: [
+      { heroId: HERO_ID, enemyHeroId: ENEMY_A, itemId: D, count: 100_000, deltaWpa: -0.30 },
+      { heroId: HERO_ID, enemyHeroId: ENEMY_B, itemId: D, count: 100_000, deltaWpa: -0.30 },
+      { heroId: HERO_ID, enemyHeroId: ENEMY_A, itemId: E, count: 100_000, deltaWpa: 0.30 },
+      { heroId: HERO_ID, enemyHeroId: ENEMY_B, itemId: E, count: 100_000, deltaWpa: 0.30 },
+    ],
+  };
+}
+
 describe('FullBuildResolverV2Service lifetime planning', () => {
   it('resolves A -> B -> (D OR E) -> F and continues after the selected CHOICE item', () => {
-    const result = service().resolve({
-      matchId: 'match-lifetime',
-      stateRevision: 'state-1',
-      heroId: HERO_ID,
-      rulesetId: 'ruleset-a',
-      archetype: archetype(),
-      itemGraph: graph,
-      capacity: 12,
-      gameTimeSec: 600,
-      currentInventoryItemIds: [],
-      enemyHeroIds: [ENEMY_A, ENEMY_B],
-      enemyThreats: [threat(ENEMY_A), threat(ENEMY_B)],
-      vsHeroRows: [
-        { heroId: HERO_ID, enemyHeroId: ENEMY_A, itemId: D, count: 100_000, deltaWpa: -0.30 },
-        { heroId: HERO_ID, enemyHeroId: ENEMY_B, itemId: D, count: 100_000, deltaWpa: -0.30 },
-        { heroId: HERO_ID, enemyHeroId: ENEMY_A, itemId: E, count: 100_000, deltaWpa: 0.30 },
-        { heroId: HERO_ID, enemyHeroId: ENEMY_B, itemId: E, count: 100_000, deltaWpa: 0.30 },
-      ],
-    });
+    const result = service().resolve(lifetimeInput());
 
     expect(result.steps.map((step) => step.buyItemId)).toEqual([A, B, E, F]);
     expect(result.steps.map((step) => step.buyItemId)).not.toContain(D);
@@ -141,5 +146,28 @@ describe('FullBuildResolverV2Service lifetime planning', () => {
     expect(result.steps[3].buyItemId).toBe(F);
     expect(result.validation.valid).toBe(true);
     expect(result.archetypeId).toBe('archetype:lifetime');
+  });
+
+  it('traces every CHOICE candidate and the same winner used by the lifetime plan', () => {
+    const trace = new BuildDecisionTraceCollectorV2();
+    const result = service().resolve({ ...lifetimeInput(), trace });
+    const choice = trace.stages().find((entry) => entry.stage === 'CHOICE_RESOLUTION');
+
+    expect(result.steps[2].buyItemId).toBe(E);
+    expect(choice?.stage).toBe('CHOICE_RESOLUTION');
+    if (!choice || choice.stage !== 'CHOICE_RESOLUTION') throw new Error('Missing choice trace');
+    expect(choice.payload.groups).toHaveLength(1);
+    expect(choice.payload.groups[0].groupId).toBe('choice:d-or-e');
+    expect(choice.payload.groups[0].selectedItemIds).toEqual([E]);
+    expect(choice.payload.groups[0].candidates.map((candidate) => ({
+      itemId: candidate.itemId,
+      disposition: candidate.disposition,
+    }))).toEqual([
+      { itemId: E, disposition: 'SELECTED' },
+      { itemId: D, disposition: 'REJECTED' },
+    ]);
+    expect(choice.payload.groups[0].candidates[0].score)
+      .toBeGreaterThan(choice.payload.groups[0].candidates[1].score!);
+    expect(trace.stages().some((entry) => entry.stage === 'FINAL_PLAN')).toBe(true);
   });
 });
