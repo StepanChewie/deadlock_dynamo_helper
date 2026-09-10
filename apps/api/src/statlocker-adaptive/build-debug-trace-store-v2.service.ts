@@ -36,7 +36,7 @@ export class BuildDebugTraceStoreV2Service {
 
     const immutableTrace = deepFreeze(copyTrace(trace));
     const tailSize = readPositiveInteger(
-      process.env.BUILD_DEBUG_TRACE_TAIL_SIZE,
+      process.env.BUILD_DEBUG_TRACE_TAIL ?? process.env.BUILD_DEBUG_TRACE_TAIL_SIZE,
       DEFAULT_TRACE_TAIL_SIZE,
     );
     const revisions = [...(existing?.revisions ?? []), immutableTrace].slice(-tailSize);
@@ -96,10 +96,7 @@ export class BuildDebugTraceStoreV2Service {
 
   private purgeExpired(): void {
     const nowMs = Date.now();
-    const ttlMs = readPositiveInteger(
-      process.env.BUILD_DEBUG_TRACE_TTL_MS,
-      DEFAULT_TRACE_TTL_MS,
-    );
+    const ttlMs = readTraceTtlMs();
     for (const [matchId, state] of this.matches) {
       if (nowMs - state.updatedAtMs <= ttlMs) continue;
       this.matches.delete(matchId);
@@ -127,6 +124,12 @@ function validateMatchId(matchId: string): void {
   if (!matchId.trim()) {
     throw new Error('Build debug trace store v2: matchId must not be empty');
   }
+}
+
+function readTraceTtlMs(): number {
+  const documentedSeconds = readPositiveInteger(process.env.BUILD_DEBUG_TRACE_IDLE_TTL_SEC, 0);
+  if (documentedSeconds > 0) return documentedSeconds * 1000;
+  return readPositiveInteger(process.env.BUILD_DEBUG_TRACE_TTL_MS, DEFAULT_TRACE_TTL_MS);
 }
 
 function readPositiveInteger(raw: string | undefined, fallback: number): number {
