@@ -24,6 +24,7 @@ import {
   ResolvedFullBuildPlanV2,
 } from './full-build-plan-v2';
 import { simulateFullBuildInventoryV2 } from './full-build-inventory-simulator-v2';
+import type { MatchupCandidateV2 } from './matchup-candidate-discovery-v2.service';
 import {
   StatlockerT4ChainsV1,
   StatlockerWpaPatchDataV1,
@@ -69,6 +70,7 @@ export interface FullBuildLifetimeResolverV2Input {
   wpaPatchData?: StatlockerWpaPatchDataV1;
   t4Chains?: StatlockerT4ChainsV1;
   recentPurchases?: readonly FullBuildRecentPurchaseV2[];
+  outsideCandidates?: readonly MatchupCandidateV2[];
   maxSteps?: number;
   trace?: BuildDecisionTraceSinkV2;
 }
@@ -103,6 +105,7 @@ interface LifetimeSemanticOptionV2 {
   targetItemId: number;
   group?: BuildArchetypeGroupV2;
   utility: BuildItemUtilityV2;
+  outsideReasonCodes?: readonly string[];
 }
 
 interface LifetimePlanningStateV2 {
@@ -178,8 +181,10 @@ export class FullBuildResolverV2Service {
 
   private resolveLifetime(input: FullBuildLifetimeResolverV2Input): ResolvedFullBuildPlanV2 {
     validateLifetimeInput(input);
+    const outsideCandidates = dedupeOutsideCandidates(input.outsideCandidates ?? []);
     const state = initializeLifetimeState(input);
-    const maxSteps = input.maxSteps ?? Math.max(32, input.archetype.items.length * 4);
+    const semanticTargetCount = input.archetype.items.length + outsideCandidates.length;
+    const maxSteps = input.maxSteps ?? Math.max(32, semanticTargetCount * 4);
     const degradedReasons = new Set<string>();
     if (input.vsHeroRows.length === 0) degradedReasons.add('MATCHUP_WPA_UNAVAILABLE');
     if (!input.t4Chains) degradedReasons.add('T4_CHAINS_UNAVAILABLE');
@@ -200,8 +205,27 @@ export class FullBuildResolverV2Service {
       },
     });
 
+    if (outsideCandidates.length > 0) {
+      input.trace?.record({
+        stage: 'CANDIDATE_DISCOVERY',
+        reasonCodes: [],
+        payload: {
+          candidates: outsideCandidates.map((candidate) => ({
+            candidateId: `outside:${candidate.targetItemId}`,
+            itemId: candidate.targetItemId,
+            score: candidate.utility.total,
+            confidence: candidate.matchup.confidence,
+            coverage: candidate.matchup.coverage,
+            disposition: 'INFO',
+            reasonCodes: [...candidate.reasonCodes],
+            insideLockedArchetype: false,
+          })),
+        },
+      });
+    }
+
     for (let iteration = 0; iteration < maxSteps; iteration += 1) {
-      const options = this.readySemanticOptions(input, state);
+      const options = this.readySemanticOptions(input, state, outsideCandidates);
       if (options.length === 0) break;
       const rankedOptions = [...options].sort(compareLifetimeOptions);
       const selected = rankedOptions[0];
@@ -223,7 +247,7 @@ export class FullBuildResolverV2Service {
                 score: option.utility.total,
                 confidence: option.utility.confidence,
                 disposition: option.targetItemId === selected.targetItemId ? 'SELECTED' : 'REJECTED',
-                reasonCodes: [...option.utility.reasonCodes],
+                reasonCodes: optionReasonCodes(option),
               })),
               selectedItemIds: [selected.targetItemId],
             }],
@@ -244,8 +268,8 @@ export class FullBuildResolverV2Service {
               ? action ? 'SELECTED' : 'REJECTED'
               : 'REJECTED',
             reasonCodes: option.targetItemId === selected.targetItemId
-              ? [...option.utility.reasonCodes, ...(action?.reasonCodes ?? [])]
-              : [...option.utility.reasonCodes, 'LOWER_PLAN_BRANCH_UTILITY'],
+              ? [...optionReasonCodes(option), ...(action?.reasonCodes ?? [])]
+              : [...optionReasonCodes(option), 'LOWER_PLAN_BRANCH_UTILITY'],
           })),
         },
       });
@@ -320,6 +344,7 @@ export class FullBuildResolverV2Service {
   private readySemanticOptions(
     input: FullBuildLifetimeResolverV2Input,
     state: LifetimePlanningStateV2,
+    outsideCandidates: readonly MatchupCandidateV2[],
   ): LifetimeSemanticOptionV2[] {
     const groupsByItemId = groupByCandidateItemId(input.archetype.groups);
     const options: LifetimeSemanticOptionV2[] = [];
@@ -339,20 +364,24 @@ export class FullBuildResolverV2Service {
         continue;
       }
 
-      const utility = this.itemUtility.scoreItem({
-        heroId: input.heroId,
-        itemId: item.itemId,
-        archetype: input.archetype,
-        gameTimeSec: input.gameTimeSec,
-        ownedItemIds: state.inventoryItemIds,
-        projectedItemIds: [],
-        enemyHeroIds: input.enemyHeroIds,
-        enemyThreats: input.enemyThreats,
-        vsHeroRows: input.vsHeroRows,
-        wpaPatchData: input.wpaPatchData,
-        t4Chains: input.t4Chains,
-      });
+      const utility = this.scoreLifetimeTarget(item.itemId, input, state);
       options.push({ targetItemId: item.itemId, group, utility });
+    }
+
+    const archetypeItemIds = new Set(input.archetype.items.map((item) => item.itemId));
+    for (const candidate of outsideCandidates) {
+      const itemId = candidate.targetItemId;
+      if (archetypeItemIds.has(itemId) || state.completedSemanticItemIds.has(itemId)) continue;
+      if (!input.itemGraph.getItem(itemId)) continue;
+      if (input.itemGraph.isTargetSatisfied(itemId, state.inventoryItemIds)) {
+        state.completedSemanticItemIds.add(itemId);
+        continue;
+      }
+      options.push({
+        targetItemId: itemId,
+        utility: this.scoreLifetimeTarget(itemId, input, state),
+        outsideReasonCodes: candidate.reasonCodes,
+      });
     }
 
     if (options.length > 0) {
@@ -370,13 +399,33 @@ export class FullBuildResolverV2Service {
               progression: option.utility.layers.progression.weighted,
               transition: option.utility.layers.transition.weighted,
             },
-            reasonCodes: [...option.utility.reasonCodes],
+            reasonCodes: optionReasonCodes(option),
           })),
         },
       });
     }
 
     return options;
+  }
+
+  private scoreLifetimeTarget(
+    itemId: number,
+    input: FullBuildLifetimeResolverV2Input,
+    state: LifetimePlanningStateV2,
+  ): BuildItemUtilityV2 {
+    return this.itemUtility.scoreItem({
+      heroId: input.heroId,
+      itemId,
+      archetype: input.archetype,
+      gameTimeSec: input.gameTimeSec,
+      ownedItemIds: state.inventoryItemIds,
+      projectedItemIds: [],
+      enemyHeroIds: input.enemyHeroIds,
+      enemyThreats: input.enemyThreats,
+      vsHeroRows: input.vsHeroRows,
+      wpaPatchData: input.wpaPatchData,
+      t4Chains: input.t4Chains,
+    });
   }
 
   private transitionForSemanticTarget(
@@ -386,10 +435,16 @@ export class FullBuildResolverV2Service {
   ): FullBuildTransitionIntentV2 | undefined {
     const item = input.itemGraph.getItem(selected.targetItemId);
     if (!item) return undefined;
-    const reasonCodes = [
-      selected.group ? 'CHOICE_SELECTED' : 'ARCHETYPE_PROGRESSION',
-      'SEMANTIC_PARTIAL_ORDER_READY',
-    ];
+    const reasonCodes = selected.outsideReasonCodes
+      ? uniqueStrings([
+          ...selected.outsideReasonCodes,
+          'MATCHUP_DISCOVERY_OUTSIDE_ARCHETYPE',
+          'OUTSIDE_ARCHETYPE_CANDIDATE_READY',
+        ])
+      : [
+          selected.group ? 'CHOICE_SELECTED' : 'ARCHETYPE_PROGRESSION',
+          'SEMANTIC_PARTIAL_ORDER_READY',
+        ];
 
     const executableRecipe = item.upgradeRecipes.find((recipe) =>
       recipe.consumedItemIds.every((componentItemId) => state.inventoryItemIds.includes(componentItemId)),
@@ -876,6 +931,35 @@ function dedupeCandidates(
   return [...byActionId.values()].sort((left, right) => left.actionId.localeCompare(right.actionId));
 }
 
+function dedupeOutsideCandidates(candidates: readonly MatchupCandidateV2[]): MatchupCandidateV2[] {
+  const byTarget = new Map<number, MatchupCandidateV2>();
+  for (const candidate of candidates) {
+    const existing = byTarget.get(candidate.targetItemId);
+    if (!existing || compareOutsideCandidates(candidate, existing) < 0) {
+      byTarget.set(candidate.targetItemId, candidate);
+    }
+  }
+  return [...byTarget.values()].sort((left, right) => left.targetItemId - right.targetItemId);
+}
+
+function compareOutsideCandidates(left: MatchupCandidateV2, right: MatchupCandidateV2): number {
+  return right.utility.total - left.utility.total ||
+    right.matchup.confidence - left.matchup.confidence ||
+    right.matchup.coverage - left.matchup.coverage ||
+    left.targetItemId - right.targetItemId;
+}
+
+function optionReasonCodes(option: LifetimeSemanticOptionV2): string[] {
+  return uniqueStrings([
+    ...option.utility.reasonCodes,
+    ...(option.outsideReasonCodes ?? []),
+  ]);
+}
+
+function uniqueStrings(values: readonly string[]): string[] {
+  return [...new Set(values)];
+}
+
 function compareEvaluations(
   left: FullBuildTransitionEvaluationV2,
   right: FullBuildTransitionEvaluationV2,
@@ -913,6 +997,14 @@ function validateLifetimeInput(input: FullBuildLifetimeResolverV2Input): void {
   }
   if (input.maxSteps !== undefined && (!Number.isInteger(input.maxSteps) || input.maxSteps <= 0)) {
     throw new Error('Full build resolver v2: maxSteps must be a positive integer');
+  }
+  for (const candidate of input.outsideCandidates ?? []) {
+    if (candidate.source !== 'STATLOCKER_VS_HERO_WPA') {
+      throw new Error('Full build resolver v2: outside candidate must be Statlocker-backed');
+    }
+    if (!input.itemGraph.getItem(candidate.targetItemId)) {
+      throw new Error(`Full build resolver v2: outside candidate item ${candidate.targetItemId} is not in the catalog`);
+    }
   }
   validateTransitionInput({
     heroId: input.heroId,
