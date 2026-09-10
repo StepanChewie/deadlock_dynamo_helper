@@ -75,6 +75,16 @@ export class BuildArchetypeSnapshotStoreV2Service {
     }
     return parsePayload(row);
   }
+
+  async getById(snapshotId: string): Promise<BuildArchetypeSnapshotV2> {
+    validateSnapshotId(snapshotId);
+    const repository = this.dataSource.getRepository(BuildArchetypeSnapshotV2Entity);
+    const row = await repository.findOne({ where: { snapshotId } });
+    if (!row) {
+      throw new Error(`Build archetype v2 snapshot not found: ${snapshotId}`);
+    }
+    return parsePayload(row);
+  }
 }
 
 function assertAcceptedQuality(
@@ -107,6 +117,12 @@ function normalizeIdentity(identity: BuildArchetypeSnapshotIdentityV2): BuildArc
     statlockerPatchId: identity.statlockerPatchId,
     catalogSha256: identity.catalogSha256.toLowerCase(),
   };
+}
+
+function validateSnapshotId(snapshotId: string): void {
+  if (snapshotId.trim() === '' || snapshotId.length > 128) {
+    throw new Error('Build archetype v2 snapshotId is invalid');
+  }
 }
 
 function parsePayload(row: BuildArchetypeSnapshotV2Entity): BuildArchetypeSnapshotV2 {
