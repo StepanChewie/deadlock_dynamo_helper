@@ -728,6 +728,9 @@ function candidateAdvancesTarget(
   targetItemId: number,
   graph: AdaptiveDecisionStateV1['itemGraph'],
 ): boolean {
+  if (candidate.reasons.includes('ITEM_ALREADY_OWNED') || candidate.reasons.includes('MAX_COPIES_REACHED')) {
+    return false;
+  }
   const candidateTarget = candidateTargetItemId(candidate);
   return candidateTarget !== undefined &&
     (candidateTarget === targetItemId || graph.isComponentAncestor(candidateTarget, targetItemId));
