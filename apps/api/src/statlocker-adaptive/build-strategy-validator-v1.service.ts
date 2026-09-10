@@ -30,7 +30,8 @@ export type BuildStrategyValidationErrorCodeV1 =
   | 'DUPLICATE_INVESTMENT_OBJECTIVE_ID'
   | 'INVESTMENT_WEIGHTS_INVALID'
   | 'HARD_INVESTMENT_ACTIVATION_NOT_GUARANTEED'
-  | 'SLOT_POLICY_INVALID';
+  | 'SLOT_POLICY_INVALID'
+  | 'GOALS_EMPTY';
 
 export interface BuildStrategyValidationErrorV1 {
   code: BuildStrategyValidationErrorCodeV1;
@@ -71,8 +72,11 @@ export class BuildStrategyValidatorV1Service {
       errors.push({ code: 'STABILITY_OUT_OF_RANGE', message: 'stability must be in [0, 1]' });
     }
 
+    if (!Array.isArray(strategy.goals) || strategy.goals.length === 0) {
+      errors.push({ code: 'GOALS_EMPTY', message: 'Strategy must declare at least one goal' });
+    }
     const goalIds = new Set<string>();
-    for (const goal of strategy.goals) {
+    for (const goal of strategy.goals ?? []) {
       if (goalIds.has(goal.goalId)) {
         errors.push({ code: 'DUPLICATE_GOAL_ID', goalId: goal.goalId, message: `Duplicate goal ${goal.goalId}` });
       }

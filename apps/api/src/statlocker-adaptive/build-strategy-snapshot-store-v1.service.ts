@@ -114,13 +114,15 @@ export class BuildStrategySnapshotStoreV1Service implements OnModuleInit {
       if (payload.specs.some((spec) => spec.heroId !== row.heroId)) {
         throw new Error(`Build strategy snapshot hero scope mismatch: ${row.snapshotId}`);
       }
+      const validSpecs = payload.specs.filter((spec) => Array.isArray(spec.goals) && spec.goals.length > 0);
+      if (validSpecs.length === 0) continue;
       const itemGraph = createRecommendationItemGraph(payload.itemDefinitions, payload.lineageEdges);
       this.registry.replaceSnapshot({
         rulesetId: row.rulesetId,
         patchId: row.patchId,
         catalogSha256: row.catalogSha256,
         sourceSha256: row.sourceSha256,
-        specs: payload.specs,
+        specs: validSpecs,
         itemGraph,
       });
       loaded += 1;

@@ -32,6 +32,7 @@ export class BuildStrategySelectorV1Service {
     const candidates = input.strategies
       .filter((strategy) => strategy.heroId === inferredHeroId)
       .filter((strategy) => strategy.rulesetId === inferredRulesetId)
+      .filter((strategy) => Array.isArray(strategy.goals) && strategy.goals.length > 0)
       .sort((a, b) => a.strategyId.localeCompare(b.strategyId));
     if (candidates.length === 0) {
       return { commitment: 'OOD', posteriors: [], reasonCodes: ['NO_STRATEGIES_AVAILABLE_FOR_LIVE_SCOPE'] };

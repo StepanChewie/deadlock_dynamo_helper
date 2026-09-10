@@ -120,7 +120,7 @@ describe('build strategy validator v1', () => {
         : goal),
     };
 
-    expect(validator.validate(cyclic, graph).errors.map((error) => error.code))
+    expect(validator.validate(cyclic, graph).errors.map((error: any) => error.code))
       .toContain('PREREQUISITE_CYCLE');
   });
 
@@ -145,7 +145,14 @@ describe('build strategy validator v1', () => {
       branchGroups: [{ branchGroupId: 'b1', optionGoalIds: ['g1', 'missing'], minSelect: 1, maxSelect: 1 }],
     };
 
-    expect(validator.validate(invalid, graph).errors.map((error) => error.code))
+    expect(validator.validate(invalid, graph).errors.map((error: any) => error.code))
       .toContain('BRANCH_UNKNOWN_GOAL');
+  });
+
+  it('rejects a strategy with empty goals', () => {
+    const invalid = { ...strategy(), goals: [] };
+    const result = validator.validate(invalid, graph);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((error: any) => error.code === 'GOALS_EMPTY')).toBe(true);
   });
 });
