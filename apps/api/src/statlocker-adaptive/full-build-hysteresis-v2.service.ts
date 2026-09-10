@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { ResolvedFullBuildPlanV2 } from './full-build-plan-v2';
+import { FullBuildStepV2, ResolvedFullBuildPlanV2 } from './full-build-plan-v2';
 import { STATLOCKER_BUILD_V2_CONFIG } from './statlocker-build-v2.config';
 
 export interface BuildPlanSwitchContextV2 {
@@ -28,11 +28,19 @@ export class FullBuildHysteresisV2Service {
     }
 
     const reasonCodes: string[] = [];
+    const config = STATLOCKER_BUILD_V2_CONFIG.fullBuildResolver;
+    const firstChangedStepIndex = findFirstChangedStepIndex(previous.steps, candidate.steps);
+    const nearTermChange = firstChangedStepIndex >= 0 &&
+      firstChangedStepIndex < config.nearTermProtectedStepCount;
+    const normalRequiredImprovement = nearTermChange
+      ? Math.max(config.minPlanSwitchImprovement, config.nearTermPlanSwitchMinImprovement)
+      : config.minPlanSwitchImprovement;
     const requiredImprovement = context.coreReplacement
-      ? STATLOCKER_BUILD_V2_CONFIG.fullBuildResolver.coreReplacementMinImprovement
-      : STATLOCKER_BUILD_V2_CONFIG.fullBuildResolver.minPlanSwitchImprovement;
+      ? Math.max(config.coreReplacementMinImprovement, normalRequiredImprovement)
+      : normalRequiredImprovement;
 
     if (context.coreReplacement) reasonCodes.push('CORE_REPLACEMENT_HIGHER_THRESHOLD');
+    if (nearTermChange) reasonCodes.push('NEAR_TERM_PLAN_COMMITMENT_PROTECTED');
     if (context.recentPurchaseProtected) {
       return {
         action: 'KEEP_PREVIOUS',
@@ -73,4 +81,27 @@ function validateComparablePlans(
   if (previous.archetypeId !== candidate.archetypeId) {
     throw new Error('Full build hysteresis v2: locked archetype cannot change');
   }
+}
+
+function findFirstChangedStepIndex(
+  previous: readonly FullBuildStepV2[],
+  candidate: readonly FullBuildStepV2[],
+): number {
+  const length = Math.max(previous.length, candidate.length);
+  for (let index = 0; index < length; index += 1) {
+    const previousStep = previous[index];
+    const candidateStep = candidate[index];
+    if (!previousStep || !candidateStep) return index;
+    if (stepSemanticKey(previousStep) !== stepSemanticKey(candidateStep)) return index;
+  }
+  return -1;
+}
+
+function stepSemanticKey(step: FullBuildStepV2): string {
+  return [
+    step.action,
+    step.buyItemId,
+    step.sellItemId ?? '',
+    step.recipeId ?? '',
+  ].join(':');
 }
