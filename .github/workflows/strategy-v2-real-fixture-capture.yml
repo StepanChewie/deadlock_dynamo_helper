@@ -57,19 +57,32 @@ jobs:
               await client.query('BEGIN TRANSACTION READ ONLY');
               await client.query("SET LOCAL statement_timeout = '10s'");
               const result = await client.query(`
-                SELECT "matchId", "replayInput", "decidedAt"
-                FROM adaptive_recommendation_decisions_v1
+                WITH recent AS MATERIALIZED (
+                  SELECT "matchId", "replayInput", "decidedAt"
+                  FROM adaptive_recommendation_decisions_v1
+                  ORDER BY "decidedAt" DESC
+                  LIMIT 2000
+                )
+                SELECT
+                  "matchId",
+                  "replayInput" #> '{decision,enemyHeroIds}' AS "enemyHeroIds",
+                  "replayInput" #>> '{decision,state,matchId}' AS "decisionMatchId",
+                  "decidedAt"
+                FROM recent
+                WHERE COALESCE(
+                  "replayInput" #>> '{decision,state,heroId}',
+                  "replayInput" #>> '{state,heroId}',
+                  "replayInput" #>> '{heroId}'
+                ) = '72'
                 ORDER BY "decidedAt" DESC
-                LIMIT 2000
+                LIMIT 100
               `);
               for (const row of result.rows) {
-                const decision = row?.replayInput?.decision;
-                if (decision?.state?.heroId !== 72) continue;
-                const enemyHeroIds = Array.isArray(decision?.enemyHeroIds)
-                  ? [...new Set(decision.enemyHeroIds.filter((value) => Number.isSafeInteger(value) && value > 0))]
+                const enemyHeroIds = Array.isArray(row.enemyHeroIds)
+                  ? [...new Set(row.enemyHeroIds.filter((value) => Number.isSafeInteger(value) && value > 0))]
                   : [];
                 if (enemyHeroIds.length !== 6) continue;
-                if (String(decision?.state?.matchId) !== String(row.matchId)) continue;
+                if (String(row.decisionMatchId) !== String(row.matchId)) continue;
                 if (!/^\d+$/.test(String(row.matchId))) continue;
                 process.stdout.write(String(row.matchId));
                 await client.query('ROLLBACK');
