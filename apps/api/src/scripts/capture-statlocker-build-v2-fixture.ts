@@ -18,6 +18,12 @@ import {
 const REQUIRED_PROFILE_COUNT = 10;
 const REQUIRED_ENEMY_ROSTER_SIZE = 6;
 
+type StatlockerFixtureDataset =
+  | 'WPA_PATCH_DATA'
+  | 'T4_CHAINS'
+  | 'HERO_LEADERBOARD'
+  | 'PRO_BUILD_ANALYSIS';
+
 export interface CaptureStatlockerBuildV2FixtureArgs {
   heroId: number;
   matchId: string;
@@ -194,6 +200,25 @@ export function parseCaptureStatlockerBuildV2FixtureArgs(
   return { heroId, matchId, out };
 }
 
+export function statlockerFixtureScope(
+  dataset: StatlockerFixtureDataset,
+  input: { heroId: number; statlockerPatchId: string; accountId?: string },
+): string {
+  if (dataset === 'WPA_PATCH_DATA') return `patch:${input.statlockerPatchId}`;
+  if (dataset === 'T4_CHAINS') return 'global';
+  if (dataset === 'HERO_LEADERBOARD') return `hero:${input.heroId}`;
+  const accountId = input.accountId?.trim();
+  if (!accountId) throw new Error('PRO_BUILD_ANALYSIS fixture scope requires accountId');
+  return `hero:${input.heroId}:account:${accountId}`;
+}
+
+export function resolveFixtureCatalogContentVersionId(
+  version: { catalogVersionId: string; contentCatalogVersionId?: string },
+): string {
+  const contentCatalogVersionId = version.contentCatalogVersionId?.trim();
+  return contentCatalogVersionId || version.catalogVersionId;
+}
+
 export function buildStatlockerBuildV2Fixture(
   input: StatlockerBuildV2FixtureSourceInput,
 ): StatlockerBuildV2Fixture {
@@ -336,10 +361,11 @@ async function loadFixtureSourceFromDatabase(
   const rulesetVersion = nonEmptyString(decision.rulesetId ?? decision.state.rulesetId, 'saved replay ruleset identity');
   const catalogSha256 = sha256String(decision.catalogSha256, 'saved replay catalog identity');
   const identity: FixtureIdentityV2 = { rulesetVersion, catalogSha256, statlockerPatchId };
+  const scopeInput = { heroId: args.heroId, statlockerPatchId };
 
   const leaderboardRow = await loadLatestSnapshot(snapshotRepo, {
     dataset: 'HERO_LEADERBOARD',
-    scopeKey: `hero:${args.heroId}`,
+    scopeKey: statlockerFixtureScope('HERO_LEADERBOARD', scopeInput),
     ...identity,
   });
   const leaderboard = parseLeaderboard(leaderboardRow.payload, args.heroId);
@@ -353,7 +379,7 @@ async function loadFixtureSourceFromDatabase(
   for (const profile of topTen) {
     const row = await loadLatestSnapshot(snapshotRepo, {
       dataset: 'PRO_BUILD_ANALYSIS',
-      scopeKey: `hero:${args.heroId}:account:${profile.accountId}`,
+      scopeKey: statlockerFixtureScope('PRO_BUILD_ANALYSIS', { ...scopeInput, accountId: profile.accountId }),
       ...identity,
     });
     profileRows.push(row);
@@ -361,8 +387,16 @@ async function loadFixtureSourceFromDatabase(
   }
 
   const [wpaPatchRow, t4Row] = await Promise.all([
-    loadLatestSnapshot(snapshotRepo, { dataset: 'WPA_PATCH_DATA', scopeKey: 'patch:current', ...identity }),
-    loadLatestSnapshot(snapshotRepo, { dataset: 'T4_CHAINS', scopeKey: 'global', ...identity }),
+    loadLatestSnapshot(snapshotRepo, {
+      dataset: 'WPA_PATCH_DATA',
+      scopeKey: statlockerFixtureScope('WPA_PATCH_DATA', scopeInput),
+      ...identity,
+    }),
+    loadLatestSnapshot(snapshotRepo, {
+      dataset: 'T4_CHAINS',
+      scopeKey: statlockerFixtureScope('T4_CHAINS', scopeInput),
+      ...identity,
+    }),
   ]);
   const enemyHeroIds = uniqueSortedPositiveIntegers(decision.enemyHeroIds);
   if (enemyHeroIds.length !== REQUIRED_ENEMY_ROSTER_SIZE) {
@@ -388,18 +422,19 @@ async function loadFixtureSourceFromDatabase(
   if (!catalogVersion) {
     throw new Error(`Fixture capture could not resolve catalog ${identity.catalogSha256} for ruleset ${identity.rulesetVersion}`);
   }
+  const contentCatalogVersionId = resolveFixtureCatalogContentVersionId(catalogVersion);
   const [catalogItems, catalogRecipes] = await Promise.all([
     catalogItemRepo.find({
-      where: { catalogVersionId: catalogVersion.catalogVersionId },
+      where: { catalogVersionId: contentCatalogVersionId },
       order: { itemId: 'ASC' },
     }),
     catalogRecipeRepo.find({
-      where: { catalogVersionId: catalogVersion.catalogVersionId },
+      where: { catalogVersionId: contentCatalogVersionId },
       order: { parentItemId: 'ASC', componentOrder: 'ASC', componentItemId: 'ASC' },
     }),
   ]);
   if (catalogItems.length === 0) {
-    throw new Error(`Fixture capture found no catalog items for ${catalogVersion.catalogVersionId}`);
+    throw new Error(`Fixture capture found no catalog items for content catalog ${contentCatalogVersionId}`);
   }
 
   return {
