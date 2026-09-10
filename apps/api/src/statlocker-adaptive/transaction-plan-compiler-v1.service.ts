@@ -152,11 +152,21 @@ export class TransactionPlanCompilerV1Service {
         contract,
         previousStepId,
       });
-      steps.push(...compiled.steps);
-      reasonCodes.push(...compiled.reasonCodes);
       if (!compiled.reachable) {
+        // If the planner already compiled valid, reachable steps for earlier goals,
+        // a future goal with incomplete transaction mechanics (e.g. unverified upgrade
+        // recipe pricing) should truncate future projection rather than invalidating
+        // the executable next action.
+        if (steps.length > 0) {
+          reasonCodes.push(...compiled.reasonCodes);
+          break;
+        }
+        steps.push(...compiled.steps);
+        reasonCodes.push(...compiled.reasonCodes);
         return { steps, reachable: false, reasonCodes: unique(reasonCodes) };
       }
+      steps.push(...compiled.steps);
+      reasonCodes.push(...compiled.reasonCodes);
       state = compiled.state;
       slots = compiled.slots;
       if (goalSatisfied(goal, input.decision.itemGraph, heldIds(state))) {
