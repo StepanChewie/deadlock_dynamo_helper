@@ -91,7 +91,7 @@ integrationDescribe('Statlocker VS_HERO_WPA V2 PostgreSQL serving path', () => {
     if (dataSource?.isInitialized) await dataSource.destroy();
   });
 
-  it('returns numeric item IDs from PostgreSQL and keeps WPA visible to the matchup scorer', async () => {
+  it('returns numeric item IDs and preserves sample-size and delta-WPA scoring semantics', async () => {
     const rows = await repository.findActive({
       statlockerPatchId: PATCH,
       rulesetVersion: RULESET,
@@ -113,7 +113,8 @@ integrationDescribe('Statlocker VS_HERO_WPA V2 PostgreSQL serving path', () => {
     expect(rows.every((row) => typeof row.itemId === 'number')).toBe(true);
     expect(observability.getStatus().counters.wpaQueryCount).toBe(1);
 
-    const score = new ThreatWeightedMatchupV1Service().scoreItem({
+    const scorer = new ThreatWeightedMatchupV1Service();
+    const score = scorer.scoreItem({
       ourHeroId: HERO_ID,
       itemId: ITEM_ID,
       enemyHeroIds: [ENEMY_A, ENEMY_B],
@@ -123,10 +124,30 @@ integrationDescribe('Statlocker VS_HERO_WPA V2 PostgreSQL serving path', () => {
         { heroId: ENEMY_B, threatMultiplier: 1 },
       ],
     });
+    const tinySampleScore = scorer.scoreItem({
+      ourHeroId: HERO_ID,
+      itemId: ITEM_ID,
+      enemyHeroIds: [ENEMY_A, ENEMY_B],
+      rows: rows.map((row) => ({ ...row, count: 1 })),
+      enemyThreats: [
+        { heroId: ENEMY_A, threatMultiplier: 1 },
+        { heroId: ENEMY_B, threatMultiplier: 1 },
+      ],
+    });
+    const zeroDeltaScore = scorer.scoreItem({
+      ourHeroId: HERO_ID,
+      itemId: ITEM_ID,
+      enemyHeroIds: [ENEMY_A, ENEMY_B],
+      rows: rows.map((row) => ({ ...row, deltaWpa: 0 })),
+      enemyThreats: [
+        { heroId: ENEMY_A, threatMultiplier: 1 },
+        { heroId: ENEMY_B, threatMultiplier: 1 },
+      ],
+    });
 
     expect(score.usedCount).toBe(2);
-    expect(score.confidence).toBeGreaterThan(0);
     expect(score.coverage).toBe(1);
-    expect(score.normalized).toBeGreaterThan(0);
+    expect(score.confidence).toBeGreaterThan(tinySampleScore.confidence);
+    expect(score.normalized).toBeGreaterThan(zeroDeltaScore.normalized);
   });
 });
