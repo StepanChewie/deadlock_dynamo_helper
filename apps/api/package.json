@@ -14,6 +14,7 @@
     "migration:run": "typeorm-ts-node-commonjs migration:run -d src/database/data-source.ts",
     "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/database/data-source.ts",
     "migration:show": "typeorm-ts-node-commonjs migration:show -d src/database/data-source.ts",
+    "build:v2:capture-fixture": "ts-node src/scripts/capture-statlocker-build-v2-fixture.ts",
     "recommendation:dataset:preflight": "ts-node src/scripts/export-recommendation-training-dataset-v8.ts preflight",
     "recommendation:dataset:export": "ts-node src/scripts/export-recommendation-training-dataset-v8.ts export",
     "recommendation:value:dataset:preflight": "ts-node src/scripts/export-recommendation-value-training-dataset-v8.ts preflight",
