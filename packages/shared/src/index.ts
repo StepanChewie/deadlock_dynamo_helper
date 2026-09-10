@@ -32,5 +32,6 @@ export * from './recommendation-sequential-rl-v1';
 export * from './recommendation-sequential-rl-evidence-v1';
 export * from './adaptive-transaction-plan-v1';
 export * from './adaptive-recommendation-v1';
+export * from './adaptive-recommendation-v2';
 export * from './adaptive-decision-trace-v1';
 export * from './adaptive-strategy-state-v1';
