@@ -1,6 +1,7 @@
 import { DataSource } from 'typeorm';
 import { StatlockerVsHeroWpaRawSnapshotV1Entity } from '../src/deadlock-live/entities/statlocker-vs-hero-wpa-raw-snapshot-v1.entity';
 import { StatlockerVsHeroWpaRowV1Entity } from '../src/deadlock-live/entities/statlocker-vs-hero-wpa-row-v1.entity';
+import { AdaptiveRecommendationObservabilityV1Service } from '../src/statlocker-adaptive/adaptive-recommendation-observability-v1.service';
 import { StatlockerVsHeroWpaRepositoryV1Service } from '../src/statlocker-adaptive/statlocker-vs-hero-wpa-repository-v1.service';
 import { ThreatWeightedMatchupV1Service } from '../src/statlocker-adaptive/threat-weighted-matchup-v1.service';
 
@@ -20,6 +21,7 @@ const integrationDescribe = process.env.WPA_REPOSITORY_INTEGRATION === 'true'
 integrationDescribe('Statlocker VS_HERO_WPA V2 PostgreSQL serving path', () => {
   let dataSource: DataSource;
   let repository: StatlockerVsHeroWpaRepositoryV1Service;
+  let observability: AdaptiveRecommendationObservabilityV1Service;
 
   beforeAll(async () => {
     dataSource = new DataSource({
@@ -81,7 +83,8 @@ integrationDescribe('Statlocker VS_HERO_WPA V2 PostgreSQL serving path', () => {
       }),
     ]);
 
-    repository = new StatlockerVsHeroWpaRepositoryV1Service(rowRepository, rawRepository);
+    observability = new AdaptiveRecommendationObservabilityV1Service();
+    repository = new StatlockerVsHeroWpaRepositoryV1Service(rowRepository, rawRepository, observability);
   }, 30_000);
 
   afterAll(async () => {
@@ -108,6 +111,7 @@ integrationDescribe('Statlocker VS_HERO_WPA V2 PostgreSQL serving path', () => {
       }),
     ]));
     expect(rows.every((row) => typeof row.itemId === 'number')).toBe(true);
+    expect(observability.getStatus().counters.wpaQueryCount).toBe(1);
 
     const score = new ThreatWeightedMatchupV1Service().scoreItem({
       ourHeroId: HERO_ID,
