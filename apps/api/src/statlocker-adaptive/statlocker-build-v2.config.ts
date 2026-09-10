@@ -64,6 +64,14 @@ export interface OutsideMatchupDiscoveryV2Config {
   coreReplacementMinImprovement: number;
 }
 
+export interface FullBuildResolverV2Config {
+  buyMinImprovement: number;
+  replacementMinImprovement: number;
+  coreReplacementMinImprovement: number;
+  recentPurchaseProtectionS: number;
+  minPlanSwitchImprovement: number;
+}
+
 export interface StatlockerBuildV2Config {
   profileLinkSimilarity: number;
   minClusterSize: number;
@@ -85,6 +93,7 @@ export interface StatlockerBuildV2Config {
   offlineArchetypeCoherenceWeight: number;
   itemUtility: BuildItemUtilityV2Config;
   outsideMatchupDiscovery: OutsideMatchupDiscoveryV2Config;
+  fullBuildResolver: FullBuildResolverV2Config;
 }
 
 export const STATLOCKER_BUILD_V2_CONFIG: Readonly<StatlockerBuildV2Config> = Object.freeze({
@@ -170,5 +179,12 @@ export const STATLOCKER_BUILD_V2_CONFIG: Readonly<StatlockerBuildV2Config> = Obj
     buyMinImprovement: 0.08,
     replacementMinImprovement: 0.30,
     coreReplacementMinImprovement: 0.45,
+  }),
+  fullBuildResolver: Object.freeze({
+    buyMinImprovement: 0.08,
+    replacementMinImprovement: 0.30,
+    coreReplacementMinImprovement: 0.45,
+    recentPurchaseProtectionS: 120,
+    minPlanSwitchImprovement: 0.08,
   }),
 });
