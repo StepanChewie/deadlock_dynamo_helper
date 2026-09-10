@@ -19,6 +19,11 @@ export class BuildArchetypeSessionV2Service {
     private readonly repository: Repository<BuildArchetypeMatchLockV2Entity>,
   ) {}
 
+  async get(matchId: string): Promise<BuildArchetypeMatchLockV2Entity | undefined> {
+    validateMatchId(matchId);
+    return (await this.repository.findOne({ where: { matchId } })) ?? undefined;
+  }
+
   async getOrLock(
     matchId: string,
     input: LockBuildArchetypeV2Input,
@@ -26,7 +31,7 @@ export class BuildArchetypeSessionV2Service {
   ): Promise<BuildArchetypeMatchLockV2Entity> {
     validateLockInput(matchId, input, lockedAt);
 
-    const existing = await this.repository.findOne({ where: { matchId } });
+    const existing = await this.get(matchId);
     if (existing) return existing;
 
     const enemyHeroIds = [...new Set(input.enemyHeroIds)].sort((a, b) => a - b);
@@ -46,7 +51,7 @@ export class BuildArchetypeSessionV2Service {
       return await this.repository.save(row);
     } catch (error) {
       if (!isUniqueViolation(error)) throw error;
-      const winner = await this.repository.findOne({ where: { matchId } });
+      const winner = await this.get(matchId);
       if (!winner) throw error;
       return winner;
     }
@@ -54,9 +59,7 @@ export class BuildArchetypeSessionV2Service {
 }
 
 function validateLockInput(matchId: string, input: LockBuildArchetypeV2Input, lockedAt: Date): void {
-  if (matchId.trim() === '' || matchId.length > 128) {
-    throw new Error('Build archetype v2 session: matchId is invalid');
-  }
+  validateMatchId(matchId);
   if (!Number.isInteger(input.heroId) || input.heroId <= 0) {
     throw new Error('Build archetype v2 session: heroId must be a positive integer');
   }
@@ -83,6 +86,12 @@ function validateLockInput(matchId: string, input: LockBuildArchetypeV2Input, lo
     (!Number.isFinite(input.lockedGameTimeS) || input.lockedGameTimeS < 0)
   ) {
     throw new Error('Build archetype v2 session: lockedGameTimeS is invalid');
+  }
+}
+
+function validateMatchId(matchId: string): void {
+  if (matchId.trim() === '' || matchId.length > 128) {
+    throw new Error('Build archetype v2 session: matchId is invalid');
   }
 }
 
