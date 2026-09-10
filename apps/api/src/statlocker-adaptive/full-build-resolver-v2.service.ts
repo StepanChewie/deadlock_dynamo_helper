@@ -124,9 +124,8 @@ export class FullBuildResolverV2Service {
     const strategic = action.type === 'BUY_ITEM' ||
       action.type === 'UPGRADE_ITEM' ||
       action.type === 'REPLACE_ITEM';
-    if (!candidate.feasible || !candidate.recommendationEligible || !strategic) {
-      reasonCodes.push('CANDIDATE_NOT_LEGAL_STRATEGIC_TRANSITION');
-    }
+    const legalStrategic = candidate.feasible && candidate.recommendationEligible && strategic;
+    if (!legalStrategic) reasonCodes.push('CANDIDATE_NOT_LEGAL_STRATEGIC_TRANSITION');
 
     const targetItemId = strategicTargetItemId(candidate);
     const transition = input.transitionCostsByActionId?.get(candidate.actionId);
@@ -138,17 +137,15 @@ export class FullBuildResolverV2Service {
       ? archetypeRoleForItem(action.sellItemId, input.archetype, input.itemGraph)
       : undefined;
     const requiredImprovement = requiredImprovementFor(candidate, soldRole);
+    const recentPurchaseProtected = action.type === 'REPLACE_ITEM' &&
+      isRecentPurchaseProtected(action.sellItemId, input.recentPurchases ?? []);
+    const gainBelowThreshold = marginalGain < requiredImprovement;
 
-    if (
-      action.type === 'REPLACE_ITEM' &&
-      isRecentPurchaseProtected(action.sellItemId, input.recentPurchases ?? [])
-    ) {
-      reasonCodes.push('RECENT_PURCHASE_PROTECTED');
-    }
+    if (recentPurchaseProtected) reasonCodes.push('RECENT_PURCHASE_PROTECTED');
     if (soldRole === 'CORE') reasonCodes.push('CORE_REPLACEMENT_HIGHER_THRESHOLD');
-    if (marginalGain < requiredImprovement) reasonCodes.push('MARGINAL_GAIN_BELOW_THRESHOLD');
+    if (gainBelowThreshold) reasonCodes.push('MARGINAL_GAIN_BELOW_THRESHOLD');
 
-    const accepted = reasonCodes.length === 1;
+    const accepted = legalStrategic && !recentPurchaseProtected && !gainBelowThreshold;
     if (accepted) reasonCodes.push('MARGINAL_GAIN_ACCEPTED');
     return {
       actionId: candidate.actionId,
