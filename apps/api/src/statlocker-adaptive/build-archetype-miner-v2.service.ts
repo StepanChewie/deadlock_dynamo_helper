@@ -2,6 +2,7 @@ import { createHash } from 'crypto';
 import { Injectable } from '@nestjs/common';
 import { StatlockerBuildProfileV2 } from './build-archetype-v2';
 import { compareBuildProfilesV2 } from './build-archetype-similarity-v2';
+import { BuildDecisionTraceSinkV2 } from './build-decision-trace-v2';
 import {
   STATLOCKER_BUILD_V2_CONFIG,
   StatlockerBuildV2Config,
@@ -48,9 +49,14 @@ export class BuildArchetypeMinerV2Service {
   mine(
     sourceProfiles: readonly StatlockerBuildProfileV2[],
     config: Partial<StatlockerBuildV2Config> = {},
+    trace?: BuildDecisionTraceSinkV2,
   ): BuildArchetypeMiningResultV2 {
     if (sourceProfiles.length === 0) {
-      return { accepted: [], rejected: [], pairwiseSimilarities: {} };
+      return traceMiningResult(
+        { accepted: [], rejected: [], pairwiseSimilarities: {} },
+        trace,
+        ['INSUFFICIENT_SOURCE_PROFILES'],
+      );
     }
 
     const resolved = resolveConfig(config);
@@ -60,7 +66,7 @@ export class BuildArchetypeMinerV2Service {
     const pairwiseRecord = Object.fromEntries([...similarities.entries()].sort(([a], [b]) => a.localeCompare(b)));
 
     if (profiles.length < resolved.minClusterSize) {
-      return {
+      return traceMiningResult({
         heroId,
         accepted: [],
         rejected: [rejectedCluster(
@@ -70,7 +76,7 @@ export class BuildArchetypeMinerV2Service {
           ['INSUFFICIENT_SOURCE_PROFILES'],
         )],
         pairwiseSimilarities: pairwiseRecord,
-      };
+      }, trace);
     }
 
     const components = connectedComponents(profiles, similarities, resolved.profileLinkSimilarity);
@@ -94,7 +100,7 @@ export class BuildArchetypeMinerV2Service {
     if (preliminaryAccepted.length === 0) {
       const consensusSimilarity = clusterInternalSimilarity(profiles, similarities);
       if (consensusSimilarity >= resolved.minConsensusSimilarity) {
-        return {
+        return traceMiningResult({
           heroId,
           accepted: [acceptedCluster(
             profiles,
@@ -105,9 +111,9 @@ export class BuildArchetypeMinerV2Service {
           )],
           rejected,
           pairwiseSimilarities: pairwiseRecord,
-        };
+        }, trace);
       }
-      return {
+      return traceMiningResult({
         heroId,
         accepted: [],
         rejected: sortRejected([
@@ -115,23 +121,23 @@ export class BuildArchetypeMinerV2Service {
           rejectedCluster(profiles, profiles, similarities, ['NO_COHERENT_ARCHETYPE'], components),
         ]),
         pairwiseSimilarities: pairwiseRecord,
-      };
+      }, trace);
     }
 
     if (preliminaryAccepted.length === 1) {
       const only = preliminaryAccepted[0];
       if (components.length === 1) {
-        return {
+        return traceMiningResult({
           heroId,
           accepted: [acceptedCluster(only, profiles, similarities, components)],
           rejected,
           pairwiseSimilarities: pairwiseRecord,
-        };
+        }, trace);
       }
 
       const consensusSimilarity = clusterInternalSimilarity(profiles, similarities);
       if (consensusSimilarity >= resolved.minConsensusSimilarity) {
-        return {
+        return traceMiningResult({
           heroId,
           accepted: [acceptedCluster(
             profiles,
@@ -142,15 +148,15 @@ export class BuildArchetypeMinerV2Service {
           )],
           rejected,
           pairwiseSimilarities: pairwiseRecord,
-        };
+        }, trace);
       }
 
-      return {
+      return traceMiningResult({
         heroId,
         accepted: [acceptedCluster(only, profiles, similarities, components)],
         rejected: sortRejected(rejected),
         pairwiseSimilarities: pairwiseRecord,
-      };
+      }, trace);
     }
 
     const separated: StatlockerBuildProfileV2[][] = [];
@@ -172,7 +178,7 @@ export class BuildArchetypeMinerV2Service {
     if (separated.length < 2) {
       const consensusSimilarity = clusterInternalSimilarity(profiles, similarities);
       if (consensusSimilarity >= resolved.minConsensusSimilarity) {
-        return {
+        return traceMiningResult({
           heroId,
           accepted: [acceptedCluster(
             profiles,
@@ -183,7 +189,7 @@ export class BuildArchetypeMinerV2Service {
           )],
           rejected: sortRejected(rejected),
           pairwiseSimilarities: pairwiseRecord,
-        };
+        }, trace);
       }
     }
 
@@ -211,13 +217,47 @@ export class BuildArchetypeMinerV2Service {
         left.profileAccountIds[0].localeCompare(right.profileAccountIds[0]),
       );
 
-    return {
+    return traceMiningResult({
       heroId,
       accepted,
       rejected: sortRejected(rejected),
       pairwiseSimilarities: pairwiseRecord,
-    };
+    }, trace);
   }
+}
+
+function traceMiningResult(
+  result: BuildArchetypeMiningResultV2,
+  trace?: BuildDecisionTraceSinkV2,
+  stageReasonCodes: readonly string[] = [],
+): BuildArchetypeMiningResultV2 {
+  trace?.record({
+    stage: 'ARCHETYPE_MINING',
+    reasonCodes: [...stageReasonCodes],
+    payload: {
+      candidates: [
+        ...result.accepted.map((cluster) => ({
+          candidateId: cluster.clusterId,
+          profileAccountIds: [...cluster.profileAccountIds],
+          support: cluster.support,
+          coherence: cluster.internalSimilarity,
+          separation: cluster.separation,
+          disposition: 'SELECTED' as const,
+          reasonCodes: [...cluster.reasonCodes],
+        })),
+        ...result.rejected.map((cluster) => ({
+          candidateId: cluster.clusterId,
+          profileAccountIds: [...cluster.profileAccountIds],
+          support: cluster.support,
+          coherence: cluster.internalSimilarity,
+          separation: cluster.separation,
+          disposition: 'REJECTED' as const,
+          reasonCodes: [...cluster.reasonCodes],
+        })),
+      ],
+    },
+  });
+  return result;
 }
 
 function resolveConfig(config: Partial<StatlockerBuildV2Config>): StatlockerBuildV2Config {
