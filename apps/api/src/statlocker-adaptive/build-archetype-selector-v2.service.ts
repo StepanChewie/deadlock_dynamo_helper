@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { BuildArchetypeGroupV2, BuildArchetypeItemV2, BuildArchetypeSnapshotV2, BuildArchetypeV2 } from './build-archetype-v2';
+import { BuildDecisionTraceSinkV2 } from './build-decision-trace-v2';
 import { STATLOCKER_BUILD_V2_CONFIG } from './statlocker-build-v2.config';
 import {
   StatlockerVsHeroWpaAggregateSourceV1,
@@ -11,6 +12,7 @@ export interface SelectBuildArchetypeV2Input {
   enemyHeroIds: readonly number[];
   snapshot: BuildArchetypeSnapshotV2;
   vsHeroRows: readonly StatlockerVsHeroWpaAggregateSourceV1[];
+  wpaQueryCount?: number;
 }
 
 export interface BuildArchetypeSelectionScoreV2 {
@@ -39,7 +41,10 @@ interface WeightedMatchupUnitV2 extends ItemMatchupV2 {
 
 @Injectable()
 export class BuildArchetypeSelectorV2Service {
-  select(input: SelectBuildArchetypeV2Input): BuildArchetypeSelectionV2 {
+  select(
+    input: SelectBuildArchetypeV2Input,
+    trace?: BuildDecisionTraceSinkV2,
+  ): BuildArchetypeSelectionV2 {
     validateInput(input);
     const enemyHeroIds = [...new Set(input.enemyHeroIds)].sort((a, b) => a - b);
     const enemySet = new Set(enemyHeroIds);
@@ -52,17 +57,47 @@ export class BuildArchetypeSelectorV2Service {
       .map((archetype) => scoreArchetype(archetype, enemyHeroIds, rowByKey))
       .sort(compareScores);
     const hasUsableMatchupEvidence = matchupScores.some((entry) => entry.coverage > 0 && entry.confidence > 0);
-    if (!hasUsableMatchupEvidence) return selectOfflineDefault(input.snapshot.archetypes);
+    const result = hasUsableMatchupEvidence
+      ? selectFromMatchupScores(matchupScores)
+      : selectOfflineDefault(input.snapshot.archetypes);
 
-    const winner = matchupScores[0];
-    const degradedReasons = winner.coverage < 1 ? ['ARCHETYPE_SELECTION_WPA_PARTIAL'] : [];
-    return {
-      archetypeId: winner.archetypeId,
-      mode: 'VS_HERO_WPA',
-      scores: matchupScores,
-      degradedReasons,
-    };
+    trace?.record({
+      stage: 'ARCHETYPE_SELECTION',
+      reasonCodes: [...result.degradedReasons],
+      payload: {
+        enemyHeroIds,
+        wpaQueryCount: normalizeQueryCount(input.wpaQueryCount),
+        candidates: result.scores.map((score) => ({
+          candidateId: score.archetypeId,
+          archetypeId: score.archetypeId,
+          score: score.score,
+          confidence: score.confidence,
+          coverage: score.coverage,
+          disposition: score.archetypeId === result.archetypeId ? 'SELECTED' : 'REJECTED',
+          reasonCodes: score.archetypeId === result.archetypeId
+            ? ['ARCHETYPE_SELECTED']
+            : ['LOWER_ARCHETYPE_SELECTION_SCORE'],
+        })),
+        selectedArchetypeId: result.archetypeId,
+        fallbackUsed: result.mode === 'OFFLINE_DEFAULT',
+      },
+    });
+
+    return result;
   }
+}
+
+function selectFromMatchupScores(
+  matchupScores: readonly BuildArchetypeSelectionScoreV2[],
+): BuildArchetypeSelectionV2 {
+  const winner = matchupScores[0];
+  const degradedReasons = winner.coverage < 1 ? ['ARCHETYPE_SELECTION_WPA_PARTIAL'] : [];
+  return {
+    archetypeId: winner.archetypeId,
+    mode: 'VS_HERO_WPA',
+    scores: matchupScores,
+    degradedReasons,
+  };
 }
 
 function scoreArchetype(
@@ -204,6 +239,13 @@ function validateInput(input: SelectBuildArchetypeV2Input): void {
   if (input.snapshot.archetypes.some((archetype) => archetype.heroId !== input.heroId)) {
     throw new Error('Build archetype v2 selector: archetype hero identity mismatch');
   }
+  if (input.wpaQueryCount !== undefined && (!Number.isInteger(input.wpaQueryCount) || input.wpaQueryCount < 0)) {
+    throw new Error('Build archetype v2 selector: wpaQueryCount must be a non-negative integer');
+  }
+}
+
+function normalizeQueryCount(value: number | undefined): number {
+  return value ?? 0;
 }
 
 function average(values: readonly number[]): number {
