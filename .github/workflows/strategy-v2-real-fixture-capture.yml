@@ -1,0 +1,143 @@
+name: Strategy V2 Real Billy Fixture Capture
+
+on:
+  push:
+    branches:
+      - feat/statlocker-build-strategy-v2
+    paths:
+      - '.github/workflows/strategy-v2-real-fixture-capture.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: [self-hosted, Linux, Arm64]
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Build fixture capture image
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="deadlock-strategy-v2-fixture:${GITHUB_SHA}"
+          sudo docker build -t "$image" .
+          echo "CAPTURE_IMAGE=$image" >> "$GITHUB_ENV"
+
+      - name: Resolve latest complete Billy replay and capture fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          prod_dir=/home/ubuntu/apps/deadlock_dynamo_helper
+          api_container="$(cd "$prod_dir" && sudo docker compose ps -q api)"
+          test -n "$api_container"
+
+          network="$(sudo docker inspect "$api_container" --format='{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' | head -n1)"
+          test -n "$network"
+
+          match_id="$(cd "$prod_dir" && sudo docker compose exec -T api node <<'NODE'
+          const { Client } = require('pg');
+
+          async function main() {
+            const client = new Client({
+              host: process.env.DB_HOST,
+              port: Number(process.env.DB_PORT || 5432),
+              user: process.env.DB_USER,
+              password: process.env.DB_PASSWORD,
+              database: process.env.DB_NAME,
+              connectionTimeoutMillis: 10000,
+            });
+            await client.connect();
+            try {
+              await client.query('BEGIN TRANSACTION READ ONLY');
+              await client.query("SET LOCAL statement_timeout = '10s'");
+              const result = await client.query(`
+                SELECT "matchId", "replayInput", "decidedAt"
+                FROM adaptive_recommendation_decisions_v1
+                WHERE COALESCE(
+                  "replayInput" #>> '{decision,state,heroId}',
+                  "replayInput" #>> '{state,heroId}',
+                  "replayInput" #>> '{heroId}'
+                ) = '72'
+                ORDER BY "decidedAt" DESC, "decisionId" DESC
+                LIMIT 500
+              `);
+              for (const row of result.rows) {
+                const decision = row?.replayInput?.decision;
+                const enemyHeroIds = Array.isArray(decision?.enemyHeroIds)
+                  ? [...new Set(decision.enemyHeroIds.filter((value) => Number.isSafeInteger(value) && value > 0))]
+                  : [];
+                if (enemyHeroIds.length !== 6) continue;
+                if (String(decision?.state?.matchId) !== String(row.matchId)) continue;
+                if (!/^\d+$/.test(String(row.matchId))) continue;
+                process.stdout.write(String(row.matchId));
+                await client.query('ROLLBACK');
+                return;
+              }
+              throw new Error('No complete saved Billy replay found');
+            } finally {
+              await client.end();
+            }
+          }
+
+          main().catch((error) => {
+            console.error(error?.stack || error);
+            process.exit(1);
+          });
+          NODE
+          )"
+          test -n "$match_id"
+          echo "Resolved Billy matchId=$match_id"
+
+          env_file="$RUNNER_TEMP/strategy-v2-production-api.env"
+          cleanup() {
+            rm -f "$env_file"
+            sudo docker image rm -f "$CAPTURE_IMAGE" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          sudo docker inspect "$api_container" --format='{{range .Config.Env}}{{println .}}{{end}}' > "$env_file"
+          chmod 600 "$env_file"
+          mkdir -p "$RUNNER_TEMP/strategy-v2-fixture"
+
+          sudo docker run --rm \
+            --network "$network" \
+            --env-file "$env_file" \
+            -e PGOPTIONS='-c default_transaction_read_only=on -c statement_timeout=10000' \
+            -v "$RUNNER_TEMP/strategy-v2-fixture:/capture" \
+            --entrypoint node \
+            "$CAPTURE_IMAGE" \
+            dist/src/scripts/capture-statlocker-build-v2-fixture.js \
+            --heroId 72 \
+            --matchId "$match_id" \
+            --out /capture/billy-real.fixture.json
+
+          sudo docker run --rm \
+            -v "$RUNNER_TEMP/strategy-v2-fixture:/capture:ro" \
+            --entrypoint node \
+            "$CAPTURE_IMAGE" \
+            -e '
+              const fixture = require("/capture/billy-real.fixture.json");
+              if (fixture?.metadata?.contract !== "STATLOCKER_BUILD_V2_REAL_FIXTURE_1") throw new Error("fixture contract mismatch");
+              if (fixture?.metadata?.source !== "EXISTING_DATABASE") throw new Error("fixture source mismatch");
+              if (fixture?.metadata?.heroId !== 72) throw new Error("fixture hero mismatch");
+              if (!/^\d+$/.test(String(fixture?.metadata?.matchId ?? ""))) throw new Error("fixture match mismatch");
+              if (!Array.isArray(fixture?.proBuildAnalyses) || fixture.proBuildAnalyses.length !== 10) throw new Error("fixture top-10 provenance mismatch");
+              if (!Array.isArray(fixture?.liveState?.enemyHeroIds) || new Set(fixture.liveState.enemyHeroIds).size !== 6) throw new Error("fixture enemy roster mismatch");
+              if (!Array.isArray(fixture?.catalog?.items) || fixture.catalog.items.length === 0) throw new Error("fixture catalog is empty");
+              if (!Array.isArray(fixture?.metadata?.snapshotProvenance) || fixture.metadata.snapshotProvenance.length < 13) throw new Error("fixture snapshot provenance incomplete");
+              process.stdout.write(`Validated Billy real fixture: match=${fixture.metadata.matchId} profiles=${fixture.proBuildAnalyses.length} enemies=${fixture.liveState.enemyHeroIds.length} catalogItems=${fixture.catalog.items.length}\n`);
+            '
+
+      - name: Upload real Billy fixture
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: statlocker-build-v2-billy-real-${{ github.sha }}
+          path: ${{ runner.temp }}/strategy-v2-fixture/billy-real.fixture.json
+          if-no-files-found: error
+          retention-days: 3
