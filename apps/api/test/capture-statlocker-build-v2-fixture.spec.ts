@@ -148,6 +148,16 @@ describe('capture Statlocker Build V2 fixture', () => {
       .toThrow('matchId');
   });
 
+  it('accepts a real request fixture as the live context source without a saved replay lookup', () => {
+    expect(parseCaptureStatlockerBuildV2FixtureArgs([
+      '--request', 'test/fixtures/statlocker-build-v2/billy-real.request.json',
+      '--out', 'test/fixtures/statlocker-build-v2/billy-real.fixture.json',
+    ])).toEqual({
+      request: 'test/fixtures/statlocker-build-v2/billy-real.request.json',
+      out: 'test/fixtures/statlocker-build-v2/billy-real.fixture.json',
+    });
+  });
+
   it('uses normalized Statlocker snapshot scopes and deduplicated catalog content identity', () => {
     expect(statlockerFixtureScope('WPA_PATCH_DATA', {
       heroId: HERO_ID,
