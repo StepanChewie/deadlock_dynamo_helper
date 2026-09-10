@@ -2,6 +2,10 @@ import {
   StatlockerBuildProfileItemV2,
   StatlockerBuildProfileV2,
 } from './build-archetype-v2';
+import {
+  BuildProfileSimilarityWeightsV2,
+  STATLOCKER_BUILD_V2_CONFIG,
+} from './statlocker-build-v2.config';
 
 const TIER_WEIGHT: Readonly<Record<StatlockerBuildProfileItemV2['frequencyTier'], number>> = {
   CORE: 1,
@@ -24,23 +28,34 @@ interface FamilyFeatureV2 {
   medianBuyTimeS: number;
 }
 
-export interface BuildArchetypeProfileSimilarityV2 {
-  similarity: number;
+export interface BuildProfileSimilarityV2 {
   composition: number;
-  role: number;
-  timing: number;
-  relationships?: number;
-  explicitGroups?: number;
+  tierAgreement: number;
+  groupAgreement: number;
+  relationshipAgreement: number;
+  phaseAgreement: number;
+  timingAgreement: number;
+  total: number;
 }
 
-export function buildArchetypeProfileSimilarityV2(
+export function compareBuildProfilesV2(
   left: StatlockerBuildProfileV2,
   right: StatlockerBuildProfileV2,
-): BuildArchetypeProfileSimilarityV2 {
+  weights: BuildProfileSimilarityWeightsV2 = STATLOCKER_BUILD_V2_CONFIG.profileSimilarityWeights,
+): BuildProfileSimilarityV2 {
   if (left.heroId !== right.heroId) {
-    return { similarity: 0, composition: 0, role: 0, timing: 0 };
+    return {
+      composition: 0,
+      tierAgreement: 0,
+      groupAgreement: 0,
+      relationshipAgreement: 0,
+      phaseAgreement: 0,
+      timingAgreement: 0,
+      total: 0,
+    };
   }
 
+  validateWeights(weights);
   const leftFamilies = familyFeatures(left);
   const rightFamilies = familyFeatures(right);
   const composition = weightedJaccard(
@@ -50,52 +65,62 @@ export function buildArchetypeProfileSimilarityV2(
   const sharedFamilyIds = [...leftFamilies.keys()]
     .filter((familyId) => rightFamilies.has(familyId))
     .sort((a, b) => a - b);
-  const role = sharedFamilyIds.length === 0
+
+  const tierAgreement = sharedFamilyIds.length === 0
     ? 0
     : mean(sharedFamilyIds.map((familyId) =>
         1 - Math.abs(leftFamilies.get(familyId)!.tierWeight - rightFamilies.get(familyId)!.tierWeight),
       ));
-  const timing = sharedFamilyIds.length === 0
+  const phaseAgreement = sharedFamilyIds.length === 0
     ? 0
-    : mean(sharedFamilyIds.map((familyId) => timingAgreement(
-        leftFamilies.get(familyId)!,
-        rightFamilies.get(familyId)!,
+    : mean(sharedFamilyIds.map((familyId) => phaseScore(
+        leftFamilies.get(familyId)!.phase,
+        rightFamilies.get(familyId)!.phase,
       )));
-
-  let numerator = composition * 0.70;
-  let denominator = 0.70;
-  if (sharedFamilyIds.length > 0) {
-    numerator += role * 0.10 + timing * 0.10;
-    denominator += 0.20;
-  }
+  const timingAgreement = sharedFamilyIds.length === 0
+    ? 0
+    : mean(sharedFamilyIds.map((familyId) => timeScore(
+        leftFamilies.get(familyId)!.medianBuyTimeS,
+        rightFamilies.get(familyId)!.medianBuyTimeS,
+      )));
 
   const leftRelationships = relationshipWeights(left);
   const rightRelationships = relationshipWeights(right);
-  const relationships = leftRelationships.size > 0 || rightRelationships.size > 0
+  const hasRelationshipEvidence = leftRelationships.size > 0 || rightRelationships.size > 0;
+  const relationshipAgreement = hasRelationshipEvidence
     ? weightedJaccard(leftRelationships, rightRelationships)
-    : undefined;
-  if (relationships !== undefined) {
-    numerator += relationships * 0.05;
-    denominator += 0.05;
-  }
+    : 0;
 
   const leftGroups = explicitGroupTokens(left);
   const rightGroups = explicitGroupTokens(right);
-  const explicitGroups = leftGroups.size > 0 || rightGroups.size > 0
-    ? setJaccard(leftGroups, rightGroups)
-    : undefined;
-  if (explicitGroups !== undefined) {
-    numerator += explicitGroups * 0.05;
-    denominator += 0.05;
+  const hasGroupEvidence = leftGroups.size > 0 || rightGroups.size > 0;
+  const groupAgreement = hasGroupEvidence ? setJaccard(leftGroups, rightGroups) : 0;
+
+  let numerator = composition * weights.composition;
+  let denominator = weights.composition;
+  if (sharedFamilyIds.length > 0) {
+    numerator += tierAgreement * weights.tierAgreement;
+    numerator += phaseAgreement * weights.phaseAgreement;
+    numerator += timingAgreement * weights.timingAgreement;
+    denominator += weights.tierAgreement + weights.phaseAgreement + weights.timingAgreement;
+  }
+  if (hasRelationshipEvidence) {
+    numerator += relationshipAgreement * weights.relationshipAgreement;
+    denominator += weights.relationshipAgreement;
+  }
+  if (hasGroupEvidence) {
+    numerator += groupAgreement * weights.groupAgreement;
+    denominator += weights.groupAgreement;
   }
 
   return {
-    similarity: clamp01(numerator / denominator),
     composition,
-    role,
-    timing,
-    ...(relationships === undefined ? {} : { relationships }),
-    ...(explicitGroups === undefined ? {} : { explicitGroups }),
+    tierAgreement,
+    groupAgreement,
+    relationshipAgreement,
+    phaseAgreement,
+    timingAgreement,
+    total: denominator <= 0 ? 0 : clamp01(numerator / denominator),
   };
 }
 
@@ -112,25 +137,30 @@ function familyFeatures(profile: StatlockerBuildProfileV2): Map<number, FamilyFe
       medianBuyTimeS: Math.max(0, item.medianBuyTimeS),
     };
     const current = result.get(item.familyId);
-    if (!current || compareFamilyFeature(candidate, current) < 0) result.set(item.familyId, candidate);
+    if (!current || isStrongerFamilyFeature(candidate, current)) result.set(item.familyId, candidate);
   }
   return result;
 }
 
-function compareFamilyFeature(left: FamilyFeatureV2, right: FamilyFeatureV2): number {
-  return right.structuralWeight - left.structuralWeight ||
-    right.tierWeight - left.tierWeight ||
-    left.medianBuyTimeS - right.medianBuyTimeS;
+function isStrongerFamilyFeature(left: FamilyFeatureV2, right: FamilyFeatureV2): boolean {
+  if (left.structuralWeight !== right.structuralWeight) return left.structuralWeight > right.structuralWeight;
+  if (left.tierWeight !== right.tierWeight) return left.tierWeight > right.tierWeight;
+  return left.medianBuyTimeS < right.medianBuyTimeS;
 }
 
-function timingAgreement(left: FamilyFeatureV2, right: FamilyFeatureV2): number {
-  const phaseDistance = Math.abs(PHASE_INDEX[left.phase] - PHASE_INDEX[right.phase]);
-  const phaseScore = phaseDistance === 0 ? 1 : phaseDistance === 1 ? 0.65 : 0.30;
-  const leftTime = Math.max(60, left.medianBuyTimeS);
-  const rightTime = Math.max(60, right.medianBuyTimeS);
-  const logRatio = Math.abs(Math.log(leftTime / rightTime));
-  const timeScore = clamp01(1 - logRatio / Math.log(4));
-  return phaseScore * 0.65 + timeScore * 0.35;
+function phaseScore(
+  left: StatlockerBuildProfileItemV2['phase'],
+  right: StatlockerBuildProfileItemV2['phase'],
+): number {
+  const distance = Math.abs(PHASE_INDEX[left] - PHASE_INDEX[right]);
+  return distance === 0 ? 1 : distance === 1 ? 0.65 : 0.30;
+}
+
+function timeScore(left: number, right: number): number {
+  const safeLeft = Math.max(60, left);
+  const safeRight = Math.max(60, right);
+  const logRatio = Math.abs(Math.log(safeLeft / safeRight));
+  return clamp01(1 - logRatio / Math.log(4));
 }
 
 function relationshipWeights(profile: StatlockerBuildProfileV2): Map<string, number> {
@@ -182,6 +212,16 @@ function setJaccard<TKey>(left: ReadonlySet<TKey>, right: ReadonlySet<TKey>): nu
   let intersection = 0;
   for (const value of left) if (right.has(value)) intersection += 1;
   return intersection / union.size;
+}
+
+function validateWeights(weights: BuildProfileSimilarityWeightsV2): void {
+  const values = Object.values(weights);
+  if (values.some((value) => !Number.isFinite(value) || value < 0)) {
+    throw new Error('Build archetype v2: similarity weights must be finite and non-negative');
+  }
+  if (weights.composition <= 0) {
+    throw new Error('Build archetype v2: composition similarity weight must be positive');
+  }
 }
 
 function mean(values: readonly number[]): number {

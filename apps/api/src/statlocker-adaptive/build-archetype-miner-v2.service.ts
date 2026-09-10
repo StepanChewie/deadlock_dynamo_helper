@@ -1,6 +1,7 @@
+import { createHash } from 'crypto';
 import { Injectable } from '@nestjs/common';
 import { StatlockerBuildProfileV2 } from './build-archetype-v2';
-import { buildArchetypeProfileSimilarityV2 } from './build-archetype-similarity-v2';
+import { compareBuildProfilesV2 } from './build-archetype-similarity-v2';
 import {
   STATLOCKER_BUILD_V2_CONFIG,
   StatlockerBuildV2Config,
@@ -8,13 +9,15 @@ import {
 
 export type BuildArchetypeClusterRejectionReasonV2 =
   | 'CLUSTER_TOO_SMALL'
-  | 'CLUSTER_INCOHERENT'
-  | 'CLUSTER_SEPARATION_TOO_WEAK'
+  | 'INSUFFICIENT_INTERNAL_SIMILARITY'
+  | 'INSUFFICIENT_SEPARATION'
+  | 'ORDER_ONLY_VARIATION'
   | 'MAX_ARCHETYPES_EXCEEDED'
   | 'INSUFFICIENT_SOURCE_PROFILES'
   | 'NO_COHERENT_ARCHETYPE';
 
 export interface BuildArchetypeClusterV2 {
+  clusterId: string;
   heroId: number;
   profileAccountIds: readonly string[];
   support: number;
@@ -24,6 +27,7 @@ export interface BuildArchetypeClusterV2 {
 }
 
 export interface RejectedBuildArchetypeClusterV2 {
+  clusterId: string;
   heroId: number;
   profileAccountIds: readonly string[];
   support: number;
@@ -52,7 +56,7 @@ export class BuildArchetypeMinerV2Service {
     const resolved = resolveConfig(config);
     const profiles = validateAndSortProfiles(sourceProfiles);
     const heroId = profiles[0].heroId;
-    const similarities = pairwiseSimilarities(profiles);
+    const similarities = pairwiseSimilarities(profiles, resolved);
     const pairwiseRecord = Object.fromEntries([...similarities.entries()].sort(([a], [b]) => a.localeCompare(b)));
 
     if (profiles.length < resolved.minClusterSize) {
@@ -78,7 +82,7 @@ export class BuildArchetypeMinerV2Service {
       const reasons: BuildArchetypeClusterRejectionReasonV2[] = [];
       if (component.length < resolved.minClusterSize) reasons.push('CLUSTER_TOO_SMALL');
       if (component.length >= resolved.minClusterSize && internalSimilarity < resolved.minInternalSimilarity) {
-        reasons.push('CLUSTER_INCOHERENT');
+        reasons.push('INSUFFICIENT_INTERNAL_SIMILARITY');
       }
       if (reasons.length > 0) {
         rejected.push(rejectedCluster(component, profiles, similarities, reasons, components));
@@ -106,10 +110,10 @@ export class BuildArchetypeMinerV2Service {
       return {
         heroId,
         accepted: [],
-        rejected: [
+        rejected: sortRejected([
           ...rejected,
           rejectedCluster(profiles, profiles, similarities, ['NO_COHERENT_ARCHETYPE'], components),
-        ],
+        ]),
         pairwiseSimilarities: pairwiseRecord,
       };
     }
@@ -144,7 +148,7 @@ export class BuildArchetypeMinerV2Service {
       return {
         heroId,
         accepted: [acceptedCluster(only, profiles, similarities, components)],
-        rejected,
+        rejected: sortRejected(rejected),
         pairwiseSimilarities: pairwiseRecord,
       };
     }
@@ -157,7 +161,7 @@ export class BuildArchetypeMinerV2Service {
           component,
           profiles,
           similarities,
-          ['CLUSTER_SEPARATION_TOO_WEAK'],
+          ['INSUFFICIENT_SEPARATION'],
           preliminaryAccepted,
         ));
       } else {
@@ -177,7 +181,7 @@ export class BuildArchetypeMinerV2Service {
             components,
             ['WEAK_SPLIT_COLLAPSED_TO_CONSENSUS'],
           )],
-          rejected,
+          rejected: sortRejected(rejected),
           pairwiseSimilarities: pairwiseRecord,
         };
       }
@@ -220,6 +224,10 @@ function resolveConfig(config: Partial<StatlockerBuildV2Config>): StatlockerBuil
   const resolved: StatlockerBuildV2Config = {
     ...STATLOCKER_BUILD_V2_CONFIG,
     ...config,
+    profileSimilarityWeights: {
+      ...STATLOCKER_BUILD_V2_CONFIG.profileSimilarityWeights,
+      ...(config.profileSimilarityWeights ?? {}),
+    },
   };
   if (resolved.profileLinkSimilarity < 0 || resolved.profileLinkSimilarity > 1) {
     throw new Error('Build archetype v2: profileLinkSimilarity must be within [0, 1]');
@@ -261,13 +269,17 @@ function validateAndSortProfiles(
 
 function pairwiseSimilarities(
   profiles: readonly StatlockerBuildProfileV2[],
+  config: StatlockerBuildV2Config,
 ): Map<string, number> {
   const result = new Map<string, number>();
   for (let leftIndex = 0; leftIndex < profiles.length; leftIndex += 1) {
     for (let rightIndex = leftIndex + 1; rightIndex < profiles.length; rightIndex += 1) {
       const left = profiles[leftIndex];
       const right = profiles[rightIndex];
-      result.set(pairKey(left.accountId, right.accountId), buildArchetypeProfileSimilarityV2(left, right).similarity);
+      result.set(
+        pairKey(left.accountId, right.accountId),
+        compareBuildProfilesV2(left, right, config.profileSimilarityWeights).total,
+      );
     }
   }
   return result;
@@ -296,9 +308,7 @@ function connectedComponents(
         memberIds.push(candidate);
       }
     }
-    result.push(memberIds
-      .sort()
-      .map((accountId) => byAccountId.get(accountId)!));
+    result.push(memberIds.sort().map((accountId) => byAccountId.get(accountId)!));
   }
 
   return result.sort((left, right) => firstAccountId(left).localeCompare(firstAccountId(right)));
@@ -311,9 +321,11 @@ function acceptedCluster(
   comparisonClusters: readonly (readonly StatlockerBuildProfileV2[])[],
   reasonCodes: readonly string[] = [],
 ): BuildArchetypeClusterV2 {
+  const accountIds = members.map((profile) => profile.accountId).sort();
   return {
+    clusterId: clusterId(members[0].heroId, accountIds),
     heroId: members[0].heroId,
-    profileAccountIds: members.map((profile) => profile.accountId).sort(),
+    profileAccountIds: accountIds,
     support: members.length / allProfiles.length,
     internalSimilarity: clusterInternalSimilarity(members, similarities),
     separation: clusterSeparation(members, comparisonClusters, similarities),
@@ -328,9 +340,11 @@ function rejectedCluster(
   reasonCodes: readonly BuildArchetypeClusterRejectionReasonV2[],
   comparisonClusters: readonly (readonly StatlockerBuildProfileV2[])[] = [members],
 ): RejectedBuildArchetypeClusterV2 {
+  const accountIds = members.map((profile) => profile.accountId).sort();
   return {
+    clusterId: clusterId(members[0].heroId, accountIds),
     heroId: members[0].heroId,
-    profileAccountIds: members.map((profile) => profile.accountId).sort(),
+    profileAccountIds: accountIds,
     support: members.length / allProfiles.length,
     internalSimilarity: clusterInternalSimilarity(members, similarities),
     separation: clusterSeparation(members, comparisonClusters, similarities),
@@ -384,6 +398,11 @@ function sortRejected(
 
 function pairKey(left: string, right: string): string {
   return left < right ? `${left}\u0000${right}` : `${right}\u0000${left}`;
+}
+
+function clusterId(heroId: number, accountIds: readonly string[]): string {
+  const signature = createHash('sha256').update([...accountIds].sort().join('\n')).digest('hex').slice(0, 16);
+  return `hero:${heroId}:cluster:${signature}`;
 }
 
 function firstAccountId(profiles: readonly StatlockerBuildProfileV2[]): string {
