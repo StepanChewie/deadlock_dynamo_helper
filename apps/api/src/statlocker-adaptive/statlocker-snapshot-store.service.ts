@@ -190,10 +190,13 @@ export function isSelectableSnapshot(snapshot: Pick<
 >): boolean {
   if (snapshot.dataset === 'VS_HERO_WPA') return false;
   if (snapshot.dataset !== 'CONSENSUS_SKELETON') return true;
-  return snapshot.schemaVersion === CONSENSUS_SKELETON_SCHEMA_VERSION &&
-    snapshot.normalizerVersion === CONSENSUS_SKELETON_NORMALIZER_VERSION &&
-    isRecord(snapshot.payload) &&
-    Array.isArray(snapshot.payload.groups);
+  const validSchema =
+    snapshot.schemaVersion === CONSENSUS_SKELETON_SCHEMA_VERSION ||
+    snapshot.schemaVersion === 'statlocker-consensus-skeleton-v1';
+  const validNormalizer =
+    snapshot.normalizerVersion === CONSENSUS_SKELETON_NORMALIZER_VERSION ||
+    snapshot.normalizerVersion === 'consensus-builder-v1';
+  return validSchema && validNormalizer && isRecord(snapshot.payload) && Array.isArray(snapshot.payload.groups);
 }
 
 function isStatlockerDatasetV1(value: string): value is StatlockerDatasetV1 {
