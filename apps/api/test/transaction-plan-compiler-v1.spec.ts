@@ -57,7 +57,7 @@ function decision(
     },
     itemGraph: graph,
     catalogVersionId: 'catalog', catalogSha256, rulesetId: 'r1', localSteamId: 'p',
-    allyHeroIds: [], enemyHeroIds: [], allyItemIds: [], enemyItemIds: [],
+    allyHeroIds: [], enemyHeroIds: [], enemyLiveStates: [], allyItemIds: [], enemyItemIds: [],
     slots: deriveAdaptiveSlotStateV1(ownedItemIds, graph, slotRules, {
       unlockedFlexSlots: unlockedFlexSlots === 'UNKNOWN' ? undefined : unlockedFlexSlots,
       evidence,

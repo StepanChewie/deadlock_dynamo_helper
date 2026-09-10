@@ -71,6 +71,7 @@ describe('resolveSituationalPlanV1', () => {
       rulesetId: 'ruleset-a',
       catalogSha256: 'a'.repeat(64),
       enemyHeroIds: [20],
+      enemyLiveStates: [],
       enemyHeroes: [{ heroId: 20, heroName: 'Enemy Twenty' }],
       ourTeamSouls: 100000,
       enemyTeamSouls: 100000,

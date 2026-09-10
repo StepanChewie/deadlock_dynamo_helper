@@ -142,6 +142,7 @@ function replayInput(): AdaptiveReplayInputV1 {
       rulesetId: 'ruleset-a',
       localSteamId: 'steam-1',
       enemyHeroIds: [20],
+      enemyLiveStates: [],
       ourTeamSouls: 100000,
       enemyTeamSouls: 100000,
       stateRevision: 'revision-1',

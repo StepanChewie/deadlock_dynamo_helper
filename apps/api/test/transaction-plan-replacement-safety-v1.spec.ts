@@ -56,7 +56,7 @@ function decision(itemGraph: ReturnType<typeof graph>): AdaptiveDecisionStateV1 
     },
     itemGraph,
     catalogVersionId: 'c', catalogSha256: '9'.repeat(64), rulesetId: 'r1', localSteamId: 'p',
-    allyHeroIds: [], enemyHeroIds: [], allyItemIds: [], enemyItemIds: [],
+    allyHeroIds: [], enemyHeroIds: [], enemyLiveStates: [], allyItemIds: [], enemyItemIds: [],
     slots: deriveAdaptiveSlotStateV1(owned, itemGraph, slotRules, { unlockedFlexSlots: 0, evidence: 'OBSERVED' }),
     investment: unknownAdaptiveInvestmentStateV1(), economyRulesEvidence: 'UNKNOWN', stateRevision: 'r',
   };

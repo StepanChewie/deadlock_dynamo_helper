@@ -126,6 +126,7 @@ function decision(options: {
     rulesetId: 'ruleset-a',
     localSteamId: 'steam-a',
     enemyHeroIds: [20],
+    enemyLiveStates: [],
     ourTeamSouls: 100000,
     enemyTeamSouls: 100000,
     slots: slotState,
@@ -227,6 +228,21 @@ function evidence(options: {
     degradedReasons: [],
     families: Object.values(byDataset),
     byDataset,
+    // Threat-weighted roadmap: exact-enemy slices are superseded by the relational
+    // draft-matchup aggregate; the scorer no longer reads VS_HERO_WPA slices.
+    draftMatchupByItemId: Object.fromEntries(
+      candidateIds.map((itemId) => {
+        const raw = options.exactWpa?.[itemId] ?? 0;
+        return [String(itemId), {
+          raw,
+          normalized: Math.tanh(raw / 0.15),
+          confidence: raw === 0 ? 0 : 0.8,
+          coverage: raw === 0 ? 0 : 1,
+          usedCount: raw === 0 ? 0 : 1,
+          contributions: [],
+        }];
+      }),
+    ),
   } as any;
 }
 

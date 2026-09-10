@@ -95,6 +95,7 @@ function decision(
     rulesetId: 'ruleset-a',
     localSteamId: 'steam-a',
     enemyHeroIds: [20],
+    enemyLiveStates: [],
     ourTeamSouls: 100000,
     enemyTeamSouls: 100000,
     stateRevision: revision,

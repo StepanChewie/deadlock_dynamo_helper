@@ -46,6 +46,7 @@ function decision() {
     rulesetId: 'ruleset-a',
     localSteamId: 'steam-a',
     enemyHeroIds: [20],
+    enemyLiveStates: [],
     enemyHeroes: [{ heroId: 20, heroName: 'Enemy Twenty' }],
     slots: {
       baseSlots: 12,

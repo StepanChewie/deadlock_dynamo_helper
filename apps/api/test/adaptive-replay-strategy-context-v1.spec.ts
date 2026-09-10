@@ -31,6 +31,7 @@ function input(): AdaptiveReplayInputV1 {
       localSteamId: 'player',
       allyHeroIds: [2, 3],
       enemyHeroIds: [4, 5],
+      enemyLiveStates: [],
       allyItemIds: [101, 102],
       enemyItemIds: [201, 202],
       slots: {
@@ -137,6 +138,7 @@ describe('adaptive replay strategy context v1', () => {
     expect(plannerInput.decision).toMatchObject({
       allyHeroIds: [2, 3],
       enemyHeroIds: [4, 5],
+      enemyLiveStates: [],
       allyItemIds: [101, 102],
       enemyItemIds: [201, 202],
       economyRulesEvidence: 'RECONSTRUCTED',

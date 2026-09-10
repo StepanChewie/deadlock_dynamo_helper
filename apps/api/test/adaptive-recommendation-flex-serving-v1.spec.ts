@@ -61,6 +61,7 @@ function decision(revision: string, unlockedFlexSlots = 1) {
     rulesetId: 'ruleset-a',
     localSteamId: 'steam-a',
     enemyHeroIds: [20],
+    enemyLiveStates: [],
     slots: {
       baseSlots: 9,
       baseSlotsByType: { weapon: 3, vitality: 3, spirit: 3 },

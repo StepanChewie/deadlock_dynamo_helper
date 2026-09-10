@@ -61,6 +61,7 @@ const decision: any = {
   localSteamId: 'player',
   allyHeroIds: [],
   enemyHeroIds: [],
+  enemyLiveStates: [],
   allyItemIds: [],
   enemyItemIds: [],
   slots,

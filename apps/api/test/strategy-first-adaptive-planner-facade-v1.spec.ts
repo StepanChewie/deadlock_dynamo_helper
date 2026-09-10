@@ -14,7 +14,7 @@ function decision(ownedItemIds: readonly number[]): any {
   const held = buildInventoryInstancesForRecommendation(ownedItemIds, graph);
   return {
     state: { decisionId: 'd', matchId: 'm', playerSlot: 0, gameTimeSec: 100, rulesetId: 'r1', heroId: 1, inventory: { initializedFromSnapshot: true, heldByItemId: held, lifecycleCountByItemId: new Map(ownedItemIds.map((itemId) => [itemId, 1])), nextInstanceSequence: held.size + 1 }, economy: { spendableSouls: observedFact(1000, 't'), shopOpportunity: observedFact('AVAILABLE', 't') } },
-    itemGraph: graph, catalogVersionId: 'c', catalogSha256: 'a'.repeat(64), rulesetId: 'r1', localSteamId: 'p', allyHeroIds: [], enemyHeroIds: [], allyItemIds: [], enemyItemIds: [],
+    itemGraph: graph, catalogVersionId: 'c', catalogSha256: 'a'.repeat(64), rulesetId: 'r1', localSteamId: 'p', allyHeroIds: [], enemyHeroIds: [], enemyLiveStates: [], allyItemIds: [], enemyItemIds: [],
     slots: deriveAdaptiveSlotStateV1(ownedItemIds, graph, slotRules, { unlockedFlexSlots: 0, evidence: 'OBSERVED' }),
     investment: unknownAdaptiveInvestmentStateV1(), economyRulesEvidence: 'UNKNOWN', stateRevision: `revision:${ownedItemIds.join(',')}`,
   };

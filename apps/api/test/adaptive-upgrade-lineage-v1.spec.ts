@@ -110,6 +110,7 @@ function decision(options: { owned?: number[]; wallet?: number; gameTimeSec?: nu
     rulesetId: 'ruleset-a',
     localSteamId: 'steam-a',
     enemyHeroIds: [20],
+    enemyLiveStates: [],
     ourTeamSouls: 100_000,
     enemyTeamSouls: 100_000,
     slots,

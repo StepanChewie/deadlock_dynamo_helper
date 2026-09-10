@@ -141,6 +141,7 @@ function scorerContext() {
   return {
     heroId: 10,
     enemyHeroIds: [30],
+    enemyLiveStates: [],
     gameTimeSec: 800,
     gameStateBlend: { ahead: 0, even: 1, behind: 0 },
     ownedItemIds: [] as number[],

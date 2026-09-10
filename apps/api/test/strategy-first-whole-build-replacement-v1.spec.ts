@@ -61,6 +61,7 @@ const decision: any = {
   localSteamId: 'p',
   allyHeroIds: [],
   enemyHeroIds: [99],
+  enemyLiveStates: [],
   allyItemIds: [],
   enemyItemIds: [],
   slots: deriveAdaptiveSlotStateV1(

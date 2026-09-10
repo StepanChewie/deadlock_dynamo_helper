@@ -21,6 +21,7 @@ function baseInput(enemyHeroes?: readonly { heroId: number; heroName?: string }[
       rulesetId: 'ruleset-a',
       localSteamId: 'steam-1',
       enemyHeroIds: [20, 30],
+      enemyLiveStates: [],
       ...(enemyHeroes === undefined ? {} : { enemyHeroes }),
       stateRevision: 'revision-1',
     },

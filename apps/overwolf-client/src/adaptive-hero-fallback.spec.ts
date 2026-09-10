@@ -51,7 +51,7 @@ describe('adaptive situational hero label fallback', () => {
       },
     } as any);
 
-    expect(view.againstLabel).toBe('Against: Vindicta');
-    expect(view.plan.items[0].againstLabel).toBe('Against: Vindicta');
+    expect(view.againstLabel).toBe('vs Vindicta');
+    expect(view.plan.items[0].againstLabel).toBe('vs Vindicta');
   });
 });

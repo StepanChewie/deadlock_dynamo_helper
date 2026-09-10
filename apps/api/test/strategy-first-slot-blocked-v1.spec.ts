@@ -34,7 +34,7 @@ const decision: any = {
   },
   itemGraph: graph,
   catalogVersionId: 'c', catalogSha256: 'a'.repeat(64), rulesetId: 'r1', localSteamId: 'steam',
-  allyHeroIds: [], enemyHeroIds: [], allyItemIds: [], enemyItemIds: [],
+  allyHeroIds: [], enemyHeroIds: [], enemyLiveStates: [], allyItemIds: [], enemyItemIds: [],
   slots: deriveAdaptiveSlotStateV1(owned, graph, noFlexRules, { unlockedFlexSlots: 0, evidence: 'OBSERVED' }),
   investment: unknownAdaptiveInvestmentStateV1(), economyRulesEvidence: 'UNKNOWN', stateRevision: 'revision-test',
 };

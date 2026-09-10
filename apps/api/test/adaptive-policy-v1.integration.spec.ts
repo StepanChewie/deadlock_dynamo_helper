@@ -221,12 +221,8 @@ async function createFixture(options: { rebuildSkeleton?: boolean } = {}) {
     }],
   };
   await publish(store, 'WPA_PATCH_DATA', `patch:${patchId}`, wpaPayload, freshAt);
-  await publish(store, 'VS_HERO_WPA', 'global', {
-    slices: [
-      { heroId: 10, enemyHeroId: 20, items: [{ itemId: 9, deltaWpa: 0.45, count: 1200 }] },
-      { heroId: 10, enemyHeroId: 30, items: [{ itemId: 9, deltaWpa: 0.35, count: 1000 }] },
-    ],
-  }, freshAt);
+  // VS_HERO_WPA is relational-only since the threat-weighted WPA roadmap; the
+  // snapshot store rejects its publication, so this fixture no longer seeds it.
   await publish(store, 'T4_CHAINS', 'global', {
     chains: [{ heroId: 10, itemIds: [1, 9], sampleSize: 800, meanWpa: 0.2 }],
   }, freshAt);
@@ -452,11 +448,6 @@ describe('Statlocker adaptive policy v1 integration', () => {
       gameState: { even: 0 },
       purchaseTiming: {},
     }];
-    lowSample.byDataset.VS_HERO_WPA.payload.slices = [{
-      heroId: 10,
-      enemyHeroId: 20,
-      items: [{ itemId: 9, deltaWpa: 1, count: 11 }],
-    }];
     lowSample.families = Object.values(lowSample.byDataset);
 
     const lowSamplePlan = h.planner.plan({ decision: fullInventory, evidence: lowSample });
@@ -505,9 +496,9 @@ describe('Statlocker adaptive policy v1 integration', () => {
     expect(stale.byDataset.WPA_PATCH_DATA.freshness).toBe('STALE_USABLE');
     expect(stale.byDataset.WPA_PATCH_DATA.confidence)
       .toBeLessThan(fresh.byDataset.WPA_PATCH_DATA.confidence);
-    expect(mismatch.byDataset.VS_HERO_WPA.freshness).toBe('PATCH_MISMATCH');
-    expect(mismatch.byDataset.VS_HERO_WPA.confidence).toBe(0);
-    expect(mismatch.byDataset.VS_HERO_WPA.payload).toBeUndefined();
+    expect(mismatch.byDataset.T4_CHAINS.freshness).toBe('PATCH_MISMATCH');
+    expect(mismatch.byDataset.T4_CHAINS.confidence).toBe(0);
+    expect(mismatch.byDataset.T4_CHAINS.payload).toBeUndefined();
   });
 
   it('keeps Chromium and ML8 runtime services out of the adaptive recommendation constructor graph', () => {

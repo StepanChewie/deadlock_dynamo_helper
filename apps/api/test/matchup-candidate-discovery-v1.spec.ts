@@ -99,6 +99,7 @@ function input(legal: RecommendationCandidate, coverage: number, matchupConfiden
     maxTotalItems: 12,
     currentItemCount: 1,
     enemyHeroIds: [99, 100],
+    enemyLiveStates: [],
     enemyItemIds: [],
     matchupByItemId: {
       '3': {

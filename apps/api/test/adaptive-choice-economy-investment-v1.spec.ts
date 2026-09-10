@@ -147,6 +147,7 @@ function scorerContext(ownedItemIds: readonly number[]) {
   return {
     heroId: 1,
     enemyHeroIds: [],
+    enemyLiveStates: [],
     gameTimeSec: 800,
     gameStateBlend: { ahead: 0, even: 1, behind: 0 },
     ownedItemIds,

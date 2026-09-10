@@ -47,7 +47,7 @@ const replayInput: any = {
       shopOpportunity: { evidence: 'UNKNOWN', source: 'test' },
     },
     itemDefinitions: [], catalogVersionId: 'c', catalogSha256: 'a'.repeat(64), rulesetId: 'r1',
-    localSteamId: 'steam-1', enemyHeroIds: [], stateRevision: 'revision-previous',
+    localSteamId: 'steam-1', enemyHeroIds: [], enemyLiveStates: [], stateRevision: 'revision-previous',
   },
   evidence: { snapshotIds: [] },
   recentPurchasedItemIds: [], recentSoldItemIds: [],

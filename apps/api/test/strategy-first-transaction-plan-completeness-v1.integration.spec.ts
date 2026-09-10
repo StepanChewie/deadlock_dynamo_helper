@@ -77,7 +77,7 @@ function decision(): AdaptiveDecisionStateV1 {
     catalogSha256,
     rulesetId: 'r1',
     localSteamId: 'p',
-    allyHeroIds: [], enemyHeroIds: [], allyItemIds: [], enemyItemIds: [],
+    allyHeroIds: [], enemyHeroIds: [], enemyLiveStates: [], allyItemIds: [], enemyItemIds: [],
     slots: deriveAdaptiveSlotStateV1([1], graph, slotRules, { unlockedFlexSlots: 0, evidence: 'OBSERVED' }),
     investment: unknownAdaptiveInvestmentStateV1(),
     economyRulesEvidence: 'UNKNOWN',

@@ -46,6 +46,7 @@ function decision(itemDefinitions: readonly any[], ownedItemIds: readonly number
     rulesetId: 'ruleset-a',
     localSteamId: 'steam-a',
     enemyHeroIds: [],
+    enemyLiveStates: [],
     slots: {
       baseSlots: 1,
       baseSlotsByType: { weapon: 1, vitality: 0, spirit: 0 },

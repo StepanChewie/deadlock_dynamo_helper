@@ -123,6 +123,13 @@ function evidence() {
     snapshotIds: Object.values(byDataset).map((entry) => entry.snapshotId),
     degradedReasons: [],
     families: Object.values(byDataset),
+    // Threat-weighted roadmap: exact-enemy slice scoring was replaced by the
+    // relational draft-matchup aggregate consumed through draftMatchupByItemId.
+    draftMatchupByItemId: {
+      1: { raw: 0.01, normalized: 0.05, confidence: 0.8, coverage: 1, usedCount: 1, contributions: [] },
+      2: { raw: 0.30, normalized: 0.5, confidence: 0.8, coverage: 1, usedCount: 1, contributions: [] },
+      3: { raw: 0.60, normalized: 0.9, confidence: 0.8, coverage: 1, usedCount: 1, contributions: [] },
+    },
     byDataset,
   } as any;
 }
@@ -161,6 +168,7 @@ function decision(owned: readonly number[] = []) {
     rulesetId: 'ruleset-a',
     localSteamId: 'steam-a',
     enemyHeroIds: [20],
+    enemyLiveStates: [],
     ourTeamSouls: 100000,
     enemyTeamSouls: 100000,
     slots: deriveAdaptiveSlotStateV1(owned, itemGraph, economyRules, { unlockedFlexSlots: 3, evidence: 'OBSERVED' }),

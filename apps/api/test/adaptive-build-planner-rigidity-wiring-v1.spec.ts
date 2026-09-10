@@ -130,6 +130,7 @@ function decision() {
     rulesetId: 'ruleset-a',
     localSteamId: 'steam-a',
     enemyHeroIds: [],
+    enemyLiveStates: [],
     ourTeamSouls: 100000,
     enemyTeamSouls: 100000,
     slots: {

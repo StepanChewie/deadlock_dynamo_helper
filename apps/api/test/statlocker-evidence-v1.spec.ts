@@ -48,7 +48,6 @@ describe('StatlockerEvidenceService', () => {
   it('treats a current structured consensus snapshot as fresh for up to two days', () => {
     const h = service([
       row('WPA_PATCH_DATA', 'patch:15-1', 47 * HOUR),
-      row('VS_HERO_WPA', 'global', 49 * HOUR),
       row('T4_CHAINS', 'global', 5 * DAY),
       structuredConsensusRow(47 * HOUR),
     ]);
@@ -56,35 +55,36 @@ describe('StatlockerEvidenceService', () => {
     expect(bundle.byDataset.WPA_PATCH_DATA.freshness).toBe('FRESH');
     expect(bundle.byDataset.CONSENSUS_SKELETON.freshness).toBe('FRESH');
     expect(bundle.byDataset.CONSENSUS_SKELETON.payload).toEqual(expect.objectContaining({ groups: [] }));
-    expect(bundle.byDataset.VS_HERO_WPA.freshness).toBe('STALE_USABLE');
+    // VS_HERO_WPA is relational-only since the threat-weighted WPA roadmap: the
+    // evidence service no longer serves it from the legacy snapshot store.
+    expect(bundle.byDataset.VS_HERO_WPA.freshness).toBe('UNAVAILABLE');
+    expect(bundle.byDataset.VS_HERO_WPA.payload).toBeUndefined();
     expect(bundle.byDataset.T4_CHAINS.freshness).toBe('UNAVAILABLE');
-    expect(bundle.byDataset.VS_HERO_WPA.confidence).toBeLessThan(bundle.byDataset.WPA_PATCH_DATA.confidence);
     expect(bundle.snapshotIds).toEqual([...bundle.snapshotIds].sort());
   });
 
   it('marks incompatible ruleset or catalog evidence as PATCH_MISMATCH and excludes payload', () => {
     const h = service([
       row('WPA_PATCH_DATA', 'patch:15-1', 5 * 60_000, { rulesetVersion: 'ruleset-old' }),
-      row('VS_HERO_WPA', 'global', 5 * 60_000, { catalogSha256: 'c'.repeat(64) }),
+      row('T4_CHAINS', 'global', 5 * 60_000, { catalogSha256: 'c'.repeat(64) }),
     ]);
     const bundle = h.service.getEvidence({ heroId: 10, rulesetVersion: 'ruleset-a', catalogSha256, statlockerPatchId: '15-1', nowMs: now });
     expect(bundle.byDataset.WPA_PATCH_DATA.freshness).toBe('PATCH_MISMATCH');
     expect(bundle.byDataset.WPA_PATCH_DATA.payload).toBeUndefined();
-    expect(bundle.byDataset.VS_HERO_WPA.freshness).toBe('PATCH_MISMATCH');
-    expect(bundle.byDataset.VS_HERO_WPA.payload).toBeUndefined();
+    expect(bundle.byDataset.T4_CHAINS.freshness).toBe('PATCH_MISMATCH');
+    expect(bundle.byDataset.T4_CHAINS.payload).toBeUndefined();
   });
 
   it('keeps partial evidence usable when one family is unavailable', () => {
     const h = service([
       row('WPA_PATCH_DATA', 'patch:15-1', 5 * 60_000),
-      row('VS_HERO_WPA', 'global', 5 * 60_000),
       structuredConsensusRow(5 * 60_000),
     ]);
     const bundle = h.service.getEvidence({ heroId: 10, rulesetVersion: 'ruleset-a', catalogSha256, statlockerPatchId: '15-1', nowMs: now });
     expect(bundle.usable).toBe(true);
     expect(bundle.byDataset.T4_CHAINS.freshness).toBe('UNAVAILABLE');
     expect(bundle.byDataset.WPA_PATCH_DATA.payload).toBeDefined();
-    expect(bundle.byDataset.VS_HERO_WPA.payload).toBeDefined();
+    expect(bundle.byDataset.VS_HERO_WPA.payload).toBeUndefined();
     expect(bundle.byDataset.CONSENSUS_SKELETON.payload).toBeDefined();
   });
 

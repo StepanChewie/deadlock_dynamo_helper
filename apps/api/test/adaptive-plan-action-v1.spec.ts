@@ -79,6 +79,7 @@ function decision(
     rulesetId: 'ruleset-a',
     localSteamId: 'steam-a',
     enemyHeroIds: [],
+    enemyLiveStates: [],
     enemyHeroes: [],
     slots: deriveAdaptiveSlotStateV1(ownedItemIds, graph, slotRules, capacity),
     investment: deriveAdaptiveInvestmentStateV1(ownedItemIds, graph, undefined),

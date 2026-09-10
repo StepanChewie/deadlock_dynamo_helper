@@ -71,6 +71,7 @@ function resultWithSituationalReasonCodes(reasonCodes: readonly string[]): any {
     purpose: 'COUNTER_ENEMY_HEROES',
     targetItemId: 3,
     enemyHeroIds: [99],
+    enemyLiveStates: [],
     enemyItemIds: [],
     statisticalSupport: 0.8,
     confidence: 0.9,

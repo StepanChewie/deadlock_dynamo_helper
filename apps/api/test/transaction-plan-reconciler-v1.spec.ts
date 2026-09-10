@@ -25,7 +25,8 @@ function decision(owned: readonly number[], gameTimeSec = 100): AdaptiveDecision
       economy: { spendableSouls: observedFact(5000, 'test'), shopOpportunity: observedFact('AVAILABLE', 'test') },
     },
     itemGraph: graph, catalogVersionId: 'c', catalogSha256: 'e'.repeat(64), rulesetId: 'r1', localSteamId: 'p',
-    allyHeroIds: [], enemyHeroIds: [], allyItemIds: [], enemyItemIds: [],
+    allyHeroIds: [],
+    enemyLiveStates: [], enemyHeroIds: [], allyItemIds: [], enemyItemIds: [],
     slots: deriveAdaptiveSlotStateV1(owned, graph, slotRules, { unlockedFlexSlots: 0, evidence: 'OBSERVED' }),
     investment: unknownAdaptiveInvestmentStateV1(), economyRulesEvidence: 'UNKNOWN', stateRevision: `r-${gameTimeSec}`,
   };

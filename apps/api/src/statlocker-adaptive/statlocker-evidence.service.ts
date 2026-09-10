@@ -276,7 +276,9 @@ function scopeFor(dataset: AdaptiveScoringDatasetV1, input: StatlockerEvidenceRe
 }
 
 function needsGlobalRefresh(byDataset: Record<AdaptiveScoringDatasetV1, StatlockerEvidenceFamilyV1>): boolean {
-  return ['WPA_PATCH_DATA', 'VS_HERO_WPA', 'T4_CHAINS'].some((dataset) =>
+  // VS_HERO_WPA is relational-only with its own daily refresh TTL; the snapshot store
+  // only tracks WPA_PATCH_DATA and T4_CHAINS for global refresh triggers.
+  return ['WPA_PATCH_DATA', 'T4_CHAINS'].some((dataset) =>
     needsRefresh(byDataset[dataset as AdaptiveScoringDatasetV1]),
   );
 }

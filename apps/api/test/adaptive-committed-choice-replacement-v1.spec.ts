@@ -104,6 +104,7 @@ function decision(owned: readonly number[]) {
     rulesetId: 'ruleset-a',
     localSteamId: 'steam-a',
     enemyHeroIds: [20],
+    enemyLiveStates: [],
     ourTeamSouls: 100000,
     enemyTeamSouls: 100000,
     slots: deriveAdaptiveSlotStateV1(owned, itemGraph, economyRules, {
@@ -190,6 +191,21 @@ function evidence(group: ConsensusBuildGroupV1, exactWpa: Readonly<Record<number
     degradedReasons: [],
     families: Object.values(byDataset),
     byDataset,
+    // Threat-weighted roadmap: exact-enemy slices are superseded by the relational
+    // draft-matchup aggregate; the scorer no longer reads VS_HERO_WPA slices.
+    draftMatchupByItemId: Object.fromEntries(
+      itemIds.map((itemId) => {
+        const raw = exactWpa[itemId] ?? 0;
+        return [String(itemId), {
+          raw,
+          normalized: Math.tanh(raw / 0.15),
+          confidence: raw === 0 ? 0 : 0.8,
+          coverage: raw === 0 ? 0 : 1,
+          usedCount: raw === 0 ? 0 : 1,
+          contributions: [],
+        }];
+      }),
+    ),
   } as any;
 }
 
@@ -200,7 +216,7 @@ describe('AdaptiveBuildPlannerV1Service committed choice replacement', () => {
     const group = choice([1, 2]);
     const result = planner.plan({
       decision: decision([1]),
-      evidence: evidence(group, { 1: 0, 2: 0.02 }),
+      evidence: evidence(group, { 1: 0, 2: 0.01 }),
     });
 
     expect(result.nextAction.type).not.toBe('REPLACE');

@@ -58,6 +58,7 @@ function decision(ownedItemIds: readonly number[], maxFlexSlots = 4): AdaptiveDe
     localSteamId: 'player',
     allyHeroIds: [],
     enemyHeroIds: [],
+    enemyLiveStates: [],
     allyItemIds: [],
     enemyItemIds: [],
     slots: deriveAdaptiveSlotStateV1(ownedItemIds, graph, slotRules, {

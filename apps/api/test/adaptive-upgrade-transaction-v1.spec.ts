@@ -76,6 +76,7 @@ describe('adaptive upgrade transaction regression', () => {
       rulesetId: 'ruleset-a',
       localSteamId: 'steam-a',
       enemyHeroIds: [],
+      enemyLiveStates: [],
       enemyHeroes: [],
       slots,
       investment: deriveAdaptiveInvestmentStateV1(ownedItemIds, graph, undefined),

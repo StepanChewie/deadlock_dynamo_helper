@@ -34,11 +34,14 @@ function graph() {
 describe('ruleset-aware adaptive economy', () => {
   it('fails closed when the exact ruleset/catalog pair is unknown', () => {
     expect(resolveRecommendationEconomyRulesV1('missing', sha, [])).toBeUndefined();
+    // Under the approved 12-slot capacity model (commit 40249886 / roadmap M0.4),
+    // 12-slot capacity is independent of economy snapshots: flex slots default to 12.
     expect(slotRulesFromEconomyRulesV1(undefined)).toEqual({
+      baseSlots: 0,
       baseSlotsByType: { weapon: 0, vitality: 0, spirit: 0 },
-      maxFlexSlots: 0,
-      maxActiveItems: 0,
-      evidence: 'UNKNOWN',
+      maxFlexSlots: 12,
+      maxActiveItems: 4,
+      evidence: 'RECONSTRUCTED',
     });
   });
 

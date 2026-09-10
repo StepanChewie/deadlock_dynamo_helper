@@ -96,6 +96,7 @@ function evidence(exactCount = 600, familyConfidence = 1) {
 const context = {
   heroId: 10,
   enemyHeroIds: [20, 21, 22, 23, 24, 25],
+  enemyLiveStates: [],
   gameTimeSec: 700,
   gameStateBlend: { ahead: 0, even: 1, behind: 0 },
   ownedItemIds: [50],

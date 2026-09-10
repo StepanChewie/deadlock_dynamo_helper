@@ -89,6 +89,7 @@ function decision(): AdaptiveDecisionStateV1 {
     localSteamId: 'player',
     allyHeroIds: [],
     enemyHeroIds: [],
+    enemyLiveStates: [],
     allyItemIds: [],
     enemyItemIds: [],
     slots: deriveAdaptiveSlotStateV1(ownedItemIds, graph, slotRules, {

@@ -94,7 +94,7 @@ describe('strategy-first situational integration v1', () => {
       purpose: 'ANTI_CC',
       targetItemId: 2,
       enemyHeroIds: [99],
-      enemyItemIds: [9001],
+            enemyItemIds: [9001],
     });
     expect(result.strategyPlan.situationalDecision?.targetItemId).toBe(2);
     expect(result.recommendedBuild.find((entry) => entry.itemId === 2)?.status).toBe('NEXT');
@@ -129,7 +129,7 @@ describe('strategy-first situational integration v1', () => {
       purpose: 'COUNTER_ENEMY_HEROES',
       targetItemId: 3,
       enemyHeroIds: [99],
-    });
+          });
     expect(result.contract.activeSituationalDecision?.reasonCodes).toContain('MATCHUP_DISCOVERY_OUTSIDE_SKELETON');
   });
 });

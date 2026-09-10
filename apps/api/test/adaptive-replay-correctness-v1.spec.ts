@@ -53,6 +53,7 @@ function decision(ownedItemIds: readonly number[] = [1, 99]): AdaptiveReplayDeci
     rulesetId: 'ruleset-a',
     localSteamId: 'steam-a',
     enemyHeroIds: [20, 21],
+    enemyLiveStates: [],
     slots: {
       baseSlots: 3,
       baseSlotsByType: { weapon: 1, vitality: 1, spirit: 1 },
