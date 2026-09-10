@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import * as puppeteer from 'puppeteer-core';
 import { DeadlockLiveModule } from '../deadlock-live/deadlock-live.module';
 import { AdaptiveRecommendationDecisionV1Entity } from '../deadlock-live/entities/adaptive-recommendation-decision-v1.entity';
+import { BuildArchetypeMatchLockV2Entity } from '../deadlock-live/entities/build-archetype-match-lock-v2.entity';
 import { BuildArchetypeSnapshotV2Entity } from '../deadlock-live/entities/build-archetype-snapshot-v2.entity';
 import { BuildStrategySnapshotV1Entity } from '../deadlock-live/entities/build-strategy-snapshot-v1.entity';
 import { MatchPlayer } from '../deadlock-live/entities/match-player.entity';
@@ -30,6 +31,8 @@ import { BuildArchetypeMinerV1Service } from './build-archetype-miner-v1.service
 import { BuildArchetypeMinerV2Service } from './build-archetype-miner-v2.service';
 import { BuildArchetypeQualityGateV2Service } from './build-archetype-quality-gate-v2.service';
 import { BuildArchetypeRefreshV2Service } from './build-archetype-refresh-v2.service';
+import { BuildArchetypeSelectorV2Service } from './build-archetype-selector-v2.service';
+import { BuildArchetypeSessionV2Service } from './build-archetype-session-v2.service';
 import { BuildArchetypeSnapshotStoreV2Service } from './build-archetype-snapshot-store-v2.service';
 import { BuildContractV1Service } from './build-contract-v1.service';
 import { BuildInvestmentPolicyV1Service } from './build-investment-policy-v1.service';
@@ -90,6 +93,7 @@ import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-
       StatlockerVsHeroWpaRowV1Entity,
       AdaptiveRecommendationDecisionV1Entity,
       BuildArchetypeSnapshotV2Entity,
+      BuildArchetypeMatchLockV2Entity,
       BuildStrategySnapshotV1Entity,
       MatchPlayer,
     ]),
@@ -114,6 +118,8 @@ import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-
     BuildArchetypeQualityGateV2Service,
     BuildArchetypeSnapshotStoreV2Service,
     BuildArchetypeRefreshV2Service,
+    BuildArchetypeSelectorV2Service,
+    BuildArchetypeSessionV2Service,
     StatlockerRefreshService,
     RecommendationEconomyRulesStoreV1Service,
     AdaptiveDecisionStateV1Service,
@@ -169,6 +175,8 @@ import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-
     RecommendationEconomyRulesStoreV1Service,
     BuildArchetypeRefreshV2Service,
     BuildArchetypeSnapshotStoreV2Service,
+    BuildArchetypeSelectorV2Service,
+    BuildArchetypeSessionV2Service,
     BuildStrategyRegistryV1Service,
     BuildStrategySnapshotStoreV1Service,
     BuildStrategyMiningPipelineV1Service,

@@ -7,6 +7,13 @@ export interface BuildProfileSimilarityWeightsV2 {
   timingAgreement: number;
 }
 
+export interface BuildArchetypeSelectionRoleWeightsV2 {
+  CORE: number;
+  FREQUENT: number;
+  SITUATIONAL: number;
+  FLEX: number;
+}
+
 export interface StatlockerBuildV2Config {
   profileLinkSimilarity: number;
   minClusterSize: number;
@@ -22,6 +29,10 @@ export interface StatlockerBuildV2Config {
   inferredChoiceMaxCooccurrence: number;
   inferredChoiceMaxTimingGapS: number;
   inferredChoiceMinRelationshipStrength: number;
+  archetypeSelectionSamplePrior: number;
+  archetypeSelectionRoleWeights: BuildArchetypeSelectionRoleWeightsV2;
+  offlineArchetypeSupportWeight: number;
+  offlineArchetypeCoherenceWeight: number;
 }
 
 export const STATLOCKER_BUILD_V2_CONFIG: Readonly<StatlockerBuildV2Config> = Object.freeze({
@@ -46,4 +57,13 @@ export const STATLOCKER_BUILD_V2_CONFIG: Readonly<StatlockerBuildV2Config> = Obj
   inferredChoiceMaxCooccurrence: 0.25,
   inferredChoiceMaxTimingGapS: 360,
   inferredChoiceMinRelationshipStrength: 0.50,
+  archetypeSelectionSamplePrior: 500,
+  archetypeSelectionRoleWeights: Object.freeze({
+    CORE: 1,
+    FREQUENT: 0.75,
+    SITUATIONAL: 0.35,
+    FLEX: 0.20,
+  }),
+  offlineArchetypeSupportWeight: 0.60,
+  offlineArchetypeCoherenceWeight: 0.40,
 });
