@@ -69,6 +69,25 @@ describe('Build debugger V2 HTTP API', () => {
     restoreEnv('NODE_ENV', previousNodeEnv);
   });
 
+  it('serves a no-store browser UI shell and client asset without requiring an authenticated data session', async () => {
+    const htmlResponse = await fetch(`${baseUrl}/debug/build-v2`);
+    expect(htmlResponse.status).toBe(200);
+    expect(htmlResponse.headers.get('content-type')).toContain('text/html');
+    expect(htmlResponse.headers.get('cache-control')).toContain('no-store');
+    const html = await htmlResponse.text();
+    expect(html).toContain('id="debugLoginForm"');
+    expect(html).toContain('id="activeMatchSelect"');
+    expect(html).toContain('id="traceStages"');
+    expect(html).toContain('id="fullBuildPanel"');
+    expect(html).toContain('id="traceRevision"');
+
+    const clientResponse = await fetch(`${baseUrl}/debug/build-v2/client.js`);
+    expect(clientResponse.status).toBe(200);
+    expect(clientResponse.headers.get('content-type')).toContain('application/javascript');
+    expect(clientResponse.headers.get('cache-control')).toContain('no-store');
+    expect(await clientResponse.text()).toContain('EventSource');
+  });
+
   it('rejects unauthenticated debugger data routes', async () => {
     expect((await fetch(`${baseUrl}/debug/build-v2/matches`)).status).toBe(401);
     expect((await fetch(`${baseUrl}/debug/build-v2/matches/${MATCH_ID}`)).status).toBe(401);
