@@ -81,6 +81,9 @@ export interface BuildArchetypeQualityV2 {
 export interface BuildArchetypeV2 {
   archetypeId: string;
   heroId: number;
+  rulesetVersion: string;
+  catalogSha256: string;
+  statlockerPatchId: string;
   sourceProfileAccountIds: readonly string[];
   items: readonly BuildArchetypeItemV2[];
   groups: readonly BuildArchetypeGroupV2[];
