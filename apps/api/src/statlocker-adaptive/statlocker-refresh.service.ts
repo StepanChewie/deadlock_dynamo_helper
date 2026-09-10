@@ -8,6 +8,7 @@ import {
   StatlockerCollectedDatasetV1,
   StatlockerCollectionTargetV1,
 } from './statlocker-browser-collector.service';
+import { BuildArchetypeRefreshV2Service } from './build-archetype-refresh-v2.service';
 import { BuildSkeletonService } from './build-skeleton.service';
 import { STATLOCKER_HERO_IDS_V1 } from './statlocker-hero-pool';
 import { StatlockerNormalizerService } from './statlocker-normalizer.service';
@@ -76,6 +77,7 @@ export class StatlockerRefreshService {
     @Optional() private readonly vsHeroWpaRowNormalizer?: StatlockerVsHeroWpaRowNormalizerV1Service,
     @Optional() private readonly vsHeroWpaPublisher?: StatlockerVsHeroWpaPublisherV1Service,
     @Optional() private readonly observability?: AdaptiveRecommendationObservabilityV1Service,
+    @Optional() private readonly archetypeRefreshV2?: BuildArchetypeRefreshV2Service,
   ) {}
 
   observeGameIdentity(identity: StatlockerGameIdentityV1, _nowMs = Date.now()): void {
@@ -229,6 +231,12 @@ export class StatlockerRefreshService {
             await this.publishObservation(normalized, identity, dataset);
           }
         }
+
+        await this.archetypeRefreshV2?.refreshHero(heroId, {
+          rulesetVersion: identity.rulesetVersion,
+          catalogSha256: identity.catalogSha256,
+          statlockerPatchId: leaderboardResult.statlockerPatchId,
+        }, nowMs);
 
         await this.skeleton?.rebuild({
           heroId,

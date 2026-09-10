@@ -25,8 +25,11 @@ import { AdaptiveRecommendationObservabilityV1Service } from './adaptive-recomme
 import { AdaptiveRecommendationV1Controller } from './adaptive-recommendation-v1.controller';
 import { AdaptiveRecommendationV1Service } from './adaptive-recommendation-v1.service';
 import { AdaptiveReplayV1Service } from './adaptive-replay-v1.service';
+import { BuildArchetypeCompilerV2Service } from './build-archetype-compiler-v2.service';
 import { BuildArchetypeMinerV1Service } from './build-archetype-miner-v1.service';
+import { BuildArchetypeMinerV2Service } from './build-archetype-miner-v2.service';
 import { BuildArchetypeQualityGateV2Service } from './build-archetype-quality-gate-v2.service';
+import { BuildArchetypeRefreshV2Service } from './build-archetype-refresh-v2.service';
 import { BuildArchetypeSnapshotStoreV2Service } from './build-archetype-snapshot-store-v2.service';
 import { BuildContractV1Service } from './build-contract-v1.service';
 import { BuildInvestmentPolicyV1Service } from './build-investment-policy-v1.service';
@@ -104,9 +107,14 @@ import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-
     StatlockerVsHeroWpaPublisherV1Service,
     StatlockerVsHeroWpaRepositoryV1Service,
     StatlockerVsHeroWpaRowNormalizerV1Service,
-    StatlockerRefreshService,
     StatlockerEvidenceService,
     BuildSkeletonService,
+    BuildArchetypeMinerV2Service,
+    BuildArchetypeCompilerV2Service,
+    BuildArchetypeQualityGateV2Service,
+    BuildArchetypeSnapshotStoreV2Service,
+    BuildArchetypeRefreshV2Service,
+    StatlockerRefreshService,
     RecommendationEconomyRulesStoreV1Service,
     AdaptiveDecisionStateV1Service,
     EnemyThreatV1Service,
@@ -122,8 +130,6 @@ import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-
     HistoricalPlannerTrajectoryExtractorV2Service,
     HistoricalBuildTrajectorySourceV2Service,
     BuildArchetypeMinerV1Service,
-    BuildArchetypeQualityGateV2Service,
-    BuildArchetypeSnapshotStoreV2Service,
     BuildStrategyValidatorV1Service,
     BuildStrategyCompilerV1Service,
     BuildStrategyFeasibilityV1Service,
@@ -161,6 +167,7 @@ import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-
     StatlockerRefreshService,
     StatlockerEvidenceService,
     RecommendationEconomyRulesStoreV1Service,
+    BuildArchetypeRefreshV2Service,
     BuildArchetypeSnapshotStoreV2Service,
     BuildStrategyRegistryV1Service,
     BuildStrategySnapshotStoreV1Service,
