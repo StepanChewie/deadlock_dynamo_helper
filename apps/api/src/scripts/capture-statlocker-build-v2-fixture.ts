@@ -1,8 +1,7 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { In, Repository } from 'typeorm';
 import { AppDataSource } from '../database/data-source';
-import { AdaptiveRecommendationDecisionV1Entity } from '../deadlock-live/entities/adaptive-recommendation-decision-v1.entity';
 import { RecommendationItemCatalogItemV1 } from '../deadlock-live/entities/recommendation-item-catalog-item-v1.entity';
 import { RecommendationItemCatalogRecipeV1 } from '../deadlock-live/entities/recommendation-item-catalog-recipe-v1.entity';
 import { RecommendationItemCatalogVersionV1 } from '../deadlock-live/entities/recommendation-item-catalog-version-v1.entity';
@@ -17,6 +16,7 @@ import {
 
 const REQUIRED_PROFILE_COUNT = 10;
 const REQUIRED_ENEMY_ROSTER_SIZE = 6;
+const MAX_IDENTITY_CANDIDATES = 50;
 
 type StatlockerFixtureDataset =
   | 'WPA_PATCH_DATA'
@@ -25,9 +25,25 @@ type StatlockerFixtureDataset =
   | 'PRO_BUILD_ANALYSIS';
 
 export interface CaptureStatlockerBuildV2FixtureArgs {
-  heroId: number;
-  matchId: string;
+  request: string;
   out: string;
+}
+
+export interface StatlockerBuildV2RequestContext {
+  matchId: string;
+  heroId: number;
+  gameTimeSec: number;
+  ownedItemIds: readonly number[];
+  spendableSouls: number;
+  localSteamId?: string;
+  allyHeroIds?: readonly number[];
+  enemyHeroIds: readonly number[];
+  enemyLiveStates?: readonly Record<string, unknown>[];
+  allyItemIds?: readonly number[];
+  enemyItemIds?: readonly number[];
+  unlockedFlexSlots?: number;
+  totalCapacity: number;
+  stateRevision: string;
 }
 
 interface FixtureIdentityV2 {
@@ -84,46 +100,6 @@ interface FixtureVsHeroWpaRowV2 {
   meanWpa?: number;
 }
 
-interface FixtureReplayDecisionV2 {
-  state: {
-    decisionId: string;
-    matchId: string;
-    playerSlot: number;
-    gameTimeSec: number;
-    rulesetId: string;
-    heroId: number;
-    ownedItemIds: readonly number[];
-    spendableSouls: Record<string, unknown>;
-    shopOpportunity: Record<string, unknown>;
-  };
-  catalogVersionId?: string;
-  catalogSha256?: string;
-  rulesetId?: string;
-  allyHeroIds?: readonly number[];
-  enemyHeroIds: readonly number[];
-  enemyHeroes?: readonly Record<string, unknown>[];
-  enemyLiveStates?: readonly Record<string, unknown>[];
-  allyItemIds?: readonly number[];
-  enemyItemIds?: readonly number[];
-  ourTeamSouls?: number;
-  enemyTeamSouls?: number;
-  slots?: Record<string, unknown>;
-  investment?: Record<string, unknown>;
-  economyRules?: Record<string, unknown>;
-  economyRulesEvidence?: string;
-  stateRevision?: string;
-}
-
-interface FixtureLiveReplayV2 {
-  decisionId: string;
-  matchId: string;
-  decidedAt: string;
-  replayInput: {
-    decision: FixtureReplayDecisionV2;
-    evidence?: Record<string, unknown>;
-  };
-}
-
 interface FixtureSnapshotProvenanceV2 {
   dataset: string;
   scopeKey: string;
@@ -133,8 +109,7 @@ interface FixtureSnapshotProvenanceV2 {
 }
 
 export interface StatlockerBuildV2FixtureSourceInput {
-  heroId: number;
-  requestedMatchId: string;
+  request: StatlockerBuildV2RequestContext;
   identity: FixtureIdentityV2;
   leaderboard: StatlockerHeroLeaderboardV1;
   proBuildAnalyses: readonly StatlockerProBuildAnalysisV1[];
@@ -146,22 +121,21 @@ export interface StatlockerBuildV2FixtureSourceInput {
     items: readonly FixtureCatalogItemV2[];
     recipes: readonly FixtureCatalogRecipeV2[];
   };
-  liveReplay: FixtureLiveReplayV2;
   snapshotProvenance?: readonly FixtureSnapshotProvenanceV2[];
 }
 
 export interface StatlockerBuildV2Fixture {
   metadata: {
     contract: 'STATLOCKER_BUILD_V2_REAL_FIXTURE_1';
-    source: 'EXISTING_DATABASE';
+    source: 'STATLOCKER_ONLY';
+    buildEvidenceSource: 'STATLOCKER_ONLY';
+    liveContextSource: 'REQUEST';
     heroId: number;
-    requestedMatchId: string;
     matchId: string;
-    decisionId: string;
-    decidedAt: string;
     identity: FixtureIdentityV2;
     snapshotProvenance: readonly FixtureSnapshotProvenanceV2[];
   };
+  request: StatlockerBuildV2RequestContext;
   leaderboard: StatlockerHeroLeaderboardV1;
   proBuildAnalyses: readonly StatlockerProBuildAnalysisV1[];
   wpaPatchData: StatlockerWpaPatchDataV1;
@@ -172,7 +146,6 @@ export interface StatlockerBuildV2Fixture {
     items: readonly FixtureCatalogItemV2[];
     recipes: readonly FixtureCatalogRecipeV2[];
   };
-  liveState: FixtureReplayDecisionV2;
 }
 
 export function parseCaptureStatlockerBuildV2FixtureArgs(
@@ -188,16 +161,16 @@ export function parseCaptureStatlockerBuildV2FixtureArgs(
     index += 1;
   }
 
-  const heroId = Number(values.get('heroId'));
-  const matchId = values.get('matchId')?.trim();
+  const request = values.get('request')?.trim();
   const out = values.get('out')?.trim();
-  if (!Number.isSafeInteger(heroId) || heroId <= 0) {
-    throw new Error('Fixture capture requires a positive integer --heroId');
-  }
-  if (!matchId) throw new Error('Fixture capture requires --matchId');
-  if (!/^\d+$/.test(matchId)) throw new Error('Fixture capture matchId must contain decimal digits only');
+  if (!request) throw new Error('Fixture capture requires --request');
   if (!out) throw new Error('Fixture capture requires --out');
-  return { heroId, matchId, out };
+
+  const unexpected = [...values.keys()].filter((key) => key !== 'request' && key !== 'out');
+  if (unexpected.length > 0) {
+    throw new Error(`Unexpected fixture capture option(s): ${unexpected.map((key) => `--${key}`).join(', ')}`);
+  }
+  return { request, out };
 }
 
 export function statlockerFixtureScope(
@@ -222,15 +195,17 @@ export function resolveFixtureCatalogContentVersionId(
 export function buildStatlockerBuildV2Fixture(
   input: StatlockerBuildV2FixtureSourceInput,
 ): StatlockerBuildV2Fixture {
-  validateSourceIdentity(input);
-  const topTen = selectTopTen(input.leaderboard, input.heroId);
+  const request = normalizeRequestContext(input.request);
+  validateSourceIdentity(input, request);
+  const heroId = request.heroId;
+  const topTen = selectTopTen(input.leaderboard, heroId);
   if (topTen.length !== REQUIRED_PROFILE_COUNT) {
     throw new Error(`Fixture capture requires exactly ${REQUIRED_PROFILE_COUNT} ranked HERO_LEADERBOARD profiles`);
   }
 
   const analysisByAccount = new Map<string, StatlockerProBuildAnalysisV1>();
   for (const analysis of input.proBuildAnalyses) {
-    if (analysis.heroId !== input.heroId || !analysis.accountId) continue;
+    if (analysis.heroId !== heroId || !analysis.accountId) continue;
     if (!analysisByAccount.has(analysis.accountId)) analysisByAccount.set(analysis.accountId, analysis);
   }
   const proBuildAnalyses = topTen
@@ -240,29 +215,29 @@ export function buildStatlockerBuildV2Fixture(
     throw new Error(`Fixture capture requires exactly ${REQUIRED_PROFILE_COUNT} ranked PRO_BUILD_ANALYSIS profiles`);
   }
 
-  const liveState = sanitizeLiveReplayDecision(input.liveReplay, input.heroId, input.requestedMatchId);
-  const enemyHeroIds = uniqueSortedPositiveIntegers(liveState.enemyHeroIds);
+  const enemyHeroIds = uniqueSortedPositiveIntegers(request.enemyHeroIds);
   if (enemyHeroIds.length !== REQUIRED_ENEMY_ROSTER_SIZE) {
-    throw new Error(`Fixture capture requires a complete enemy roster of ${REQUIRED_ENEMY_ROSTER_SIZE} unique heroes`);
+    throw new Error(`Fixture capture requires a complete enemy roster of ${REQUIRED_ENEMY_ROSTER_SIZE} unique heroes in the request`);
   }
 
   const wpaPatchData: StatlockerWpaPatchDataV1 = {
     patchId: input.wpaPatchData.patchId,
     items: input.wpaPatchData.items
-      .filter((item) => item.heroId === input.heroId)
+      .filter((item) => item.heroId === heroId)
       .map(cloneJson)
       .sort((left, right) => left.itemId - right.itemId),
   };
   const t4Chains: StatlockerT4ChainsV1 = {
     chains: input.t4Chains.chains
-      .filter((chain) => chain.heroId === input.heroId)
+      .filter((chain) => chain.heroId === heroId)
       .map((chain) => ({ ...cloneJson(chain), itemIds: [...chain.itemIds].sort((a, b) => a - b) }))
       .sort(compareT4Chains),
   };
+
   const enemySet = new Set(enemyHeroIds);
   const vsHeroWpaRows = input.vsHeroWpaRows
     .filter((row) =>
-      row.heroId === input.heroId &&
+      row.heroId === heroId &&
       row.statlockerPatchId === input.identity.statlockerPatchId &&
       row.rulesetVersion === input.identity.rulesetVersion &&
       row.catalogSha256.toLowerCase() === input.identity.catalogSha256.toLowerCase() &&
@@ -270,13 +245,16 @@ export function buildStatlockerBuildV2Fixture(
     )
     .map(cloneJson)
     .sort(compareVsHeroRows);
+  if (vsHeroWpaRows.length === 0) {
+    throw new Error(`Fixture capture requires nonzero compatible VS_HERO_WPA rows for hero ${heroId}`);
+  }
 
   const relevantItemIds = collectRelevantItemIds({
     proBuildAnalyses,
     wpaPatchData,
     t4Chains,
     vsHeroWpaRows,
-    liveState,
+    request,
     recipes: input.catalog.recipes,
   });
   const catalogItems = input.catalog.items
@@ -298,20 +276,20 @@ export function buildStatlockerBuildV2Fixture(
   return {
     metadata: {
       contract: 'STATLOCKER_BUILD_V2_REAL_FIXTURE_1',
-      source: 'EXISTING_DATABASE',
-      heroId: input.heroId,
-      requestedMatchId: input.requestedMatchId,
-      matchId: liveState.state.matchId,
-      decisionId: input.liveReplay.decisionId,
-      decidedAt: input.liveReplay.decidedAt,
+      source: 'STATLOCKER_ONLY',
+      buildEvidenceSource: 'STATLOCKER_ONLY',
+      liveContextSource: 'REQUEST',
+      heroId,
+      matchId: request.matchId,
       identity: {
         ...input.identity,
         catalogSha256: input.identity.catalogSha256.toLowerCase(),
       },
       snapshotProvenance,
     },
+    request,
     leaderboard: {
-      heroId: input.heroId,
+      heroId,
       profiles: topTen.map(cloneJson),
     },
     proBuildAnalyses: proBuildAnalyses.map(cloneJson),
@@ -323,123 +301,169 @@ export function buildStatlockerBuildV2Fixture(
       items: catalogItems,
       recipes: catalogRecipes,
     },
-    liveState,
   };
 }
 
 async function main(): Promise<void> {
   const args = parseCaptureStatlockerBuildV2FixtureArgs(process.argv.slice(2));
+  const request = await loadRequestContext(args.request);
   await AppDataSource.initialize();
   try {
-    const source = await loadFixtureSourceFromDatabase(args);
+    const source = await loadStatlockerFixtureSourceFromDatabase(request);
     const fixture = buildStatlockerBuildV2Fixture(source);
     const outputPath = resolve(process.cwd(), args.out);
     await mkdir(dirname(outputPath), { recursive: true });
     await writeFile(outputPath, `${JSON.stringify(fixture, null, 2)}\n`, 'utf8');
     process.stdout.write(
-      `Captured Statlocker Build V2 fixture: hero=${fixture.metadata.heroId} match=${fixture.metadata.matchId} profiles=${fixture.proBuildAnalyses.length} wpaRows=${fixture.vsHeroWpaRows.length} out=${outputPath}\n`,
+      `Captured Statlocker-only Build V2 fixture: hero=${fixture.metadata.heroId} match=${fixture.metadata.matchId} profiles=${fixture.proBuildAnalyses.length} wpaRows=${fixture.vsHeroWpaRows.length} out=${outputPath}\n`,
     );
   } finally {
     if (AppDataSource.isInitialized) await AppDataSource.destroy();
   }
 }
 
-async function loadFixtureSourceFromDatabase(
-  args: CaptureStatlockerBuildV2FixtureArgs,
+async function loadRequestContext(path: string): Promise<StatlockerBuildV2RequestContext> {
+  const inputPath = resolve(process.cwd(), path);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(await readFile(inputPath, 'utf8')) as unknown;
+  } catch (error) {
+    throw new Error(`Fixture capture could not read request ${inputPath}: ${describeError(error)}`);
+  }
+  return normalizeRequestContext(parsed);
+}
+
+async function loadStatlockerFixtureSourceFromDatabase(
+  request: StatlockerBuildV2RequestContext,
 ): Promise<StatlockerBuildV2FixtureSourceInput> {
-  const replayRepo = AppDataSource.getRepository(AdaptiveRecommendationDecisionV1Entity);
   const snapshotRepo = AppDataSource.getRepository(StatlockerEvidenceSnapshotV1Entity);
   const wpaRepo = AppDataSource.getRepository(StatlockerVsHeroWpaRowV1Entity);
   const catalogVersionRepo = AppDataSource.getRepository(RecommendationItemCatalogVersionV1);
   const catalogItemRepo = AppDataSource.getRepository(RecommendationItemCatalogItemV1);
   const catalogRecipeRepo = AppDataSource.getRepository(RecommendationItemCatalogRecipeV1);
-
-  const liveReplay = await loadLiveReplay(replayRepo, args.heroId, args.matchId);
-  const decision = parseReplayDecision(liveReplay.replayInput.decision);
-  const evidence = liveReplay.replayInput.evidence ?? {};
-  const statlockerPatchId = nonEmptyString(evidence.statlockerPatchId, 'saved replay Statlocker patch identity');
-  const rulesetVersion = nonEmptyString(decision.rulesetId ?? decision.state.rulesetId, 'saved replay ruleset identity');
-  const catalogSha256 = sha256String(decision.catalogSha256, 'saved replay catalog identity');
-  const identity: FixtureIdentityV2 = { rulesetVersion, catalogSha256, statlockerPatchId };
-  const scopeInput = { heroId: args.heroId, statlockerPatchId };
-
-  const leaderboardRow = await loadLatestSnapshot(snapshotRepo, {
-    dataset: 'HERO_LEADERBOARD',
-    scopeKey: statlockerFixtureScope('HERO_LEADERBOARD', scopeInput),
-    ...identity,
+  const scopeKey = statlockerFixtureScope('HERO_LEADERBOARD', {
+    heroId: request.heroId,
+    statlockerPatchId: 'identity-from-statlocker',
   });
-  const leaderboard = parseLeaderboard(leaderboardRow.payload, args.heroId);
-  const topTen = selectTopTen(leaderboard, args.heroId);
-  if (topTen.length !== REQUIRED_PROFILE_COUNT) {
-    throw new Error(`Fixture capture requires exactly ${REQUIRED_PROFILE_COUNT} ranked HERO_LEADERBOARD profiles for hero ${args.heroId}`);
+  const leaderboardRows = await snapshotRepo.find({
+    where: { dataset: 'HERO_LEADERBOARD', scopeKey },
+    order: { fetchedAt: 'DESC', snapshotId: 'DESC' },
+    take: MAX_IDENTITY_CANDIDATES,
+  });
+  if (leaderboardRows.length === 0) {
+    throw new Error(`Fixture capture found no Statlocker HERO_LEADERBOARD snapshots for hero ${request.heroId}`);
   }
 
+  const failures: string[] = [];
+  for (const leaderboardRow of leaderboardRows) {
+    try {
+      return await loadExactStatlockerIdentity({
+        request,
+        leaderboardRow,
+        snapshotRepo,
+        wpaRepo,
+        catalogVersionRepo,
+        catalogItemRepo,
+        catalogRecipeRepo,
+      });
+    } catch (error) {
+      failures.push(`${leaderboardRow.snapshotId}: ${describeError(error)}`);
+    }
+  }
+
+  throw new Error(
+    `Fixture capture could not prove one complete Statlocker-only identity for hero ${request.heroId}: ${failures.slice(0, 5).join(' | ')}`,
+  );
+}
+
+async function loadExactStatlockerIdentity(input: {
+  request: StatlockerBuildV2RequestContext;
+  leaderboardRow: StatlockerEvidenceSnapshotV1Entity;
+  snapshotRepo: Repository<StatlockerEvidenceSnapshotV1Entity>;
+  wpaRepo: Repository<StatlockerVsHeroWpaRowV1Entity>;
+  catalogVersionRepo: Repository<RecommendationItemCatalogVersionV1>;
+  catalogItemRepo: Repository<RecommendationItemCatalogItemV1>;
+  catalogRecipeRepo: Repository<RecommendationItemCatalogRecipeV1>;
+}): Promise<StatlockerBuildV2FixtureSourceInput> {
+  const heroId = input.request.heroId;
+  const identity: FixtureIdentityV2 = {
+    rulesetVersion: nonEmptyString(input.leaderboardRow.rulesetVersion, 'Statlocker ruleset identity'),
+    catalogSha256: sha256String(input.leaderboardRow.catalogSha256, 'Statlocker catalog identity'),
+    statlockerPatchId: nonEmptyString(input.leaderboardRow.statlockerPatchId, 'Statlocker patch identity'),
+  };
+  const leaderboard = parseLeaderboard(input.leaderboardRow.payload, heroId);
+  const topTen = selectTopTen(leaderboard, heroId);
+  if (topTen.length !== REQUIRED_PROFILE_COUNT) {
+    throw new Error(`requires exactly ${REQUIRED_PROFILE_COUNT} ranked HERO_LEADERBOARD profiles`);
+  }
+
+  const scopeInput = { heroId, statlockerPatchId: identity.statlockerPatchId };
   const profileRows: StatlockerEvidenceSnapshotV1Entity[] = [];
   const proBuildAnalyses: StatlockerProBuildAnalysisV1[] = [];
   for (const profile of topTen) {
-    const row = await loadLatestSnapshot(snapshotRepo, {
+    const row = await loadLatestSnapshot(input.snapshotRepo, {
       dataset: 'PRO_BUILD_ANALYSIS',
       scopeKey: statlockerFixtureScope('PRO_BUILD_ANALYSIS', { ...scopeInput, accountId: profile.accountId }),
       ...identity,
     });
     profileRows.push(row);
-    proBuildAnalyses.push(parseProBuild(row.payload, args.heroId, profile.accountId));
+    proBuildAnalyses.push(parseProBuild(row.payload, heroId, profile.accountId));
   }
 
   const [wpaPatchRow, t4Row] = await Promise.all([
-    loadLatestSnapshot(snapshotRepo, {
+    loadLatestSnapshot(input.snapshotRepo, {
       dataset: 'WPA_PATCH_DATA',
       scopeKey: statlockerFixtureScope('WPA_PATCH_DATA', scopeInput),
       ...identity,
     }),
-    loadLatestSnapshot(snapshotRepo, {
+    loadLatestSnapshot(input.snapshotRepo, {
       dataset: 'T4_CHAINS',
       scopeKey: statlockerFixtureScope('T4_CHAINS', scopeInput),
       ...identity,
     }),
   ]);
-  const enemyHeroIds = uniqueSortedPositiveIntegers(decision.enemyHeroIds);
+
+  const enemyHeroIds = uniqueSortedPositiveIntegers(input.request.enemyHeroIds);
   if (enemyHeroIds.length !== REQUIRED_ENEMY_ROSTER_SIZE) {
-    throw new Error(`Fixture capture requires a complete enemy roster of ${REQUIRED_ENEMY_ROSTER_SIZE} unique heroes in saved replay ${liveReplay.decisionId}`);
+    throw new Error(`request requires a complete enemy roster of ${REQUIRED_ENEMY_ROSTER_SIZE} unique heroes`);
   }
-  const vsHeroWpaRows = await wpaRepo.find({
+  const vsHeroWpaRows = await input.wpaRepo.find({
     where: {
       statlockerPatchId: identity.statlockerPatchId,
       rulesetVersion: identity.rulesetVersion,
       catalogSha256: identity.catalogSha256,
-      heroId: args.heroId,
+      heroId,
       enemyHeroId: In(enemyHeroIds),
     },
     order: { enemyHeroId: 'ASC', itemId: 'ASC', rankBucket: 'ASC', snapshotId: 'ASC' },
   });
   if (vsHeroWpaRows.length === 0) {
-    throw new Error(`Fixture capture found no compatible VS_HERO_WPA rows for hero ${args.heroId} and match ${args.matchId}`);
+    throw new Error(`found no compatible Statlocker VS_HERO_WPA rows for hero ${heroId}`);
   }
 
-  const catalogVersion = await catalogVersionRepo.findOne({
+  const catalogVersion = await input.catalogVersionRepo.findOne({
     where: { rulesetKey: identity.rulesetVersion, payloadSha256: identity.catalogSha256 },
   });
   if (!catalogVersion) {
-    throw new Error(`Fixture capture could not resolve catalog ${identity.catalogSha256} for ruleset ${identity.rulesetVersion}`);
+    throw new Error(`could not resolve legality catalog ${identity.catalogSha256} for ruleset ${identity.rulesetVersion}`);
   }
   const contentCatalogVersionId = resolveFixtureCatalogContentVersionId(catalogVersion);
   const [catalogItems, catalogRecipes] = await Promise.all([
-    catalogItemRepo.find({
+    input.catalogItemRepo.find({
       where: { catalogVersionId: contentCatalogVersionId },
       order: { itemId: 'ASC' },
     }),
-    catalogRecipeRepo.find({
+    input.catalogRecipeRepo.find({
       where: { catalogVersionId: contentCatalogVersionId },
       order: { parentItemId: 'ASC', componentOrder: 'ASC', componentItemId: 'ASC' },
     }),
   ]);
   if (catalogItems.length === 0) {
-    throw new Error(`Fixture capture found no catalog items for content catalog ${contentCatalogVersionId}`);
+    throw new Error(`found no legality catalog items for content catalog ${contentCatalogVersionId}`);
   }
 
   return {
-    heroId: args.heroId,
-    requestedMatchId: args.matchId,
+    request,
     identity,
     leaderboard,
     proBuildAnalyses,
@@ -451,43 +475,13 @@ async function loadFixtureSourceFromDatabase(
       items: catalogItems.map(toCatalogItemFixture),
       recipes: catalogRecipes.map(toCatalogRecipeFixture),
     },
-    liveReplay,
     snapshotProvenance: [
-      leaderboardRow,
+      input.leaderboardRow,
       ...profileRows,
       wpaPatchRow,
       t4Row,
     ].map(toSnapshotProvenance),
   };
-}
-
-async function loadLiveReplay(
-  repository: Repository<AdaptiveRecommendationDecisionV1Entity>,
-  heroId: number,
-  matchId: string,
-): Promise<FixtureLiveReplayV2> {
-  const rows = await repository.find({
-    where: { matchId },
-    order: { decidedAt: 'DESC', decisionId: 'DESC' },
-  });
-  for (const row of rows) {
-    const replayInput = row.replayInput as unknown as FixtureLiveReplayV2['replayInput'];
-    if (!replayInput || typeof replayInput !== 'object') continue;
-    try {
-      const decision = parseReplayDecision(replayInput.decision);
-      if (decision.state.heroId !== heroId || decision.state.matchId !== matchId) continue;
-      if (uniqueSortedPositiveIntegers(decision.enemyHeroIds).length !== REQUIRED_ENEMY_ROSTER_SIZE) continue;
-      return {
-        decisionId: row.decisionId,
-        matchId: row.matchId,
-        decidedAt: row.decidedAt.toISOString(),
-        replayInput: cloneJson(replayInput),
-      };
-    } catch {
-      continue;
-    }
-  }
-  throw new Error(`Fixture capture could not prove a complete enemy roster for hero ${heroId} in saved match ${matchId}`);
 }
 
 async function loadLatestSnapshot(
@@ -507,7 +501,7 @@ async function loadLatestSnapshot(
   });
   const row = rows[0];
   if (!row) {
-    throw new Error(`Fixture capture missing ${input.dataset} snapshot for ${input.scopeKey} at exact ruleset/catalog/patch identity`);
+    throw new Error(`missing ${input.dataset} snapshot for ${input.scopeKey} at exact Statlocker identity`);
   }
   return row;
 }
@@ -534,59 +528,59 @@ function selectTopTen(
   return result;
 }
 
-function sanitizeLiveReplayDecision(
-  liveReplay: FixtureLiveReplayV2,
-  heroId: number,
-  requestedMatchId: string,
-): FixtureReplayDecisionV2 {
-  const decision = parseReplayDecision(liveReplay.replayInput.decision);
-  if (decision.state.heroId !== heroId) {
-    throw new Error(`Fixture capture saved replay hero ${decision.state.heroId} does not match requested hero ${heroId}`);
+function normalizeRequestContext(value: unknown): StatlockerBuildV2RequestContext {
+  if (!isRecord(value)) throw new Error('Fixture capture request must be a JSON object');
+  const matchId = nonEmptyString(value.matchId, 'request matchId');
+  const heroId = positiveInteger(value.heroId, 'request heroId');
+  const gameTimeSec = nonNegativeNumber(value.gameTimeSec, 'request gameTimeSec');
+  const spendableSouls = nonNegativeNumber(value.spendableSouls, 'request spendableSouls');
+  const totalCapacity = positiveInteger(value.totalCapacity, 'request totalCapacity');
+  const stateRevision = nonEmptyString(value.stateRevision, 'request stateRevision');
+  const enemyHeroIds = exactPositiveIntegerArray(value.enemyHeroIds, 'request enemyHeroIds');
+  if (enemyHeroIds.length !== REQUIRED_ENEMY_ROSTER_SIZE) {
+    throw new Error(`Fixture capture requires a complete enemy roster of ${REQUIRED_ENEMY_ROSTER_SIZE} unique heroes in the request`);
   }
-  if (decision.state.matchId !== requestedMatchId || liveReplay.matchId !== requestedMatchId) {
-    throw new Error(`Fixture capture saved replay match ${decision.state.matchId} does not match requested match ${requestedMatchId}`);
-  }
-  const enemyHeroIds = uniqueSortedPositiveIntegers(decision.enemyHeroIds);
-  const sanitizedEnemyHeroes = (decision.enemyHeroes ?? [])
-    .map((entry) => pickRecord(entry, ['heroId', 'heroName']))
-    .filter((entry) => typeof entry.heroId === 'number')
-    .sort((left, right) => Number(left.heroId) - Number(right.heroId));
-  const sanitizedEnemyLiveStates = (decision.enemyLiveStates ?? [])
-    .map((entry) => pickRecord(entry, [
-      'heroId', 'level', 'souls', 'kills', 'deaths', 'assists', 'heroDamage', 'health', 'maxHealth',
-    ]))
-    .filter((entry) => typeof entry.heroId === 'number')
-    .sort((left, right) => Number(left.heroId) - Number(right.heroId));
 
-  return {
-    state: {
-      decisionId: decision.state.decisionId,
-      matchId: decision.state.matchId,
-      playerSlot: decision.state.playerSlot,
-      gameTimeSec: decision.state.gameTimeSec,
-      rulesetId: decision.state.rulesetId,
-      heroId: decision.state.heroId,
-      ownedItemIds: uniqueSortedPositiveIntegers(decision.state.ownedItemIds),
-      spendableSouls: cloneJson(decision.state.spendableSouls),
-      shopOpportunity: cloneJson(decision.state.shopOpportunity),
-    },
-    catalogVersionId: decision.catalogVersionId,
-    catalogSha256: decision.catalogSha256,
-    rulesetId: decision.rulesetId,
-    allyHeroIds: uniqueSortedPositiveIntegers(decision.allyHeroIds ?? []),
+  const request: StatlockerBuildV2RequestContext = {
+    matchId,
+    heroId,
+    gameTimeSec,
+    ownedItemIds: optionalPositiveIntegerArray(value.ownedItemIds, 'request ownedItemIds'),
+    spendableSouls,
+    allyHeroIds: optionalPositiveIntegerArray(value.allyHeroIds, 'request allyHeroIds'),
     enemyHeroIds,
-    enemyHeroes: sanitizedEnemyHeroes,
-    enemyLiveStates: sanitizedEnemyLiveStates,
-    allyItemIds: uniqueSortedPositiveIntegers(decision.allyItemIds ?? []),
-    enemyItemIds: uniqueSortedPositiveIntegers(decision.enemyItemIds ?? []),
-    ourTeamSouls: decision.ourTeamSouls,
-    enemyTeamSouls: decision.enemyTeamSouls,
-    slots: decision.slots ? cloneJson(decision.slots) : undefined,
-    investment: decision.investment ? cloneJson(decision.investment) : undefined,
-    economyRules: decision.economyRules ? cloneJson(decision.economyRules) : undefined,
-    economyRulesEvidence: decision.economyRulesEvidence,
-    stateRevision: decision.stateRevision,
+    enemyLiveStates: normalizeEnemyLiveStates(value.enemyLiveStates, enemyHeroIds),
+    allyItemIds: optionalPositiveIntegerArray(value.allyItemIds, 'request allyItemIds'),
+    enemyItemIds: optionalPositiveIntegerArray(value.enemyItemIds, 'request enemyItemIds'),
+    totalCapacity,
+    stateRevision,
   };
+  if (value.localSteamId !== undefined) request.localSteamId = nonEmptyString(value.localSteamId, 'request localSteamId');
+  if (value.unlockedFlexSlots !== undefined) {
+    request.unlockedFlexSlots = nonNegativeInteger(value.unlockedFlexSlots, 'request unlockedFlexSlots');
+  }
+  return request;
+}
+
+function normalizeEnemyLiveStates(
+  value: unknown,
+  enemyHeroIds: readonly number[],
+): readonly Record<string, unknown>[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) throw new Error('Fixture capture request enemyLiveStates must be an array');
+  const enemySet = new Set(enemyHeroIds);
+  const allowedKeys = [
+    'steamId', 'playerName', 'heroId', 'heroName', 'level', 'souls', 'kills', 'deaths', 'assists',
+    'heroDamage', 'health', 'maxHealth',
+  ] as const;
+  return value
+    .map((entry) => {
+      if (!isRecord(entry)) throw new Error('Fixture capture request enemyLiveStates entries must be objects');
+      const heroId = positiveInteger(entry.heroId, 'request enemyLiveStates heroId');
+      if (!enemySet.has(heroId)) throw new Error(`Fixture capture enemyLiveStates contains hero ${heroId} outside enemyHeroIds`);
+      return pickRecord(entry, allowedKeys);
+    })
+    .sort((left, right) => Number(left.heroId) - Number(right.heroId));
 }
 
 function collectRelevantItemIds(input: {
@@ -594,7 +588,7 @@ function collectRelevantItemIds(input: {
   wpaPatchData: StatlockerWpaPatchDataV1;
   t4Chains: StatlockerT4ChainsV1;
   vsHeroWpaRows: readonly FixtureVsHeroWpaRowV2[];
-  liveState: FixtureReplayDecisionV2;
+  request: StatlockerBuildV2RequestContext;
   recipes: readonly FixtureCatalogRecipeV2[];
 }): Set<number> {
   const ids = new Set<number>();
@@ -602,9 +596,9 @@ function collectRelevantItemIds(input: {
   for (const item of input.wpaPatchData.items) ids.add(item.itemId);
   for (const chain of input.t4Chains.chains) for (const itemId of chain.itemIds) ids.add(itemId);
   for (const row of input.vsHeroWpaRows) ids.add(row.itemId);
-  for (const itemId of input.liveState.state.ownedItemIds) ids.add(itemId);
-  for (const itemId of input.liveState.allyItemIds ?? []) ids.add(itemId);
-  for (const itemId of input.liveState.enemyItemIds ?? []) ids.add(itemId);
+  for (const itemId of input.request.ownedItemIds) ids.add(itemId);
+  for (const itemId of input.request.allyItemIds ?? []) ids.add(itemId);
+  for (const itemId of input.request.enemyItemIds ?? []) ids.add(itemId);
 
   let changed = true;
   while (changed) {
@@ -624,26 +618,20 @@ function collectRelevantItemIds(input: {
   return ids;
 }
 
-function validateSourceIdentity(input: StatlockerBuildV2FixtureSourceInput): void {
-  if (!Number.isSafeInteger(input.heroId) || input.heroId <= 0) throw new Error('Fixture capture heroId must be positive');
-  if (!input.requestedMatchId) throw new Error('Fixture capture requestedMatchId is required');
-  if (!input.identity.rulesetVersion || !input.identity.statlockerPatchId) throw new Error('Fixture capture identity is incomplete');
-  sha256String(input.identity.catalogSha256, 'fixture catalog identity');
-  if (input.leaderboard.heroId !== input.heroId) throw new Error('Fixture capture leaderboard hero mismatch');
+function validateSourceIdentity(
+  input: StatlockerBuildV2FixtureSourceInput,
+  request: StatlockerBuildV2RequestContext,
+): void {
+  if (!input.identity.rulesetVersion || !input.identity.statlockerPatchId) {
+    throw new Error('Fixture capture Statlocker identity is incomplete');
+  }
+  sha256String(input.identity.catalogSha256, 'Statlocker catalog identity');
+  if (input.leaderboard.heroId !== request.heroId) throw new Error('Fixture capture leaderboard hero mismatch');
   if (input.wpaPatchData.patchId !== input.identity.statlockerPatchId) throw new Error('Fixture capture WPA patch identity mismatch');
   if (input.catalog.version.rulesetKey !== input.identity.rulesetVersion) throw new Error('Fixture capture catalog ruleset identity mismatch');
   if (input.catalog.version.payloadSha256.toLowerCase() !== input.identity.catalogSha256.toLowerCase()) {
     throw new Error('Fixture capture catalog SHA identity mismatch');
   }
-}
-
-function parseReplayDecision(value: unknown): FixtureReplayDecisionV2 {
-  if (!isRecord(value) || !isRecord(value.state)) throw new Error('Fixture capture saved replay decision is invalid');
-  const state = value.state;
-  if (!Number.isSafeInteger(state.heroId) || !Array.isArray(value.enemyHeroIds)) {
-    throw new Error('Fixture capture saved replay decision is missing hero/enemy roster');
-  }
-  return value as unknown as FixtureReplayDecisionV2;
 }
 
 function parseLeaderboard(payload: Record<string, unknown>, heroId: number): StatlockerHeroLeaderboardV1 {
@@ -762,6 +750,19 @@ function compareT4Chains(
   return leftKey.localeCompare(rightKey) || left.sampleSize - right.sampleSize;
 }
 
+function exactPositiveIntegerArray(value: unknown, label: string): number[] {
+  if (!Array.isArray(value)) throw new Error(`Fixture capture ${label} must be an array`);
+  const normalized = value.map((entry) => positiveInteger(entry, label));
+  const unique = [...new Set(normalized)];
+  if (unique.length !== normalized.length) throw new Error(`Fixture capture ${label} must contain unique values`);
+  return unique.sort((a, b) => a - b);
+}
+
+function optionalPositiveIntegerArray(value: unknown, label: string): number[] {
+  if (value === undefined) return [];
+  return exactPositiveIntegerArray(value, label);
+}
+
 function uniqueSortedPositiveIntegers(values: readonly number[]): number[] {
   return [...new Set(values.filter((value) => Number.isSafeInteger(value) && value > 0))].sort((a, b) => a - b);
 }
@@ -772,9 +773,26 @@ function pickRecord(value: Record<string, unknown>, keys: readonly string[]): Re
   return result;
 }
 
+function positiveInteger(value: unknown, label: string): number {
+  if (!Number.isSafeInteger(value) || Number(value) <= 0) throw new Error(`Fixture capture ${label} must be a positive integer`);
+  return Number(value);
+}
+
+function nonNegativeInteger(value: unknown, label: string): number {
+  if (!Number.isSafeInteger(value) || Number(value) < 0) throw new Error(`Fixture capture ${label} must be a non-negative integer`);
+  return Number(value);
+}
+
+function nonNegativeNumber(value: unknown, label: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    throw new Error(`Fixture capture ${label} must be a non-negative number`);
+  }
+  return value;
+}
+
 function nonEmptyString(value: unknown, label: string): string {
   if (typeof value !== 'string' || value.trim() === '') throw new Error(`Fixture capture missing ${label}`);
-  return value;
+  return value.trim();
 }
 
 function sha256String(value: unknown, label: string): string {
@@ -790,9 +808,13 @@ function cloneJson<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+function describeError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 if (require.main === module) {
   void main().catch((error) => {
-    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    process.stderr.write(`${describeError(error)}\n`);
     process.exitCode = 1;
   });
 }
