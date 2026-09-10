@@ -59,16 +59,12 @@ jobs:
               const result = await client.query(`
                 SELECT "matchId", "replayInput", "decidedAt"
                 FROM adaptive_recommendation_decisions_v1
-                WHERE COALESCE(
-                  "replayInput" #>> '{decision,state,heroId}',
-                  "replayInput" #>> '{state,heroId}',
-                  "replayInput" #>> '{heroId}'
-                ) = '72'
-                ORDER BY "decidedAt" DESC, "decisionId" DESC
-                LIMIT 500
+                ORDER BY "decidedAt" DESC
+                LIMIT 2000
               `);
               for (const row of result.rows) {
                 const decision = row?.replayInput?.decision;
+                if (decision?.state?.heroId !== 72) continue;
                 const enemyHeroIds = Array.isArray(decision?.enemyHeroIds)
                   ? [...new Set(decision.enemyHeroIds.filter((value) => Number.isSafeInteger(value) && value > 0))]
                   : [];
@@ -79,7 +75,7 @@ jobs:
                 await client.query('ROLLBACK');
                 return;
               }
-              throw new Error('No complete saved Billy replay found');
+              throw new Error('No complete saved Billy replay found in the latest 2000 decisions');
             } finally {
               await client.end();
             }
