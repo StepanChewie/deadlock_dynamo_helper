@@ -1,0 +1,183 @@
+name: Billy Warden Build Readonly Diagnostic
+
+on:
+  push:
+    branches:
+      - diag/billy-warden-build-readonly-20260910
+    paths:
+      - '.github/workflows/diag-billy-warden-build-readonly.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [self-hosted, linux, ARM64, vps-arm64-runner-v3]
+    timeout-minutes: 10
+    steps:
+      - name: Inspect production revision and adaptive modes
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd /home/ubuntu/apps/deadlock_dynamo_helper
+          container_id="$(sudo docker compose ps -q api)"
+          echo '=== PRODUCTION_REVISION ==='
+          sudo docker image inspect "$(sudo docker inspect --format='{{.Image}}' "$container_id")" --format='revision={{index .Config.Labels "org.opencontainers.image.revision"}}'
+          echo '=== ADAPTIVE_NON_SECRET_ENV ==='
+          sudo docker compose exec -T api sh -lc 'env | grep -E "^ADAPTIVE_(STRATEGY_PLANNER_MODE|STRATEGY_PROMOTION_APPROVED|TRANSACTION_PLAN_MODE|TRANSACTION_PLAN_PROMOTION_APPROVED|THREAT_WEIGHTED_MODE|THREAT_WEIGHTED_PROMOTION_APPROVED)=" | sort || true'
+          echo '=== ADAPTIVE_STATUS ==='
+          curl --fail-with-body --show-error --silent http://127.0.0.1:3000/deadlock/adaptive/v1/status
+          echo
+
+      - name: Read only Billy and Warden evidence from PostgreSQL
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd /home/ubuntu/apps/deadlock_dynamo_helper
+          sudo docker compose exec -T api node <<'NODE'
+          const { Client } = require('pg');
+
+          async function main() {
+            const client = new Client({
+              host: process.env.DB_HOST,
+              port: Number(process.env.DB_PORT || 5432),
+              user: process.env.DB_USER,
+              password: process.env.DB_PASSWORD,
+              database: process.env.DB_NAME,
+              connectionTimeoutMillis: 10000,
+            });
+            await client.connect();
+            try {
+              await client.query('BEGIN TRANSACTION READ ONLY');
+              await client.query("SET LOCAL statement_timeout = '10s'");
+
+              async function section(name, sql, params = []) {
+                const result = await client.query(sql, params);
+                console.log(`=== ${name} ===`);
+                console.log(JSON.stringify(result.rows, null, 2));
+              }
+
+              await section('STRATEGY_SNAPSHOTS', `
+                SELECT
+                  "heroId",
+                  "snapshotId",
+                  "schemaVersion",
+                  active,
+                  "publishedAt",
+                  CASE WHEN jsonb_typeof(payload->'specs') = 'array'
+                    THEN jsonb_array_length(payload->'specs') ELSE 0 END AS "specCount",
+                  COALESCE((
+                    SELECT jsonb_agg(jsonb_build_object(
+                      'strategyId', spec->>'strategyId',
+                      'goals', CASE WHEN jsonb_typeof(spec->'goals') = 'array' THEN jsonb_array_length(spec->'goals') ELSE 0 END,
+                      'support', spec->'support',
+                      'stability', spec->'stability'
+                    ) ORDER BY spec->>'strategyId')
+                    FROM jsonb_array_elements(CASE WHEN jsonb_typeof(payload->'specs') = 'array' THEN payload->'specs' ELSE '[]'::jsonb END) spec
+                  ), '[]'::jsonb) AS strategies
+                FROM build_strategy_snapshots_v1
+                WHERE "heroId" IN (25, 72)
+                ORDER BY "heroId", "publishedAt" DESC
+                LIMIT 30
+              `);
+
+              await section('CONSENSUS_SKELETONS', `
+                SELECT
+                  "scopeKey",
+                  "snapshotId",
+                  "schemaVersion",
+                  "normalizerVersion",
+                  "statlockerPatchId",
+                  "fetchedAt",
+                  payload->>'heroId' AS "payloadHeroId",
+                  payload->>'profileCount' AS "profileCount",
+                  CASE WHEN jsonb_typeof(payload->'groups') = 'array'
+                    THEN jsonb_array_length(payload->'groups') ELSE 0 END AS "groupCount",
+                  CASE WHEN jsonb_typeof(payload->'items') = 'array'
+                    THEN jsonb_array_length(payload->'items') ELSE 0 END AS "itemCount"
+                FROM statlocker_evidence_snapshots_v1
+                WHERE dataset = 'CONSENSUS_SKELETON'
+                  AND "scopeKey" IN ('hero:25:consensus', 'hero:72:consensus')
+                ORDER BY "scopeKey", "fetchedAt" DESC
+                LIMIT 20
+              `);
+
+              await section('WPA_ROWS', `
+                SELECT
+                  "heroId",
+                  count(*)::int AS rows,
+                  count(DISTINCT "enemyHeroId")::int AS "enemyHeroes",
+                  count(DISTINCT "itemId")::int AS items,
+                  max("count")::int AS "maxSampleCount",
+                  round(avg(abs("deltaWpa"))::numeric, 6) AS "meanAbsDeltaWpa"
+                FROM statlocker_vs_hero_wpa_rows_v1
+                WHERE "heroId" IN (25, 72)
+                GROUP BY "heroId"
+                ORDER BY "heroId"
+              `);
+
+              await section('WPA_PUBLISHED_SNAPSHOTS', `
+                SELECT
+                  "snapshotId",
+                  "ingestStatus",
+                  "statlockerPatchId",
+                  "fetchedAt",
+                  "createdAt",
+                  "ingestMetadata"
+                FROM statlocker_vs_hero_wpa_raw_snapshots_v1
+                ORDER BY "createdAt" DESC
+                LIMIT 5
+              `);
+
+              await section('RECENT_DECISION_SHAPES', `
+                SELECT
+                  "decidedAt",
+                  jsonb_object_keys("replayInput") AS "replayInputTopLevelKey"
+                FROM adaptive_recommendation_decisions_v1
+                ORDER BY "decidedAt" DESC
+                LIMIT 80
+              `);
+
+              await section('RECENT_BILLY_WARDEN_RESULTS', `
+                WITH recent AS (
+                  SELECT
+                    "decidedAt",
+                    "replayInput",
+                    result,
+                    COALESCE(
+                      "replayInput" #>> '{decision,state,heroId}',
+                      "replayInput" #>> '{state,heroId}',
+                      "replayInput" #>> '{heroId}'
+                    ) AS "heroIdText"
+                  FROM adaptive_recommendation_decisions_v1
+                  ORDER BY "decidedAt" DESC
+                  LIMIT 500
+                )
+                SELECT
+                  "decidedAt",
+                  "heroIdText",
+                  result->>'ready' AS ready,
+                  result->'blockers' AS blockers,
+                  result->'nextAction' AS "nextAction",
+                  CASE WHEN jsonb_typeof(result->'recommendedBuild') = 'array'
+                    THEN jsonb_array_length(result->'recommendedBuild') ELSE 0 END AS "recommendedBuildCount",
+                  result->'strategy'->>'strategyId' AS "strategyId",
+                  result->'buildStatus' AS "buildStatus",
+                  result->'evidence'->'degradedReasons' AS "degradedReasons"
+                FROM recent
+                WHERE "heroIdText" IN ('25', '72')
+                ORDER BY "decidedAt" DESC
+                LIMIT 30
+              `);
+
+              await client.query('ROLLBACK');
+            } finally {
+              await client.end();
+            }
+          }
+
+          main().catch((error) => {
+            console.error(error?.stack || error);
+            process.exit(1);
+          });
+          NODE
