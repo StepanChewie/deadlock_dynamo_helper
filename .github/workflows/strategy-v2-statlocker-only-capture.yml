@@ -8,7 +8,7 @@ on:
       - '.github/workflows/strategy-v2-statlocker-only-capture.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   capture:
@@ -19,7 +19,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          persist-credentials: false
+          persist-credentials: true
 
       - name: Build current API image
         shell: bash
@@ -95,6 +95,19 @@ jobs:
               }
               process.stdout.write(`Validated Statlocker-only Billy fixture: profiles=${fixture.proBuildAnalyses.length} wpaRows=${fixture.vsHeroWpaRows.length} provenance=${fixture.metadata.snapshotProvenance.length} catalogItems=${fixture.catalog.items.length}\n`);
             '
+
+      - name: Freeze validated fixture on feature branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="apps/api/test/fixtures/statlocker-build-v2/billy-real.fixture.json"
+          cp "$RUNNER_TEMP/statlocker-build-v2-capture/billy-real.fixture.json" "$target"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "$target"
+          git diff --cached --quiet && { echo 'Fixture already frozen'; exit 0; }
+          git commit -m 'test(strategy-v2): freeze real Statlocker Billy fixture'
+          git push origin HEAD:feat/statlocker-build-strategy-v2
 
       - name: Upload frozen-input candidate
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
