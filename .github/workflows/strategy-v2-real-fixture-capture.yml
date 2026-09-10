@@ -29,7 +29,7 @@ jobs:
           sudo docker build -t "$image" .
           echo "CAPTURE_IMAGE=$image" >> "$GITHUB_ENV"
 
-      - name: Resolve latest complete Billy replay and capture fixture
+      - name: Resolve Billy match from indexed production state and capture fixture
         shell: bash
         run: |
           set -euo pipefail
@@ -56,39 +56,36 @@ jobs:
             try {
               await client.query('BEGIN TRANSACTION READ ONLY');
               await client.query("SET LOCAL statement_timeout = '10s'");
-              const result = await client.query(`
-                WITH recent AS MATERIALIZED (
-                  SELECT "matchId", "replayInput", "decidedAt"
-                  FROM adaptive_recommendation_decisions_v1
-                  ORDER BY "decidedAt" DESC
-                  LIMIT 2000
-                )
+
+              const schema = await client.query(`
                 SELECT
-                  "matchId",
-                  "replayInput" #> '{decision,enemyHeroIds}' AS "enemyHeroIds",
-                  "replayInput" #>> '{decision,state,matchId}' AS "decisionMatchId",
-                  "decidedAt"
-                FROM recent
-                WHERE COALESCE(
-                  "replayInput" #>> '{decision,state,heroId}',
-                  "replayInput" #>> '{state,heroId}',
-                  "replayInput" #>> '{heroId}'
-                ) = '72'
-                ORDER BY "decidedAt" DESC
-                LIMIT 100
+                  to_regclass('public.build_archetype_match_locks_v2')::text AS "lockTable",
+                  to_regclass('public.recommendation_telemetry_events')::text AS "telemetryTable"
               `);
-              for (const row of result.rows) {
+              const lockTable = schema.rows[0]?.lockTable;
+              if (!lockTable) {
+                throw new Error(`Indexed Billy match lock table is unavailable; telemetry=${schema.rows[0]?.telemetryTable ?? 'missing'}`);
+              }
+
+              const locks = await client.query(`
+                SELECT "matchId", "enemyHeroIds", "lockedAt"
+                FROM build_archetype_match_locks_v2
+                WHERE "heroId" = 72
+                ORDER BY "lockedAt" DESC
+                LIMIT 50
+              `);
+              for (const row of locks.rows) {
                 const enemyHeroIds = Array.isArray(row.enemyHeroIds)
                   ? [...new Set(row.enemyHeroIds.filter((value) => Number.isSafeInteger(value) && value > 0))]
                   : [];
-                if (enemyHeroIds.length !== 6) continue;
-                if (String(row.decisionMatchId) !== String(row.matchId)) continue;
-                if (!/^\d+$/.test(String(row.matchId))) continue;
-                process.stdout.write(String(row.matchId));
+                const matchId = String(row.matchId ?? '');
+                if (!/^\d+$/.test(matchId) || enemyHeroIds.length !== 6) continue;
+                process.stderr.write(`Resolved indexed Billy lock: match=${matchId} enemies=${enemyHeroIds.length} lockedAt=${row.lockedAt?.toISOString?.() ?? row.lockedAt}\n`);
+                process.stdout.write(matchId);
                 await client.query('ROLLBACK');
                 return;
               }
-              throw new Error('No complete saved Billy replay found in the latest 2000 decisions');
+              throw new Error(`No complete Billy match lock found; rows=${locks.rowCount ?? locks.rows.length}`);
             } finally {
               await client.end();
             }
