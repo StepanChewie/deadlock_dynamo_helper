@@ -10,6 +10,10 @@ import {
   BuildArchetypeV2,
 } from './build-archetype-v2';
 import {
+  BuildDecisionTraceSinkV2,
+  BuildReplacementSearchTracePayloadV2,
+} from './build-decision-trace-v2';
+import {
   BuildItemUtilityV2,
   BuildItemUtilityV2Service,
   BuildTransitionCostV2,
@@ -66,6 +70,7 @@ export interface FullBuildLifetimeResolverV2Input {
   t4Chains?: StatlockerT4ChainsV1;
   recentPurchases?: readonly FullBuildRecentPurchaseV2[];
   maxSteps?: number;
+  trace?: BuildDecisionTraceSinkV2;
 }
 
 export interface FullBuildInventoryUtilityV2 {
@@ -179,11 +184,72 @@ export class FullBuildResolverV2Service {
     if (input.vsHeroRows.length === 0) degradedReasons.add('MATCHUP_WPA_UNAVAILABLE');
     if (!input.t4Chains) degradedReasons.add('T4_CHAINS_UNAVAILABLE');
 
+    input.trace?.record({
+      stage: 'LIVE_CONTEXT',
+      reasonCodes: [],
+      payload: {
+        gameTimeSec: input.gameTimeSec,
+        inventoryItemIds: [...input.currentInventoryItemIds],
+        capacity: input.capacity,
+        enemyThreats: input.enemyThreats.map((enemy) => ({
+          heroId: enemy.heroId,
+          threatMultiplier: enemy.threatMultiplier,
+          completeness: enemy.completeness,
+          reasonCodes: [...enemy.reasonCodes],
+        })),
+      },
+    });
+
     for (let iteration = 0; iteration < maxSteps; iteration += 1) {
       const options = this.readySemanticOptions(input, state);
       if (options.length === 0) break;
-      const selected = options.sort(compareLifetimeOptions)[0];
+      const rankedOptions = [...options].sort(compareLifetimeOptions);
+      const selected = rankedOptions[0];
       const action = this.transitionForSemanticTarget(input, state, selected);
+
+      if (selected.group) {
+        const groupOptions = rankedOptions.filter((option) => option.group?.groupId === selected.group?.groupId);
+        input.trace?.record({
+          stage: 'CHOICE_RESOLUTION',
+          reasonCodes: [],
+          payload: {
+            groups: [{
+              groupId: selected.group.groupId,
+              minSelect: selected.group.minSelect,
+              maxSelect: selected.group.maxSelect,
+              candidates: groupOptions.map((option) => ({
+                candidateId: `item:${option.targetItemId}`,
+                itemId: option.targetItemId,
+                score: option.utility.total,
+                confidence: option.utility.confidence,
+                disposition: option.targetItemId === selected.targetItemId ? 'SELECTED' : 'REJECTED',
+                reasonCodes: [...option.utility.reasonCodes],
+              })),
+              selectedItemIds: [selected.targetItemId],
+            }],
+          },
+        });
+      }
+
+      input.trace?.record({
+        stage: 'PLAN_SEARCH',
+        reasonCodes: action ? [] : ['LIFETIME_PROGRESS_BLOCKED'],
+        payload: {
+          branches: rankedOptions.map((option) => ({
+            sequence: iteration + 1,
+            targetItemId: option.targetItemId,
+            ...(option.targetItemId === selected.targetItemId && action ? { action: action.action } : {}),
+            score: option.utility.total,
+            disposition: option.targetItemId === selected.targetItemId
+              ? action ? 'SELECTED' : 'REJECTED'
+              : 'REJECTED',
+            reasonCodes: option.targetItemId === selected.targetItemId
+              ? [...option.utility.reasonCodes, ...(action?.reasonCodes ?? [])]
+              : [...option.utility.reasonCodes, 'LOWER_PLAN_BRANCH_UTILITY'],
+          })),
+        },
+      });
+
       if (!action) {
         degradedReasons.add('LIFETIME_PROGRESS_BLOCKED');
         break;
@@ -227,7 +293,7 @@ export class FullBuildResolverV2Service {
       actions: state.actions,
     });
     const planRevision = lifetimePlanRevision(input, state.actions);
-    return {
+    const plan: ResolvedFullBuildPlanV2 = {
       planRevision,
       matchId: input.matchId,
       heroId: input.heroId,
@@ -237,6 +303,18 @@ export class FullBuildResolverV2Service {
       degradedReasons: [...degradedReasons].sort(),
       validation: finalSimulation.validation,
     };
+    input.trace?.record({
+      stage: 'FINAL_PLAN',
+      reasonCodes: [...plan.validation.reasonCodes],
+      payload: {
+        planRevision: plan.planRevision,
+        stepCount: plan.steps.length,
+        degradedReasons: [...plan.degradedReasons],
+        valid: plan.validation.valid,
+        validationReasonCodes: [...plan.validation.reasonCodes],
+      },
+    });
+    return plan;
   }
 
   private readySemanticOptions(
@@ -275,6 +353,27 @@ export class FullBuildResolverV2Service {
         t4Chains: input.t4Chains,
       });
       options.push({ targetItemId: item.itemId, group, utility });
+    }
+
+    if (options.length > 0) {
+      input.trace?.record({
+        stage: 'ITEM_SCORING',
+        reasonCodes: [],
+        payload: {
+          items: options.map((option) => ({
+            itemId: option.targetItemId,
+            total: option.utility.total,
+            confidence: option.utility.confidence,
+            layers: {
+              structure: option.utility.layers.structure.weighted,
+              matchup: option.utility.layers.matchup.weighted,
+              progression: option.utility.layers.progression.weighted,
+              transition: option.utility.layers.transition.weighted,
+            },
+            reasonCodes: [...option.utility.reasonCodes],
+          })),
+        },
+      });
     }
 
     return options;
@@ -340,14 +439,29 @@ export class FullBuildResolverV2Service {
   ): FullBuildTransitionIntentV2 | undefined {
     const currentState = this.scoreLifetimeInventory(state.inventoryItemIds, input);
     const options: LifetimeReplacementOptionV2[] = [];
+    const traceCandidates: Array<BuildReplacementSearchTracePayloadV2['candidates'][number]> = [];
 
     for (const sellItemId of [...new Set(state.inventoryItemIds)].sort((a, b) => a - b)) {
       const soldItem = input.itemGraph.getItem(sellItemId);
       if (!soldItem?.sellTransition) continue;
-      if (isRecentPurchaseProtected(sellItemId, input.recentPurchases ?? [])) continue;
 
       const soldRole = archetypeRoleForItem(sellItemId, input.archetype, input.itemGraph);
       const requiredImprovement = lifetimeReplacementThreshold(soldRole);
+      if (isRecentPurchaseProtected(sellItemId, input.recentPurchases ?? [])) {
+        traceCandidates.push({
+          sellItemId,
+          buyItemId: selected.targetItemId,
+          marginalGain: 0,
+          requiredImprovement,
+          disposition: 'REJECTED',
+          reasonCodes: [
+            'RECENT_PURCHASE_PROTECTED',
+            ...(soldRole === 'CORE' ? ['CORE_REPLACEMENT_HIGHER_THRESHOLD'] : []),
+          ],
+        });
+        continue;
+      }
+
       const action: FullBuildTransitionIntentV2 = {
         action: 'REPLACE',
         sellItemId,
@@ -369,6 +483,14 @@ export class FullBuildResolverV2Service {
           actions: [action],
         }).finalInventoryItemIds;
       } catch {
+        traceCandidates.push({
+          sellItemId,
+          buyItemId: selected.targetItemId,
+          marginalGain: 0,
+          requiredImprovement,
+          disposition: 'REJECTED',
+          reasonCodes: ['MECHANICS_REJECTED'],
+        });
         continue;
       }
 
@@ -379,7 +501,20 @@ export class FullBuildResolverV2Service {
         { replacementPenalty: 1 },
       );
       const marginalGain = roundUtility(resultingState.total - currentState.total);
-      if (marginalGain < requiredImprovement) continue;
+      if (marginalGain < requiredImprovement) {
+        traceCandidates.push({
+          sellItemId,
+          buyItemId: selected.targetItemId,
+          marginalGain,
+          requiredImprovement,
+          disposition: 'REJECTED',
+          reasonCodes: [
+            'MARGINAL_GAIN_BELOW_THRESHOLD',
+            ...(soldRole === 'CORE' ? ['CORE_REPLACEMENT_HIGHER_THRESHOLD'] : []),
+          ],
+        });
+        continue;
+      }
       options.push({
         sellItemId,
         action,
@@ -388,9 +523,37 @@ export class FullBuildResolverV2Service {
         requiredImprovement,
         soldRole,
       });
+      traceCandidates.push({
+        sellItemId,
+        buyItemId: selected.targetItemId,
+        marginalGain,
+        requiredImprovement,
+        disposition: 'REJECTED',
+        reasonCodes: [
+          'MARGINAL_GAIN_ACCEPTED',
+          ...(soldRole === 'CORE' ? ['CORE_REPLACEMENT_HIGHER_THRESHOLD'] : []),
+        ],
+      });
     }
 
-    return options.sort(compareLifetimeReplacements)[0]?.action;
+    const ranked = options.sort(compareLifetimeReplacements);
+    const winner = ranked[0];
+    input.trace?.record({
+      stage: 'REPLACEMENT_SEARCH',
+      reasonCodes: winner ? [] : ['NO_ACCEPTED_REPLACEMENT'],
+      payload: {
+        targetItemId: selected.targetItemId,
+        candidates: traceCandidates.map((candidate) => {
+          if (!winner || candidate.sellItemId !== winner.sellItemId) return candidate;
+          return {
+            ...candidate,
+            disposition: 'SELECTED',
+            reasonCodes: [...candidate.reasonCodes, 'WHOLE_INVENTORY_REPLACEMENT_SELECTED'],
+          };
+        }),
+      },
+    });
+    return winner?.action;
   }
 
   private scoreLifetimeInventory(
