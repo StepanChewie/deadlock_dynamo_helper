@@ -54,6 +54,16 @@ export interface BuildItemUtilityV2Config {
   phaseLateMinTimeS: number;
 }
 
+export interface OutsideMatchupDiscoveryV2Config {
+  minCoverage: number;
+  minConfidence: number;
+  replacementMinConfidence: number;
+  minNormalizedSupport: number;
+  buyMinImprovement: number;
+  replacementMinImprovement: number;
+  coreReplacementMinImprovement: number;
+}
+
 export interface StatlockerBuildV2Config {
   profileLinkSimilarity: number;
   minClusterSize: number;
@@ -74,6 +84,7 @@ export interface StatlockerBuildV2Config {
   offlineArchetypeSupportWeight: number;
   offlineArchetypeCoherenceWeight: number;
   itemUtility: BuildItemUtilityV2Config;
+  outsideMatchupDiscovery: OutsideMatchupDiscoveryV2Config;
 }
 
 export const STATLOCKER_BUILD_V2_CONFIG: Readonly<StatlockerBuildV2Config> = Object.freeze({
@@ -150,5 +161,14 @@ export const STATLOCKER_BUILD_V2_CONFIG: Readonly<StatlockerBuildV2Config> = Obj
     timingScaleS: 900,
     phaseMidMinTimeS: 600,
     phaseLateMinTimeS: 1500,
+  }),
+  outsideMatchupDiscovery: Object.freeze({
+    minCoverage: 0.30,
+    minConfidence: 0.35,
+    replacementMinConfidence: 0.40,
+    minNormalizedSupport: 0,
+    buyMinImprovement: 0.08,
+    replacementMinImprovement: 0.30,
+    coreReplacementMinImprovement: 0.45,
   }),
 });
