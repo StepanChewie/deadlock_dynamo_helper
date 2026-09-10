@@ -1,4 +1,6 @@
 import { Injectable, Optional } from '@nestjs/common';
+import { ConsensusStrategyFallbackV1Service } from './consensus-strategy-fallback-v1.service';
+import { ConsensusSkeletonV1 } from './statlocker-adaptive.types';
 import { AdaptiveRecommendationResultV1 } from '@deadlock-live-probe/shared';
 import { AdaptiveDecisionStateV1 } from './adaptive-decision-state-v1.service';
 import { AdaptiveRecommendationObservabilityV1Service } from './adaptive-recommendation-observability-v1.service';
@@ -47,6 +49,7 @@ export class StrategyFirstAdaptivePlannerFacadeV1Service {
     @Optional() private readonly situational?: StrategyFirstSituationalOverlayV1Service,
     @Optional() private readonly observability?: AdaptiveRecommendationObservabilityV1Service,
     @Optional() private readonly transactionPlan?: StrategyFirstTransactionPlanV1Service,
+    @Optional() private readonly consensusFallback?: ConsensusStrategyFallbackV1Service,
   ) {}
 
   plan(input: StrategyFirstAdaptivePlannerFacadeV1Input): StrategyFirstTransactionPlanResultV1 {
@@ -127,6 +130,21 @@ export class StrategyFirstAdaptivePlannerFacadeV1Service {
       input.decision.catalogSha256,
       input.evidence.statlockerPatchId,
     );
+    if (strategies.length === 0 && this.consensusFallback) {
+      const skeletonPayload = input.evidence.byDataset.CONSENSUS_SKELETON?.payload;
+      const skeleton = asConsensusSkeletonV1(skeletonPayload, input.decision.state.heroId);
+      if (skeleton && skeleton.groups.length > 0) {
+        const fallback = this.consensusFallback.compile(
+          skeleton,
+          input.decision.itemGraph,
+          input.decision.rulesetId,
+          input.evidence.statlockerPatchId,
+        );
+        if (fallback && fallback.goals.length > 0) {
+          strategies = [fallback];
+        }
+      }
+    }
     if (strategies.length === 0) {
       throw new Error('STRATEGY_OUT_OF_DISTRIBUTION: no exact strategy snapshot for decision scope');
     }
@@ -401,4 +419,12 @@ function previousBuildContract(
 
 function unique(values: readonly string[]): string[] {
   return [...new Set(values)];
+}
+
+
+function asConsensusSkeletonV1(value: unknown, heroId: number): ConsensusSkeletonV1 | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  if (record.heroId !== heroId || !Array.isArray(record.groups)) return undefined;
+  return value as unknown as ConsensusSkeletonV1;
 }

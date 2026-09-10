@@ -38,4 +38,20 @@ describe('strategy-first adaptive planner facade v1', () => {
   it('fails closed for a complete-state fixture without an exact strategy snapshot', () => {
     expect(() => facade().plan({ decision: decision([1]), evidence })).toThrow('STRATEGY_OUT_OF_DISTRIBUTION');
   });
+
+  it('falls back to compiling the consensus skeleton when no exact mined strategy exists', () => {
+    const { ConsensusStrategyFallbackV1Service } = require('../src/statlocker-adaptive/consensus-strategy-fallback-v1.service');
+    const withFallback = new StrategyFirstAdaptivePlannerFacadeV1Service(
+      new StrategyFirstBuildPlannerV1Service(fakeScorer),
+      new BuildStrategyRegistryV1Service(),
+      undefined,
+      undefined,
+      undefined,
+      new ConsensusStrategyFallbackV1Service(),
+    );
+    const result = withFallback.plan({ decision: decision([]), evidence });
+    expect(result.nextAction).toBeDefined();
+    expect(result.recommendedBuild.length).toBeGreaterThan(0);
+    expect(result.strategy.strategyId).toContain('consensus-fallback');
+  });
 });
