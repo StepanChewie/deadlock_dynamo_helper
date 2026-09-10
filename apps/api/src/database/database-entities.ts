@@ -1,4 +1,5 @@
 import { AdaptiveRecommendationDecisionV1Entity } from '../deadlock-live/entities/adaptive-recommendation-decision-v1.entity';
+import { BuildArchetypeSnapshotV2Entity } from '../deadlock-live/entities/build-archetype-snapshot-v2.entity';
 import { BuildStrategySnapshotV1Entity } from '../deadlock-live/entities/build-strategy-snapshot-v1.entity';
 import { CrawlerRun } from '../deadlock-live/entities/crawler-run.entity';
 import { CrawlerState } from '../deadlock-live/entities/crawler-state.entity';
@@ -62,6 +63,7 @@ export const DATABASE_ENTITIES = [
   StatlockerVsHeroWpaRawSnapshotV1Entity,
   StatlockerVsHeroWpaRowV1Entity,
   AdaptiveRecommendationDecisionV1Entity,
+  BuildArchetypeSnapshotV2Entity,
   BuildStrategySnapshotV1Entity,
   RecommendationEconomyRulesSnapshotV1Entity,
   ModelBundleRegistryV1,

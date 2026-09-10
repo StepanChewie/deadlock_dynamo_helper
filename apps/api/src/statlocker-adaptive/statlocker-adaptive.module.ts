@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import * as puppeteer from 'puppeteer-core';
 import { DeadlockLiveModule } from '../deadlock-live/deadlock-live.module';
 import { AdaptiveRecommendationDecisionV1Entity } from '../deadlock-live/entities/adaptive-recommendation-decision-v1.entity';
+import { BuildArchetypeSnapshotV2Entity } from '../deadlock-live/entities/build-archetype-snapshot-v2.entity';
 import { BuildStrategySnapshotV1Entity } from '../deadlock-live/entities/build-strategy-snapshot-v1.entity';
 import { MatchPlayer } from '../deadlock-live/entities/match-player.entity';
 import { RecommendationEconomyRulesSnapshotV1Entity } from '../deadlock-live/entities/recommendation-economy-rules-snapshot-v1.entity';
@@ -25,6 +26,8 @@ import { AdaptiveRecommendationV1Controller } from './adaptive-recommendation-v1
 import { AdaptiveRecommendationV1Service } from './adaptive-recommendation-v1.service';
 import { AdaptiveReplayV1Service } from './adaptive-replay-v1.service';
 import { BuildArchetypeMinerV1Service } from './build-archetype-miner-v1.service';
+import { BuildArchetypeQualityGateV2Service } from './build-archetype-quality-gate-v2.service';
+import { BuildArchetypeSnapshotStoreV2Service } from './build-archetype-snapshot-store-v2.service';
 import { BuildContractV1Service } from './build-contract-v1.service';
 import { BuildInvestmentPolicyV1Service } from './build-investment-policy-v1.service';
 import { BuildSituationalResolverV1Service } from './build-situational-resolver-v1.service';
@@ -83,6 +86,7 @@ import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-
       StatlockerVsHeroWpaRawSnapshotV1Entity,
       StatlockerVsHeroWpaRowV1Entity,
       AdaptiveRecommendationDecisionV1Entity,
+      BuildArchetypeSnapshotV2Entity,
       BuildStrategySnapshotV1Entity,
       MatchPlayer,
     ]),
@@ -118,6 +122,8 @@ import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-
     HistoricalPlannerTrajectoryExtractorV2Service,
     HistoricalBuildTrajectorySourceV2Service,
     BuildArchetypeMinerV1Service,
+    BuildArchetypeQualityGateV2Service,
+    BuildArchetypeSnapshotStoreV2Service,
     BuildStrategyValidatorV1Service,
     BuildStrategyCompilerV1Service,
     BuildStrategyFeasibilityV1Service,
@@ -155,6 +161,7 @@ import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-
     StatlockerRefreshService,
     StatlockerEvidenceService,
     RecommendationEconomyRulesStoreV1Service,
+    BuildArchetypeSnapshotStoreV2Service,
     BuildStrategyRegistryV1Service,
     BuildStrategySnapshotStoreV1Service,
     BuildStrategyMiningPipelineV1Service,
