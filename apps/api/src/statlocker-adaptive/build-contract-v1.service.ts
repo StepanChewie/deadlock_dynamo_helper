@@ -61,16 +61,25 @@ export class BuildContractV1Service {
       }
     }
 
-    // Optional goals remain visible as READY diagnostics but never become the mandatory current target.
-    // This keeps hard goals and hard investment objectives ahead of minor optional purchases.
-    const orderedReady = input.strategy.goals
+    // Hard goals take strict priority over soft/optional goals. When all hard goals
+    // are completed, the contract advances into remaining soft core progression goals
+    // instead of prematurely marking the build complete.
+    const orderedHardReady = input.strategy.goals
       .filter((goal) => goal.hard && goalStates[goal.goalId] === 'READY')
       .filter((goal) => !goalExcludedByUnselectedBranch(input.strategy, goal.goalId, selectedBranches))
       .sort((a, b) =>
         phaseOrderBuildStrategyV1(a.phase) - phaseOrderBuildStrategyV1(b.phase) ||
         input.strategy.goals.indexOf(a) - input.strategy.goals.indexOf(b),
       );
-    const active = orderedReady[0];
+    const orderedSoftReady = input.strategy.goals
+      .filter((goal) => !goal.hard && goalStates[goal.goalId] === 'READY')
+      .filter((goal) => !goalExcludedByUnselectedBranch(input.strategy, goal.goalId, selectedBranches))
+      .filter((goal) => !goal.targetItemIds.every((id) => input.itemGraph.isTargetSatisfied(id, owned)))
+      .sort((a, b) =>
+        phaseOrderBuildStrategyV1(a.phase) - phaseOrderBuildStrategyV1(b.phase) ||
+        input.strategy.goals.indexOf(a) - input.strategy.goals.indexOf(b),
+      );
+    const active = orderedHardReady[0] ?? orderedSoftReady[0];
     if (active) goalStates[active.goalId] = 'ACTIVE';
 
     const effectiveHardGoals = input.strategy.goals.filter((goal) =>
@@ -87,7 +96,7 @@ export class BuildContractV1Service {
     let status: BuildContractV1['status'];
     if ((input.commitment ?? 'PROVISIONAL') === 'OOD') status = 'OUT_OF_DISTRIBUTION';
     else if (unresolvedBlockedHard && !active) status = 'REPLAN_REQUIRED';
-    else if (mandatoryRemaining.length === 0) status = 'COMPLETE';
+    else if (mandatoryRemaining.length === 0 && !active) status = 'COMPLETE';
     else if (input.immediateMode === 'HOLD' || input.immediateMode === 'WAIT') status = 'WAITING';
     else status = 'IN_PROGRESS';
 
