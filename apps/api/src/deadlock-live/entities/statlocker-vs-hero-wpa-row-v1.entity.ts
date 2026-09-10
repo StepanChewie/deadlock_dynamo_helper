@@ -1,4 +1,17 @@
-import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, Index, PrimaryGeneratedColumn, ValueTransformer } from 'typeorm';
+
+const SAFE_BIGINT_NUMBER_TRANSFORMER: ValueTransformer = {
+  to(value: number): number {
+    return value;
+  },
+  from(value: string | number): number {
+    const normalized = Number(value);
+    if (!Number.isSafeInteger(normalized)) {
+      throw new Error(`Unsafe bigint value for Statlocker itemId: ${String(value)}`);
+    }
+    return normalized;
+  },
+};
 
 @Entity('statlocker_vs_hero_wpa_rows_v1')
 @Index(
@@ -39,7 +52,7 @@ export class StatlockerVsHeroWpaRowV1Entity {
   @Column({ type: 'integer' })
   enemyHeroId!: number;
 
-  @Column({ type: 'bigint' })
+  @Column({ type: 'bigint', transformer: SAFE_BIGINT_NUMBER_TRANSFORMER })
   itemId!: number;
 
   @Column({ type: 'integer' })
