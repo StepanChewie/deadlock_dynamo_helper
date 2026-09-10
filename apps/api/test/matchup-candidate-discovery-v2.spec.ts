@@ -212,11 +212,11 @@ describe('MatchupCandidateDiscoveryV2Service', () => {
     const flexReplacement = service().discover(input(candidate(
       { type: 'REPLACE_ITEM', sellItemId: FLEX_ITEM_ID, buyItemId: COUNTER_ITEM_ID },
       [CORE_ITEM_ID, COUNTER_ITEM_ID],
-    ))[0];
+    )))[0];
     const coreReplacement = service().discover(input(candidate(
       { type: 'REPLACE_ITEM', sellItemId: CORE_ITEM_ID, buyItemId: COUNTER_ITEM_ID },
       [FLEX_ITEM_ID, COUNTER_ITEM_ID],
-    ))[0];
+    )))[0];
 
     expect(flexReplacement).toBeDefined();
     expect(coreReplacement).toBeDefined();
