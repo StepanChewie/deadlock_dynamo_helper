@@ -28,6 +28,7 @@ import { BuildArchetypeSnapshotStoreV2Service } from './build-archetype-snapshot
 import { BuildDebugTraceStoreV2Service } from './build-debug-trace-store-v2.service';
 import { BuildDecisionTraceCollectorV2 } from './build-decision-trace-v2';
 import { EnemyThreatV1Service } from './enemy-threat-v1.service';
+import { ResolvedFullBuildPlanV2 } from './full-build-plan-v2';
 import { FullBuildResolverV2Service } from './full-build-resolver-v2.service';
 import { MatchupCandidateDiscoveryV2Service } from './matchup-candidate-discovery-v2.service';
 import {
@@ -235,9 +236,14 @@ function readyRecommendation(input: {
   lock: BuildArchetypeMatchLockV2Entity;
   selection: BuildArchetypeSelectionV2;
   archetype: BuildArchetypeV2;
-  plan: ReturnType<FullBuildResolverV2Service['resolve']>;
+  plan: ResolvedFullBuildPlanV2;
 }): AdaptiveRecommendationResultV2 {
-  const plan = input.plan as AdaptiveFullBuildPlanV2;
+  const plan: AdaptiveFullBuildPlanV2 = {
+    planRevision: input.plan.planRevision,
+    steps: input.plan.steps,
+    degradedReasons: input.plan.degradedReasons,
+    validation: input.plan.validation,
+  };
   const selectionScore = input.selection.scores.find((entry) => entry.archetypeId === input.lock.archetypeId);
   const degradedReasons = unique([
     ...input.evidence.degradedReasons,
