@@ -1,0 +1,105 @@
+name: Strategy V2 Statlocker-only Billy Capture
+
+on:
+  push:
+    branches:
+      - feat/statlocker-build-strategy-v2
+    paths:
+      - '.github/workflows/strategy-v2-statlocker-only-capture.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: [self-hosted, Linux, Arm64]
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Build current API image
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="deadlock-strategy-v2-statlocker-capture:${GITHUB_SHA}"
+          sudo docker build -t "$image" .
+          echo "CAPTURE_IMAGE=$image" >> "$GITHUB_ENV"
+
+      - name: Capture Billy fixture from request plus Statlocker evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          prod_dir=/home/ubuntu/apps/deadlock_dynamo_helper
+          api_container="$(cd "$prod_dir" && sudo docker compose ps -q api)"
+          test -n "$api_container"
+
+          network="$(sudo docker inspect "$api_container" --format='{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' | head -n1)"
+          test -n "$network"
+
+          db_env="$RUNNER_TEMP/statlocker-build-v2-db.env"
+          output_dir="$RUNNER_TEMP/statlocker-build-v2-capture"
+          request_file="$GITHUB_WORKSPACE/apps/api/test/fixtures/statlocker-build-v2/billy-real.request.json"
+
+          cleanup() {
+            rm -f "$db_env"
+            sudo docker image rm -f "$CAPTURE_IMAGE" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          sudo docker inspect "$api_container" --format='{{range .Config.Env}}{{println .}}{{end}}' \
+            | grep -E '^DB_(HOST|PORT|USER|PASSWORD|NAME)=' > "$db_env"
+          chmod 600 "$db_env"
+          test "$(wc -l < "$db_env")" -eq 5
+          test -f "$request_file"
+          mkdir -p "$output_dir"
+
+          sudo docker run --rm \
+            --network "$network" \
+            --env-file "$db_env" \
+            -e DB_RUN_MIGRATIONS=false \
+            -e PGOPTIONS='-c default_transaction_read_only=on -c statement_timeout=30000' \
+            -v "$request_file:/capture-input/billy-real.request.json:ro" \
+            -v "$output_dir:/capture-output" \
+            --entrypoint node \
+            "$CAPTURE_IMAGE" \
+            dist/src/scripts/capture-statlocker-build-v2-fixture.js \
+            --request /capture-input/billy-real.request.json \
+            --out /capture-output/billy-real.fixture.json
+
+          sudo docker run --rm \
+            -v "$output_dir:/capture-output:ro" \
+            --entrypoint node \
+            "$CAPTURE_IMAGE" \
+            -e '
+              const fixture = require("/capture-output/billy-real.fixture.json");
+              const fail = (message) => { throw new Error(message); };
+              if (fixture?.metadata?.contract !== "STATLOCKER_BUILD_V2_REAL_FIXTURE_1") fail("fixture contract mismatch");
+              if (fixture?.metadata?.source !== "STATLOCKER_ONLY") fail("fixture source is not Statlocker-only");
+              if (fixture?.metadata?.buildEvidenceSource !== "STATLOCKER_ONLY") fail("build evidence source is not Statlocker-only");
+              if (fixture?.metadata?.liveContextSource !== "REQUEST") fail("live context source is not request");
+              if (fixture?.metadata?.heroId !== 72 || fixture?.request?.heroId !== 72) fail("Billy hero mismatch");
+              if (!Array.isArray(fixture?.request?.enemyHeroIds) || new Set(fixture.request.enemyHeroIds).size !== 6) fail("request enemy roster mismatch");
+              if (!Array.isArray(fixture?.proBuildAnalyses) || fixture.proBuildAnalyses.length !== 10) fail("Statlocker top-10 analysis count mismatch");
+              const ranked = fixture?.leaderboard?.profiles?.map((entry) => entry.rank);
+              if (JSON.stringify(ranked) !== JSON.stringify([1,2,3,4,5,6,7,8,9,10])) fail("Statlocker leaderboard provenance mismatch");
+              if (!Array.isArray(fixture?.vsHeroWpaRows) || fixture.vsHeroWpaRows.length === 0) fail("VS_HERO_WPA evidence missing");
+              if (!Array.isArray(fixture?.metadata?.snapshotProvenance) || fixture.metadata.snapshotProvenance.length < 13) fail("Statlocker snapshot provenance incomplete");
+              if (!Array.isArray(fixture?.catalog?.items) || fixture.catalog.items.length === 0) fail("legality catalog missing");
+              const json = JSON.stringify(fixture);
+              for (const forbidden of ["DB_PASSWORD", "DEADLOCK_API_KEY", "BUILD_DEBUG_PASSWORD", "BUILD_DEBUG_SESSION_SECRET"]) {
+                if (json.includes(forbidden)) fail(`fixture leaked ${forbidden}`);
+              }
+              process.stdout.write(`Validated Statlocker-only Billy fixture: profiles=${fixture.proBuildAnalyses.length} wpaRows=${fixture.vsHeroWpaRows.length} provenance=${fixture.metadata.snapshotProvenance.length} catalogItems=${fixture.catalog.items.length}\n`);
+            '
+
+      - name: Upload frozen-input candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: statlocker-build-v2-billy-real-${{ github.sha }}
+          path: ${{ runner.temp }}/statlocker-build-v2-capture/billy-real.fixture.json
+          if-no-files-found: error
+          retention-days: 3
