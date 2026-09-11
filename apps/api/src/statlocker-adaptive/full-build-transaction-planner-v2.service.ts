@@ -23,6 +23,14 @@ export interface FullBuildTransactionPlannerV2Result {
   reasonCodes: readonly string[];
 }
 
+interface PendingFamilyProgressionV2 {
+  desiredFamily: DesiredFamilyStateV2;
+  family: BuildArchetypeFamilyV2;
+  path: readonly number[];
+  nextIndex: number;
+  blocked: boolean;
+}
+
 @Injectable()
 export class FullBuildTransactionPlannerV2Service {
   plan(input: FullBuildTransactionPlannerV2Input): FullBuildTransactionPlannerV2Result {
@@ -30,9 +38,9 @@ export class FullBuildTransactionPlannerV2Service {
     const reasonCodes = new Set<string>();
     const families = input.archetype.families ?? [];
     let projectedInventory = [...input.currentInventoryItemIds];
+    const pending: PendingFamilyProgressionV2[] = [];
 
-    const desiredFamilies = [...input.desiredState.families].sort(compareDesiredFamilies);
-    for (const desiredFamily of desiredFamilies) {
+    for (const desiredFamily of input.desiredState.families) {
       const family = families.find((entry) => entry.familyId === desiredFamily.familyId);
       if (!family) {
         reasonCodes.add('DESIRED_FAMILY_NOT_IN_ARCHETYPE');
@@ -51,34 +59,53 @@ export class FullBuildTransactionPlannerV2Service {
         reasonCodes.add('NO_LEGAL_OBSERVED_LINEAGE');
         continue;
       }
+      pending.push({
+        desiredFamily,
+        family,
+        path: progression.path,
+        nextIndex: progression.heldItemId === undefined ? 0 : 1,
+        blocked: false,
+      });
+    }
 
-      if (progression.heldItemId === undefined && projectedInventory.length >= input.capacity) {
-        const replacement = this.findSafeReplacement(input, families, projectedInventory, desiredFamily, progression.path[0]);
-        if (!replacement) {
-          reasonCodes.add('REQUIRED_FAMILY_REGRESSION');
-          continue;
+    while (true) {
+      const next = pending
+        .filter((entry) => !entry.blocked && entry.nextIndex < entry.path.length)
+        .sort(comparePendingProgressions)[0];
+      if (!next) break;
+
+      const buyItemId = next.path[next.nextIndex];
+      let action: FullBuildTransitionIntentV2 | undefined;
+
+      if (next.nextIndex === 0) {
+        if (projectedInventory.length >= input.capacity) {
+          const replacement = this.findSafeReplacement(
+            input,
+            families,
+            projectedInventory,
+            next.desiredFamily,
+            buyItemId,
+          );
+          if (!replacement) {
+            reasonCodes.add('REQUIRED_FAMILY_REGRESSION');
+            next.blocked = true;
+            continue;
+          }
+          action = {
+            action: 'REPLACE',
+            sellItemId: replacement.sellItemId,
+            buyItemId,
+            reasonCodes: ['FAMILY_ENTRY_REPLACEMENT'],
+          };
+        } else {
+          action = {
+            action: 'BUY',
+            buyItemId,
+            reasonCodes: ['FAMILY_ENTRY_PURCHASE'],
+          };
         }
-        const action: FullBuildTransitionIntentV2 = {
-          action: 'REPLACE',
-          sellItemId: replacement.sellItemId,
-          buyItemId: progression.path[0],
-          reasonCodes: ['FAMILY_ENTRY_REPLACEMENT'],
-        };
-        actions.push(action);
-        projectedInventory = simulateOne(input, projectedInventory, action);
-      } else if (progression.heldItemId === undefined) {
-        const action: FullBuildTransitionIntentV2 = {
-          action: 'BUY',
-          buyItemId: progression.path[0],
-          reasonCodes: ['FAMILY_ENTRY_PURCHASE'],
-        };
-        actions.push(action);
-        projectedInventory = simulateOne(input, projectedInventory, action);
-      }
-
-      for (let index = 1; index < progression.path.length; index += 1) {
-        const previousItemId = progression.path[index - 1];
-        const buyItemId = progression.path[index];
+      } else {
+        const previousItemId = next.path[next.nextIndex - 1];
         const recipe = executableOneSlotRecipe(
           buyItemId,
           previousItemId,
@@ -88,17 +115,20 @@ export class FullBuildTransactionPlannerV2Service {
         );
         if (!recipe) {
           reasonCodes.add('NO_LEGAL_OBSERVED_LINEAGE');
-          break;
+          next.blocked = true;
+          continue;
         }
-        const action: FullBuildTransitionIntentV2 = {
+        action = {
           action: 'UPGRADE',
           buyItemId,
           recipeId: recipe.recipeId,
           reasonCodes: ['OBSERVED_FAMILY_UPGRADE'],
         };
-        actions.push(action);
-        projectedInventory = simulateOne(input, projectedInventory, action);
       }
+
+      actions.push(action);
+      projectedInventory = simulateOne(input, projectedInventory, action);
+      next.nextIndex += 1;
     }
 
     return { actions, reasonCodes: [...reasonCodes].sort() };
@@ -138,6 +168,28 @@ export class FullBuildTransactionPlannerV2Service {
 
     return undefined;
   }
+}
+
+function comparePendingProgressions(
+  left: PendingFamilyProgressionV2,
+  right: PendingFamilyProgressionV2,
+): number {
+  return progressionTime(left) - progressionTime(right)
+    || requirementPriority(left.desiredFamily.requirement) - requirementPriority(right.desiredFamily.requirement)
+    || left.family.familyId - right.family.familyId
+    || left.path[left.nextIndex] - right.path[right.nextIndex];
+}
+
+function progressionTime(entry: PendingFamilyProgressionV2): number {
+  const itemId = entry.path[entry.nextIndex];
+  return entry.family.progressionNodes.find((node) => node.itemId === itemId)?.timing.medianBuyTimeS
+    ?? Number.MAX_SAFE_INTEGER;
+}
+
+function requirementPriority(value: DesiredFamilyStateV2['requirement']): number {
+  if (value === 'REQUIRED' || value === 'CHOICE') return 0;
+  if (value === 'OPTIONAL') return 1;
+  return 2;
 }
 
 function findObservedLineagePath(
@@ -260,15 +312,4 @@ function requiredFamilyCount(
     family.requirement === 'REQUIRED'
       && isTerminalFamilySatisfactionV2(statusByFamily.get(family.familyId) ?? 'UNSATISFIED'),
   ).length;
-}
-
-function compareDesiredFamilies(left: DesiredFamilyStateV2, right: DesiredFamilyStateV2): number {
-  const priority = (value: DesiredFamilyStateV2['requirement']): number => {
-    if (value === 'REQUIRED' || value === 'CHOICE') return 0;
-    if (value === 'OPTIONAL') return 1;
-    return 2;
-  };
-  return priority(left.requirement) - priority(right.requirement)
-    || right.score - left.score
-    || left.familyId - right.familyId;
 }
