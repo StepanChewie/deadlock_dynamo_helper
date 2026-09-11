@@ -74,6 +74,10 @@ export interface FullBuildResolverV2Config {
   nearTermPlanSwitchMinImprovement: number;
 }
 
+export interface ArchetypePublicationV2Config {
+  heldItemCapacity: number;
+}
+
 export interface StatlockerBuildV2Config {
   profileLinkSimilarity: number;
   minClusterSize: number;
@@ -93,6 +97,7 @@ export interface StatlockerBuildV2Config {
   archetypeSelectionRoleWeights: BuildArchetypeSelectionRoleWeightsV2;
   offlineArchetypeSupportWeight: number;
   offlineArchetypeCoherenceWeight: number;
+  archetypePublication: ArchetypePublicationV2Config;
   itemUtility: BuildItemUtilityV2Config;
   outsideMatchupDiscovery: OutsideMatchupDiscoveryV2Config;
   fullBuildResolver: FullBuildResolverV2Config;
@@ -129,6 +134,9 @@ export const STATLOCKER_BUILD_V2_CONFIG: Readonly<StatlockerBuildV2Config> = Obj
   }),
   offlineArchetypeSupportWeight: 0.60,
   offlineArchetypeCoherenceWeight: 0.40,
+  archetypePublication: Object.freeze({
+    heldItemCapacity: 12,
+  }),
   itemUtility: Object.freeze({
     layerWeights: Object.freeze({
       structure: 1,
