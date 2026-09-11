@@ -41,6 +41,14 @@ export class FullBuildHysteresisV2Service {
 
     if (context.coreReplacement) reasonCodes.push('CORE_REPLACEMENT_HIGHER_THRESHOLD');
     if (nearTermChange) reasonCodes.push('NEAR_TERM_PLAN_COMMITMENT_PROTECTED');
+    if (!candidate.validation.valid) {
+      return {
+        action: 'KEEP_PREVIOUS',
+        selected: previous,
+        requiredImprovement,
+        reasonCodes: [...reasonCodes, 'SEMANTICALLY_INVALID_CANDIDATE'],
+      };
+    }
     if (context.recentPurchaseProtected) {
       return {
         action: 'KEEP_PREVIOUS',
