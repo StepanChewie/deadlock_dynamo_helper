@@ -1,11 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import {
+  BuildArchetypeFamilyV2,
   BuildArchetypeGroupV2,
   BuildArchetypeItemV2,
   BuildArchetypeRelationshipV2,
   BuildArchetypeV2,
   BuildOrderEdgeV2,
   BuildPhaseV2,
+  BuildProgressionNodeV2,
   StatlockerBuildProfileItemV2,
   StatlockerBuildProfileV2,
 } from './build-archetype-v2';
@@ -55,8 +57,9 @@ export class BuildArchetypeCompilerV2Service {
     validateIdentity(input);
     const members = resolveClusterMembers(input.cluster, input.profiles);
     const familyEvidence = collectFamilyEvidence(members);
+    const families = compileFamilies(familyEvidence, members.length);
     const items = compileItems(familyEvidence, members.length);
-    if (items.length === 0) {
+    if (families.length === 0 || items.length === 0) {
       throw new Error(`Build archetype v2 compiler: cluster ${input.cluster.clusterId} contains no semantic items`);
     }
 
@@ -73,6 +76,7 @@ export class BuildArchetypeCompilerV2Service {
       catalogSha256: input.catalogSha256.toLowerCase(),
       statlockerPatchId: input.statlockerPatchId,
       sourceProfileAccountIds: members.map((profile) => profile.accountId).sort(),
+      families,
       items,
       groups,
       orderEdges,
@@ -153,6 +157,141 @@ function collectFamilyEvidence(
     }
   }
   return result;
+}
+
+function compileFamilies(
+  familyEvidence: ReadonlyMap<number, FamilyEvidenceV2>,
+  profileCount: number,
+): BuildArchetypeFamilyV2[] {
+  return [...familyEvidence.values()]
+    .map((family) => compileFamily(family, profileCount))
+    .sort((left, right) =>
+      firstFamilyTiming(left) - firstFamilyTiming(right) || left.familyId - right.familyId,
+    );
+}
+
+function compileFamily(
+  family: FamilyEvidenceV2,
+  profileCount: number,
+): BuildArchetypeFamilyV2 {
+  const observedByItemId = new Map<number, StatlockerBuildProfileItemV2[]>();
+  for (const values of family.profiles.values()) {
+    for (const item of values) {
+      const observed = observedByItemId.get(item.itemId) ?? [];
+      observed.push(item);
+      observedByItemId.set(item.itemId, observed);
+    }
+  }
+
+  const rawNodes = [...observedByItemId.entries()]
+    .map(([itemId, observed]) => compileProgressionNode(itemId, observed, profileCount))
+    .sort((left, right) =>
+      left.timing.medianBuyTimeS - right.timing.medianBuyTimeS || left.itemId - right.itemId,
+    );
+  const strongTerminalIndexes = rawNodes
+    .map((node, index) => ({ node, index }))
+    .filter(({ node }) => node.rawFrequencyTier === 'CORE' || node.rawFrequencyTier === 'FREQUENT')
+    .map(({ index }) => index);
+  const defaultTerminalIndex = strongTerminalIndexes.length > 0
+    ? strongTerminalIndexes[strongTerminalIndexes.length - 1]
+    : rawNodes.length - 1;
+
+  const progressionNodes = rawNodes.map((node, index): BuildProgressionNodeV2 => ({
+    ...node,
+    progressionRole: index === defaultTerminalIndex
+      ? 'DEFAULT_TERMINAL'
+      : index > defaultTerminalIndex
+        ? 'OPTIONAL_TERMINAL'
+        : index === 0
+          ? 'ENTRY'
+          : 'INTERMEDIATE',
+  }));
+  const defaultTerminal = progressionNodes[defaultTerminalIndex];
+  const optionalTerminals = progressionNodes.filter((node) => node.progressionRole === 'OPTIONAL_TERMINAL');
+
+  const perProfileTiers = [...family.profiles.values()].map((items) => modeTier(items.map((item) => item.frequencyTier)));
+  const aggregateFrequencyTier = modeTier(perProfileTiers);
+  const sourceProfileCount = family.profiles.size;
+  const profileCoverage = sourceProfileCount / Math.max(1, profileCount);
+  const profilePurchaseRates = [...family.profiles.values()].map((items) =>
+    Math.max(...items.map((item) => item.purchaseRate)),
+  );
+  const purchaseRate = clamp01(mean(profilePurchaseRates));
+
+  return {
+    familyId: family.familyId,
+    requirement: familyRequirement(family, profileCoverage, aggregateFrequencyTier),
+    aggregateFrequencyTier,
+    sourceProfileCount,
+    profileCoverage,
+    purchaseRate,
+    structuralPriority: clamp01(
+      profileCoverage * 0.45 +
+      purchaseRate * 0.35 +
+      TIER_SCORE[aggregateFrequencyTier] * 0.20,
+    ),
+    progressionNodes,
+    terminalCandidates: [
+      terminalCandidate(defaultTerminal, 'DEFAULT_TERMINAL'),
+      ...optionalTerminals.map((node) => terminalCandidate(node, 'OPTIONAL_TERMINAL')),
+    ],
+  };
+}
+
+function compileProgressionNode(
+  itemId: number,
+  observed: readonly StatlockerBuildProfileItemV2[],
+  profileCount: number,
+): Omit<BuildProgressionNodeV2, 'progressionRole'> {
+  const times = observed.map((item) => item.medianBuyTimeS);
+  const timingMedian = median(times);
+  return {
+    itemId,
+    rawFrequencyTier: modeTier(observed.map((item) => item.frequencyTier)),
+    sourceProfileCount: observed.length,
+    profileCoverage: observed.length / Math.max(1, profileCount),
+    purchaseRate: clamp01(mean(observed.map((item) => item.purchaseRate))),
+    timing: {
+      medianBuyTimeS: timingMedian,
+      spreadS: median(times.map((value) => Math.abs(value - timingMedian))),
+      phase: modePhase(observed.map((item) => item.phase)),
+    },
+  };
+}
+
+function terminalCandidate(
+  node: BuildProgressionNodeV2,
+  kind: 'DEFAULT_TERMINAL' | 'OPTIONAL_TERMINAL',
+): BuildArchetypeFamilyV2['terminalCandidates'][number] {
+  return {
+    itemId: node.itemId,
+    kind,
+    sourceProfileCount: node.sourceProfileCount,
+    profileCoverage: node.profileCoverage,
+    purchaseRate: node.purchaseRate,
+    rawFrequencyTier: node.rawFrequencyTier,
+  };
+}
+
+function familyRequirement(
+  family: FamilyEvidenceV2,
+  profileCoverage: number,
+  aggregateFrequencyTier: StatlockerBuildProfileItemV2['frequencyTier'],
+): BuildArchetypeFamilyV2['requirement'] {
+  const explicitTypes = new Set(
+    [...family.profiles.values()].flatMap((items) =>
+      items.flatMap((item) => item.explicitGroup ? [item.explicitGroup.type] : []),
+    ),
+  );
+  if (explicitTypes.has('REQUIRED')) return 'REQUIRED';
+  if (explicitTypes.has('OPTIONAL') || explicitTypes.has('CHOICE')) return 'OPTIONAL';
+  if (profileCoverage === 1 && aggregateFrequencyTier === 'CORE') return 'REQUIRED';
+  if (aggregateFrequencyTier === 'FREQUENT') return 'OPTIONAL';
+  return 'SITUATIONAL';
+}
+
+function firstFamilyTiming(family: BuildArchetypeFamilyV2): number {
+  return family.progressionNodes[0]?.timing.medianBuyTimeS ?? 0;
 }
 
 function compileItems(
