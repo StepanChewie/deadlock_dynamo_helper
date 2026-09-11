@@ -34,6 +34,7 @@ import { BuildItemUtilityV2Service } from '../src/statlocker-adaptive/build-item
 import { EnemyThreatV1Service } from '../src/statlocker-adaptive/enemy-threat-v1.service';
 import { FamilyFirstFullBuildResolverV2Service } from '../src/statlocker-adaptive/family-first-full-build-resolver-v2.service';
 import { MatchupCandidateDiscoveryV2Service } from '../src/statlocker-adaptive/matchup-candidate-discovery-v2.service';
+import { STATLOCKER_HERO_POOL_V1 } from '../src/statlocker-adaptive/statlocker-hero-pool';
 import { ThreatWeightedMatchupV1Service } from '../src/statlocker-adaptive/threat-weighted-matchup-v1.service';
 import { toStatlockerBuildProfileV2 } from '../src/statlocker-adaptive/statlocker-build-profile-v2';
 
@@ -56,11 +57,36 @@ const FORBIDDEN_CHURN_REASON_CODES = new Set([
   'POINTLESS_PURCHASE_CHURN',
 ]);
 
+interface ApprovedBillyGoldenV2 {
+  selectedArchetypeId: string;
+  desiredFamilies: readonly {
+    familyId: number;
+    selectedTerminalItemId: number;
+    selectedTerminalKind: 'DEFAULT_TERMINAL' | 'OPTIONAL_TERMINAL';
+  }[];
+  selectedChoiceFamilyIdsByGroup: Readonly<Record<string, readonly number[]>>;
+  actionSemanticKeys: readonly string[];
+  finalFamilySatisfaction: readonly {
+    familyId: number;
+    status: string;
+    terminalItemId: number;
+  }[];
+  mechanicalValidation: boolean;
+  semanticValidation: boolean;
+}
+
 function loadFixture(): StatlockerBuildV2Fixture {
   return JSON.parse(readFileSync(
     join(__dirname, 'fixtures/statlocker-build-v2/billy-real.fixture.json'),
     'utf8',
   )) as StatlockerBuildV2Fixture;
+}
+
+function loadExpected(): ApprovedBillyGoldenV2 {
+  return JSON.parse(readFileSync(
+    join(__dirname, 'fixtures/statlocker-build-v2/billy-real.expected.json'),
+    'utf8',
+  )) as ApprovedBillyGoldenV2;
 }
 
 function buildGraph(fixture: StatlockerBuildV2Fixture) {
@@ -320,6 +346,43 @@ function allPlanReasonCodes(result: any): string[] {
   ];
 }
 
+function actionSemanticKey(step: any): string {
+  if (step.action === 'BUY') return `BUY:${step.buyItemId}`;
+  if (step.action === 'UPGRADE') return `UPGRADE:${step.buyItemId}:${step.recipeId}`;
+  return `REPLACE:${step.sellItemId}->${step.buyItemId}`;
+}
+
+function approvedGoldenFor(result: any, selection: { archetypeId: string }): ApprovedBillyGoldenV2 {
+  const desiredState = result.fullBuild?.desiredState;
+  const finalFamilyStates = new Map<number, any>(
+    (result.fullBuild?.semanticValidation?.finalFamilyStates ?? [])
+      .map((state: any) => [state.familyId, state]),
+  );
+  const requiredOrChoiceFamilies = (desiredState?.families ?? [])
+    .filter((family: any) => family.requirement === 'REQUIRED' || family.requirement === 'CHOICE');
+
+  return {
+    selectedArchetypeId: selection.archetypeId,
+    desiredFamilies: (desiredState?.families ?? []).map((family: any) => ({
+      familyId: family.familyId,
+      selectedTerminalItemId: family.selectedTerminalItemId,
+      selectedTerminalKind: family.selectedTerminalKind,
+    })),
+    selectedChoiceFamilyIdsByGroup: desiredState?.selectedChoiceFamilyIdsByGroup ?? {},
+    actionSemanticKeys: (result.fullBuild?.steps ?? []).map(actionSemanticKey),
+    finalFamilySatisfaction: requiredOrChoiceFamilies.map((family: any) => {
+      const state = finalFamilyStates.get(family.familyId);
+      return {
+        familyId: family.familyId,
+        status: state?.status ?? 'UNSATISFIED',
+        terminalItemId: state?.terminalItemId ?? 0,
+      };
+    }),
+    mechanicalValidation: result.fullBuild?.mechanicalValidation?.valid === true,
+    semanticValidation: result.fullBuild?.semanticValidation?.valid === true,
+  };
+}
+
 function renderReport(input: {
   fixture: StatlockerBuildV2Fixture;
   snapshot: BuildArchetypeSnapshotV2;
@@ -329,6 +392,7 @@ function renderReport(input: {
   stages: readonly BuildDecisionTraceStageV2[];
 }): string {
   const names = new Map(input.fixture.catalog.items.map((catalogItem) => [catalogItem.itemId, catalogItem.name]));
+  const heroNames = new Map(STATLOCKER_HERO_POOL_V1.map((hero) => [hero.heroId, hero.name]));
   const item = (itemId: number) => `${names.get(itemId) ?? 'Unknown item'} [${itemId}]`;
   const selectedArchetype = input.snapshot.archetypes.find((archetype) => archetype.archetypeId === input.selection.archetypeId);
   const finalInventory = input.result.fullBuild?.steps?.at(-1)?.inventoryAfter ?? input.fixture.request.ownedItemIds;
@@ -336,6 +400,7 @@ function renderReport(input: {
 
   lines.push('BUILD_V2_E2E_REPORT_START');
   lines.push(`Hero: Billy (${input.fixture.request.heroId})`);
+  lines.push(`Enemy roster: ${input.fixture.request.enemyHeroIds.map((heroId) => `${heroNames.get(heroId) ?? 'Unknown hero'} [${heroId}]`).join(', ')}`);
   lines.push(`Source profiles: ${input.snapshot.sourceProfileAccountIds.length}`);
   lines.push(`Statlocker VS_HERO_WPA rows: ${input.fixture.vsHeroWpaRows.length}`);
   lines.push(`Archetypes found: ${input.snapshot.archetypes.map((archetype) => archetype.archetypeId).join(', ')}`);
@@ -369,7 +434,7 @@ function renderReport(input: {
     );
   }
 
-  lines.push('FULL BUILD:');
+  lines.push('FULL BUILD - PURCHASE ORDER:');
   for (const step of input.result.fullBuild?.steps ?? []) {
     if (step.action === 'BUY') {
       lines.push(`  ${step.sequence}. BUY ${item(step.buyItemId)} -> [${step.inventoryAfter.map(item).join(', ')}]`);
@@ -380,7 +445,8 @@ function renderReport(input: {
     }
   }
 
-  lines.push('FINAL INVENTORY:');
+  lines.push('FINAL INVENTORY - ORDER IS NOT PURCHASE ORDER:');
+  lines.push(`  Final occupancy: ${finalInventory.length}/${input.fixture.request.totalCapacity}`);
   for (const itemId of finalInventory) lines.push(`  ${item(itemId)}`);
 
   lines.push('FAMILY SATISFACTION:');
@@ -569,6 +635,8 @@ describe('Statlocker Build V2 real Billy fixture', () => {
         expect(step.inventoryAfter).toContain(step.buyItemId);
       }
     }
+
+    expect(approvedGoldenFor(result, selection)).toEqual(loadExpected());
 
     expect(lockDb.get()).toBeDefined();
     const second = await controller.recommend({ matchId: fixture.request.matchId });
