@@ -1,172 +1,100 @@
 # Statlocker Build Strategy V2 Family-First Completion Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to execute this plan task-by-task. Use TDD for every behavior change and `superpowers:verification-before-completion` before completion claims.
 
-**Goal:** Correct the V2 lifetime-build semantics so Statlocker upgrade families produce coherent final-state goals and BUY/UPGRADE/REPLACE trajectories, rerun and human-review the frozen Billy full-pipeline E2E, then finish the original V2 production cutover and release gates.
+**Goal:** Correct V2 lifetime-build semantics so Statlocker upgrade families produce coherent final-state goals and legal BUY/UPGRADE/REPLACE trajectories, rerun and human-review the frozen Billy full-pipeline E2E, then finish the original V2 Overwolf cutover and production release gates.
 
-**Architecture:** Keep the already-built V2 sourcing, mining, immutable archetype lock, WPA, trace/debugger, fixture, and API infrastructure. Replace flat item goals with family-first archetypes, select a desired terminal state before generating transactions, recompute family satisfaction from projected inventory, and validate both mechanics and semantics. After the corrected Billy result is approved, resume the original Task 18 Overwolf cutover/V1 retirement and Task 19 production-readiness verification.
+**Architecture:** Keep the already-built V2 source collection, profile mining, immutable archetype lock, WPA integration, persistent snapshot/lock storage, trace/debugger, frozen Billy fixture, and V2 API infrastructure. Replace flat item goals with family-first archetypes; select a desired family/terminal state before generating transactions; recompute family satisfaction from projected inventory; plan one-slot Deadlock upgrades as atomic ancestor-to-descendant transitions; and validate mechanics plus semantics. Only after the corrected Billy report is approved do we freeze the golden, cut Overwolf to V2, remove V1 serving fallback authority, and run the original final release gate.
 
 **Tech Stack:** TypeScript 5.9, NestJS 11, Jest/ts-jest, TypeORM/PostgreSQL, existing `@deadlock-live-probe/build-domain` item graph, existing Statlocker snapshot/WPA storage, existing V2 trace/debugger, existing Overwolf client.
 
-**Spec:** `docs/superpowers/specs/2026-09-11-statlocker-build-strategy-v2-family-first-design.md`
+**Primary design:** `docs/superpowers/specs/2026-09-11-statlocker-build-strategy-v2-family-first-design.md`
 
-## Global Constraints
+**Original roadmap being resumed:** `docs/superpowers/plans/2026-09-10-statlocker-build-strategy-v2.md`
 
-- Strategic build evidence is Statlocker-only. The live request supplies runtime context, not build evidence.
-- Continue using the frozen Billy fixture/request already checked into `apps/api/test/fixtures/statlocker-build-v2/`.
-- The catalog/item graph is mechanics authority only: upgrade ancestry, recipes, direct-purchase legality, ruleset legality, max copies, and capacity.
-- A catalog-only descendant with no Statlocker strategic evidence cannot become a strategic terminal.
-- Keep raw Statlocker frequency (`CORE/FREQUENT/SOMETIMES/FLEX`), family requirement (`REQUIRED/CHOICE/OPTIONAL/SITUATIONAL`), and progression role (`ENTRY/INTERMEDIATE/DEFAULT_TERMINAL/OPTIONAL_TERMINAL`) separate.
-- `frequencyTier === CORE` alone never means an independent final slot requirement.
-- A semantic upgrade family is one final-slot concept even when several tiers are common in Statlocker.
-- For normal Deadlock lineage progression, `UPGRADE C -> D` atomically consumes C and obtains D; 12/12 stays 12/12.
-- Do not implement multi-held-component strategic progression such as `C + X -> D` for this V2 family planner.
-- Family satisfaction is derived from current projected inventory, never sticky historical ownership.
+## Global constraints
+
+- Strategic build evidence is Statlocker-only. Request/live state supplies runtime context, never build evidence.
+- Keep the frozen Billy inputs at `apps/api/test/fixtures/statlocker-build-v2/billy-real.fixture.json` and `apps/api/test/fixtures/statlocker-build-v2/billy-real.request.json` unchanged unless a separate source-integrity defect is proven.
+- Catalog/item graph is mechanics authority only: family ancestry, legal recipes, direct purchase, ruleset availability, max copies, and capacity.
+- A catalog-only descendant with no Statlocker strategic evidence cannot become a default or optional strategic terminal.
+- Keep three concepts separate:
+  - raw Statlocker frequency: `CORE | FREQUENT | SOMETIMES | FLEX`
+  - family requirement: `REQUIRED | CHOICE | OPTIONAL | SITUATIONAL`
+  - progression role: `ENTRY | INTERMEDIATE | DEFAULT_TERMINAL | OPTIONAL_TERMINAL`
+- `frequencyTier === CORE` alone never means an independent final-slot requirement.
+- One upgrade lineage is one final-slot family even when multiple tiers are common in Statlocker.
+- Deadlock progression for this planner is one-slot lineage progression: `UPGRADE C -> D` atomically consumes C and obtains D; `12/12 -> 12/12`.
+- Do not introduce multi-held-component strategic progression such as `C + X -> D` in the family planner.
+- Family satisfaction derives from the current projected inventory, not historical ownership.
 - REQUIRED family satisfaction cannot regress inside one generated lifetime plan.
-- `BUY X -> REPLACE X -> Y` inside one generated plan is invalid unless X is consumed by a legal upgrade; the first family-first version does not invent temporary-item semantics.
-- Missing optional WPA/T4 evidence degrades adaptation but must not erase the Statlocker-backed base build.
-- Do not reintroduce V1 positional planning as fallback.
-- Do not freeze `billy-real.expected.json` until the corrected actual report is shown to and approved by the user.
-- Follow project style: TypeScript, English code comments and Swagger descriptions, regular hyphen characters, no `| null` in function return types.
+- `BUY X -> REPLACE X -> Y` inside one generated lifetime plan is semantically invalid unless X disappears because a legal UPGRADE consumed it. Do not invent temporary-item semantics from aggregate Statlocker data.
+- Missing optional WPA/T4 evidence degrades adaptation but cannot delete the Statlocker-backed base build.
+- Never reintroduce V1 positional strategy as V2 fallback.
+- Never freeze `billy-real.expected.json` until the actual corrected Billy report has been shown to and explicitly approved by the user.
+- Follow project style: TypeScript, English code comments and Swagger descriptions, regular hyphen characters, and no `| null` in function return types.
 
 ---
 
-## File Structure
+## Task 1: Replace flat archetype item goals with family-first contracts and compilation
 
-### Domain/compiler responsibilities
+**Files**
 
-**Modify:**
-- `apps/api/src/statlocker-adaptive/build-archetype-v2.ts` - family-first domain contracts.
-- `apps/api/src/statlocker-adaptive/build-archetype-compiler-v2.service.ts` - compile observed item lineages into families, terminals, family groups, and family order/relationships.
-- `apps/api/src/statlocker-adaptive/statlocker-build-profile-v2.ts` - keep deterministic family canonicalization and raw Statlocker evidence.
-- `apps/api/src/statlocker-adaptive/statlocker-build-v2.config.ts` - centralized family/terminal/optional-upgrade policy.
-
-### Validation/selection responsibilities
-
-**Create:**
-- `apps/api/src/statlocker-adaptive/build-family-satisfaction-v2.ts` - pure current-inventory family satisfaction.
-- `apps/api/src/statlocker-adaptive/build-desired-state-v2.service.ts` - CHOICE/default/optional terminal selection and desired final family state.
-- `apps/api/src/statlocker-adaptive/full-build-semantic-validator-v2.service.ts` - family regression, final satisfaction, choice bounds, and anti-churn validation.
-- `apps/api/src/statlocker-adaptive/full-build-transaction-planner-v2.service.ts` - family-aware BUY/UPGRADE/REPLACE transaction planning.
-
-**Modify:**
-- `apps/api/src/statlocker-adaptive/build-archetype-quality-gate-v2.service.ts` - family/terminal validation and `TERMINAL_CAPACITY_CONFLICT`.
-- `apps/api/src/statlocker-adaptive/build-archetype-selector-v2.service.ts` - score family/default-terminal units and family CHOICE alternatives instead of flat items.
-- `apps/api/src/statlocker-adaptive/build-item-utility-v2.service.ts` - preserve item utility as the terminal/transition scorer; add no catalog-derived strategic priors.
-- `apps/api/src/statlocker-adaptive/full-build-resolver-v2.service.ts` - become orchestration facade over desired-state selection, transaction planner, simulator, semantic validator, and hysteresis.
-- `apps/api/src/statlocker-adaptive/full-build-plan-v2.ts` - expose semantic validation/desired-state summaries needed by trace/API.
-- `apps/api/src/statlocker-adaptive/full-build-inventory-simulator-v2.ts` - keep mechanics authority; add regression for 12/12 one-slot upgrades if needed, not new strategic policy.
-
-### Runtime/trace/API responsibilities
-
-**Modify:**
-- `apps/api/src/statlocker-adaptive/adaptive-recommendation-v2.service.ts`
-- `apps/api/src/statlocker-adaptive/build-decision-trace-v2.ts`
-- `apps/api/src/statlocker-adaptive/build-debug-trace-store-v2.service.ts` only if the typed trace shape requires storage changes.
-- `apps/api/src/build-debug-v2/build-debug-v2.client.ts`
-- `apps/api/src/build-debug-v2/build-debug-v2.ui.ts`
-- `packages/shared/src/adaptive-recommendation-v2.ts`
-
-### Tests
-
-**Create:**
-- `apps/api/test/build-family-satisfaction-v2.spec.ts`
-- `apps/api/test/build-desired-state-v2.spec.ts`
-- `apps/api/test/full-build-semantic-validator-v2.spec.ts`
-- `apps/api/test/full-build-transaction-planner-v2.spec.ts`
-
-**Modify/replace:**
-- `apps/api/test/build-archetype-compiler-v2.spec.ts`
-- `apps/api/test/build-archetype-quality-gate-v2.spec.ts`
-- `apps/api/test/build-archetype-selector-v2.spec.ts`
-- `apps/api/test/full-build-inventory-simulator-v2.spec.ts`
-- `apps/api/test/full-build-resolver-v2.spec.ts`
-- `apps/api/test/full-build-resolver-v2-lifetime.spec.ts`
-- `apps/api/test/full-build-resolver-v2-replacement.spec.ts`
-- `apps/api/test/full-build-lifetime-ranked-fallback-v2.spec.ts`
-- Replace the old semantic expectation in `apps/api/test/full-build-lifetime-mandatory-core-v2.spec.ts`; rename/delete that file when the replacement regressions cover its mechanics.
-- `apps/api/test/adaptive-recommendation-v2.e2e.spec.ts`
-- `apps/api/test/build-debug-v2.e2e.spec.ts`
-- `apps/api/test/statlocker-build-v2-real-data.e2e.spec.ts`
-
-### Original roadmap continuation
-
-**Modify after corrected Billy approval:**
-- `apps/overwolf-client/src/adaptive-recommendation-client.ts`
-- `apps/overwolf-client/src/adaptive-recommendation-client.spec.ts`
-- `apps/overwolf-client/src/adaptive-recommendation-full-build-client.integration.spec.ts`
-- `apps/overwolf-client/src/adaptive-recommendation-full-build-path.spec.ts`
-- `apps/api/src/statlocker-adaptive/statlocker-adaptive.module.ts`
-- V1 production-serving registration/controller files only as required to remove V1 runtime fallback authority.
-
----
-
-### Task 1: Replace flat archetype items with family-first semantic contracts and compilation
-
-**Files:**
 - Modify: `apps/api/src/statlocker-adaptive/build-archetype-v2.ts`
 - Modify: `apps/api/src/statlocker-adaptive/build-archetype-compiler-v2.service.ts`
 - Modify: `apps/api/src/statlocker-adaptive/statlocker-build-profile-v2.ts`
+- Modify: `apps/api/src/statlocker-adaptive/statlocker-build-v2.config.ts`
 - Modify: `apps/api/test/build-archetype-compiler-v2.spec.ts`
 - Modify: `apps/api/test/statlocker-build-profile-v2.spec.ts`
 
-**Interfaces:**
-- Consumes: existing `StatlockerBuildProfileV2`, `RecommendationItemGraph`, cluster identity/quality.
-- Produces: `BuildArchetypeFamilyV2`, `BuildProgressionNodeV2`, `BuildTerminalCandidateV2`, family-level `BuildArchetypeGroupV2`, and family-level order/relationship contracts inside `BuildArchetypeV2`.
+### Step 1.1 - RED: one upgrade lineage compiles to one semantic family
 
-- [ ] **Step 1: Write the failing compiler regression that collapses one upgrade lineage into one family**
-
-Add a graph with `A -> B -> C` and profiles where A/B/C have different raw tiers. Assert one family, all three observed nodes, and one final-slot family concept:
+Add a catalog graph `A -> B -> C` and two Statlocker profiles where A/B/C have different raw frequency tiers. Assert one family and three observed progression nodes, not three final goals:
 
 ```ts
-const compiled = compiler.compile(inputForProfiles([
-  profile('p1', [
-    profileItem(A, { frequencyTier: 'CORE', medianBuyTimeS: 300 }),
-    profileItem(B, { frequencyTier: 'CORE', medianBuyTimeS: 700 }),
-    profileItem(C, { frequencyTier: 'FREQUENT', medianBuyTimeS: 1200 }),
-  ]),
-  profile('p2', [
-    profileItem(A, { frequencyTier: 'CORE', medianBuyTimeS: 320 }),
-    profileItem(B, { frequencyTier: 'CORE', medianBuyTimeS: 720 }),
-    profileItem(C, { frequencyTier: 'FREQUENT', medianBuyTimeS: 1180 }),
-  ]),
-]));
-
-expect(compiled.families).toHaveLength(1);
-expect(compiled.families[0].progressionNodes.map((node) => node.itemId)).toEqual([A, B, C]);
-expect(compiled.families[0].progressionNodes.map((node) => node.progressionRole)).toEqual([
-  'ENTRY', 'INTERMEDIATE', 'DEFAULT_TERMINAL',
+expect(archetype.families).toHaveLength(1);
+expect(archetype.families[0].progressionNodes.map((node) => node.itemId)).toEqual([A, B, C]);
+expect(archetype.families[0].progressionNodes.map((node) => node.progressionRole)).toEqual([
+  'ENTRY',
+  'INTERMEDIATE',
+  'DEFAULT_TERMINAL',
 ]);
 ```
 
-- [ ] **Step 2: Write the failing rare-descendant and catalog-only-descendant regressions**
+### Step 1.2 - RED: rare observed descendant is optional, catalog-only descendant is not strategic
 
-Use `A -> B -> C -> D`. In the first case D is present with raw `SOMETIMES`/`FLEX` evidence and C is the deepest observed `CORE/FREQUENT` node; assert C default and D optional. In the second case omit D from every Statlocker profile; assert D does not appear in `terminalCandidates`.
+Use catalog `A -> B -> C -> D`.
+
+Case A: D has small but real Statlocker usage. Assert:
 
 ```ts
 expect(family.terminalCandidates).toEqual(expect.arrayContaining([
   expect.objectContaining({ itemId: C, kind: 'DEFAULT_TERMINAL' }),
   expect.objectContaining({ itemId: D, kind: 'OPTIONAL_TERMINAL' }),
 ]));
-expect(catalogOnlyFamily.terminalCandidates.some((entry) => entry.itemId === D)).toBe(false);
 ```
 
-- [ ] **Step 3: Run the compiler/profile tests and verify RED**
+Case B: D is absent from every Statlocker profile. Assert:
 
-Run:
+```ts
+expect(family.terminalCandidates.some((entry) => entry.itemId === D)).toBe(false);
+```
+
+### Step 1.3 - Verify RED
 
 ```bash
 yarn workspace @deadlock-live-probe/api test --runTestsByPath test/statlocker-build-profile-v2.spec.ts test/build-archetype-compiler-v2.spec.ts
 ```
 
-Expected: FAIL because current `BuildArchetypeV2` exposes one representative `items[]` row per family and has no progression/terminal contracts.
+Expected: FAIL because current `BuildArchetypeV2` exposes representative `items[]` goals and no progression/terminal contracts.
 
-- [ ] **Step 4: Add the family-first domain contracts**
+### Step 1.4 - Implement family-first domain contracts
 
-Define these stable semantics in `build-archetype-v2.ts`:
+Add in `build-archetype-v2.ts`:
 
 ```ts
 export type BuildFamilyRequirementV2 = 'REQUIRED' | 'OPTIONAL' | 'SITUATIONAL';
+
 export type BuildProgressionRoleV2 =
   | 'ENTRY'
   | 'INTERMEDIATE'
@@ -219,82 +147,103 @@ export interface BuildArchetypeGroupV2 {
 }
 ```
 
-Change `BuildArchetypeV2` to expose `families` as the strategic semantic authority. Order edges and relationships must reference family IDs rather than representative item IDs. Remove flat `items[]` from decision authority rather than maintaining two competing goal models.
+Change `BuildArchetypeV2` so `families` is the strategic semantic authority. Family-level order edges/relationships reference `familyId`, not representative item IDs. Do not keep flat `items[]` as a second goal authority.
 
-- [ ] **Step 5: Implement deterministic family compilation**
+### Step 1.5 - Implement deterministic terminal classification
 
-For each canonical `familyId`, retain every observed Statlocker item node. Order mechanically related nodes by graph ancestry and deterministic item ID tie-breaks. For a linear observed branch, mark the deepest observed node whose aggregate raw tier is `CORE` or `FREQUENT` as `DEFAULT_TERMINAL`; mark deeper observed `SOMETIMES`/`FLEX` descendants as `OPTIONAL_TERMINAL`. If a branch has no `CORE/FREQUENT` node, use its deepest observed node as the default only for that observed family; do not synthesize an unobserved catalog node.
+For each existing canonical `familyId`:
 
-Infer non-explicit family requirement conservatively:
+1. retain every Statlocker-observed item node in that family;
+2. use the item graph only to order observed ancestors/descendants;
+3. on each observed lineage branch, choose the deepest observed node whose aggregate raw tier is `CORE` or `FREQUENT` as `DEFAULT_TERMINAL`;
+4. deeper Statlocker-observed `SOMETIMES`/`FLEX` descendants become `OPTIONAL_TERMINAL`;
+5. if an observed family has no `CORE/FREQUENT` node, its deepest observed node is the default for that family;
+6. never synthesize an unobserved catalog node as a terminal.
+
+Initial non-explicit family requirement inference is intentionally conservative and deterministic:
 
 ```ts
-const required = family.profileCoverage === 1 &&
+const inferredRequired =
+  family.profileCoverage === 1 &&
   family.aggregateFrequencyTier === 'CORE' &&
   !choiceFamilyIds.has(family.familyId);
 ```
 
-Map remaining `FREQUENT` families to `OPTIONAL` and `SOMETIMES/FLEX` families to `SITUATIONAL`, unless explicit Statlocker grouping gives stronger semantics. Explicit CHOICE becomes a family-level CHOICE group; explicit REQUIRED makes the family REQUIRED; explicit OPTIONAL prevents inferred REQUIRED.
+Explicit Statlocker grouping overrides inference:
 
-- [ ] **Step 6: Run focused compiler/profile tests**
+- explicit REQUIRED -> `REQUIRED`
+- explicit OPTIONAL -> never inferred REQUIRED
+- explicit CHOICE -> represented by a family-level CHOICE group
 
-Run the same command as Step 3.
+For non-explicit non-required families:
 
-Expected: PASS with one family for A/B/C, D retained only when Statlocker-backed, and no catalog-only terminal promotion.
+- aggregate `FREQUENT` -> `OPTIONAL`
+- aggregate `SOMETIMES` or `FLEX` -> `SITUATIONAL`
 
-- [ ] **Step 7: Commit**
+Do not loosen the 100% inferred REQUIRED rule until frozen real-data evidence demonstrates a concrete false negative and a focused regression justifies calibration.
+
+### Step 1.6 - GREEN
+
+Run the Step 1.3 command. Expected: PASS.
+
+### Step 1.7 - Commit
 
 ```bash
-git add apps/api/src/statlocker-adaptive/build-archetype-v2.ts apps/api/src/statlocker-adaptive/build-archetype-compiler-v2.service.ts apps/api/src/statlocker-adaptive/statlocker-build-profile-v2.ts apps/api/test/build-archetype-compiler-v2.spec.ts apps/api/test/statlocker-build-profile-v2.spec.ts
+git add apps/api/src/statlocker-adaptive/build-archetype-v2.ts apps/api/src/statlocker-adaptive/build-archetype-compiler-v2.service.ts apps/api/src/statlocker-adaptive/statlocker-build-profile-v2.ts apps/api/src/statlocker-adaptive/statlocker-build-v2.config.ts apps/api/test/build-archetype-compiler-v2.spec.ts apps/api/test/statlocker-build-profile-v2.spec.ts
 git commit -m "refactor(strategy-v2): compile family-first archetypes"
 ```
 
 ---
 
-### Task 2: Make archetype quality and initial WPA selection family-aware
+## Task 2: Make archetype quality gating and initial VS_HERO_WPA selection family-aware
 
-**Files:**
+**Files**
+
 - Modify: `apps/api/src/statlocker-adaptive/build-archetype-quality-gate-v2.service.ts`
 - Modify: `apps/api/src/statlocker-adaptive/build-archetype-selector-v2.service.ts`
 - Modify: `apps/api/src/statlocker-adaptive/statlocker-build-v2.config.ts`
 - Modify: `apps/api/test/build-archetype-quality-gate-v2.spec.ts`
 - Modify: `apps/api/test/build-archetype-selector-v2.spec.ts`
 
-**Interfaces:**
-- Consumes: family-first `BuildArchetypeV2` from Task 1 and existing `RecommendationItemGraph`/VS_HERO_WPA rows.
-- Produces: publication gate that rejects impossible family contracts and selector scores based on default family semantics rather than flat item count.
+### Step 2.1 - RED: impossible final contract is rejected before planner
 
-- [ ] **Step 1: Write a failing terminal-capacity gate test**
-
-Build an archetype with 12 REQUIRED families plus one CHOICE group with `minSelect=1` and capacity policy 12. Assert rejection:
+Create an archetype with 12 REQUIRED families plus one CHOICE group with `minSelect=1` and capacity 12. Assert:
 
 ```ts
 expect(result.accepted).toBe(false);
 expect(result.reasonCodes).toContain('TERMINAL_CAPACITY_CONFLICT');
 ```
 
-Add a companion case with 8 REQUIRED families plus two CHOICE groups each `minSelect=1`; assert acceptance when all other quality rules pass.
+Add a passing companion with 8 REQUIRED families and two CHOICE groups each `minSelect=1`.
 
-- [ ] **Step 2: Write failing family/terminal validity tests**
+### Step 2.2 - RED: family/terminal validity
 
-Assert the gate rejects a family with no Statlocker-backed default terminal, a terminal item unknown to the graph, duplicate family IDs, invalid CHOICE bounds, and a CHOICE family not present in `archetype.families`.
+Assert rejection for:
 
-- [ ] **Step 3: Write a failing selector regression proving one family is one scoring unit**
+- duplicate family IDs;
+- family with no default terminal;
+- terminal item unknown to item graph;
+- terminal not present in that family's Statlocker-observed nodes;
+- invalid CHOICE min/max;
+- CHOICE referencing a non-existent family.
 
-Use two archetypes where one contains three upgrade tiers in one family and the other contains one terminal item. Give identical terminal WPA. Assert the first archetype gets no hidden score bonus from having three observed progression nodes.
+### Step 2.3 - RED: one family is one WPA scoring unit
 
-For CHOICE, give two alternatives and assert the group is evaluated as `minSelect` alternatives, not summed as if all are bought.
+Construct two otherwise equivalent archetypes. One has three observed tiers in one family; the other has one terminal node in one family. Give equal terminal matchup evidence. Assert the first gets no bonus merely from having more tiers.
 
-- [ ] **Step 4: Run focused gate/selector tests and verify RED**
+For CHOICE, assert only `minSelect` chosen alternatives contribute to the archetype score, not all candidates summed together.
+
+### Step 2.4 - Verify RED
 
 ```bash
 yarn workspace @deadlock-live-probe/api test --runTestsByPath test/build-archetype-quality-gate-v2.spec.ts test/build-archetype-selector-v2.spec.ts
 ```
 
-Expected: FAIL because the current gate/selector iterate flat `items` and groups of item IDs.
+Expected: FAIL against current flat-item gate/selector behavior.
 
-- [ ] **Step 5: Add publication capacity policy and quality reason codes**
+### Step 2.5 - Implement family quality gate
 
-Add an explicit 12-slot publication capacity in centralized config:
+Add centralized config:
 
 ```ts
 archetypePublication: {
@@ -302,7 +251,7 @@ archetypePublication: {
 }
 ```
 
-Add reason codes at minimum:
+Add gate reasons:
 
 ```ts
 'TERMINAL_CAPACITY_CONFLICT'
@@ -311,19 +260,29 @@ Add reason codes at minimum:
 'FAMILY_TERMINAL_NOT_OBSERVED'
 ```
 
-Compute minimum required occupancy as REQUIRED family count plus `sum(group.minSelect)` for CHOICE groups. Reject before publication when it exceeds 12.
+Compute:
 
-- [ ] **Step 6: Update selector scoring to family/default-terminal units**
+```ts
+minimumRequiredOccupancy =
+  requiredFamilyCount +
+  sum(choiceGroups.map((group) => group.minSelect));
+```
 
-For each non-CHOICE family, score its default terminal candidates as one weighted family unit. For CHOICE groups, rank candidate families by their default-terminal matchup score and aggregate only the required number of selections. Do not include OPTIONAL_TERMINAL descendants in initial archetype selection merely because they exist; optional-terminal promotion belongs to runtime desired-state selection.
+Reject when occupancy > 12. Unused slots are valid and remain available to optional/situational runtime choices.
 
-- [ ] **Step 7: Run focused tests**
+### Step 2.6 - Implement family-aware initial archetype selector
 
-Run the Step 4 command.
+Normal match lock still uses full enemy roster + VS_HERO_WPA only.
 
-Expected: PASS.
+- non-CHOICE family: score its default terminal as one family unit;
+- CHOICE: rank candidate families by default-terminal WPA and contribute only the number required by `minSelect`;
+- OPTIONAL_TERMINAL descendants do not add initial archetype score merely because they exist; optional promotion is a runtime desired-state decision.
 
-- [ ] **Step 8: Commit**
+### Step 2.7 - GREEN
+
+Run Step 2.4. Expected: PASS.
+
+### Step 2.8 - Commit
 
 ```bash
 git add apps/api/src/statlocker-adaptive/build-archetype-quality-gate-v2.service.ts apps/api/src/statlocker-adaptive/build-archetype-selector-v2.service.ts apps/api/src/statlocker-adaptive/statlocker-build-v2.config.ts apps/api/test/build-archetype-quality-gate-v2.spec.ts apps/api/test/build-archetype-selector-v2.spec.ts
@@ -332,17 +291,56 @@ git commit -m "feat(strategy-v2): gate and select family archetypes"
 
 ---
 
-### Task 3: Add desired-build-state selection with CHOICE and optional-terminal WPA promotion
+## Task 3: Add desired-build-state selection, CHOICE resolution, and optional-terminal WPA promotion
 
-**Files:**
+**Files**
+
 - Create: `apps/api/src/statlocker-adaptive/build-desired-state-v2.service.ts`
 - Create: `apps/api/test/build-desired-state-v2.spec.ts`
+- Modify: `apps/api/src/statlocker-adaptive/build-item-utility-v2.service.ts`
 - Modify: `apps/api/src/statlocker-adaptive/statlocker-build-v2.config.ts`
-- Modify: `apps/api/src/statlocker-adaptive/build-item-utility-v2.service.ts` only where a reusable incremental terminal score is needed.
 
-**Interfaces:**
-- Consumes: locked `BuildArchetypeV2`, current inventory/time, enemy roster/threat, VS_HERO_WPA, WPA patch data, T4 chains.
-- Produces:
+### Step 3.1 - RED: default terminal remains default on weak evidence
+
+For one REQUIRED family with C default and D optional, provide low/noisy incremental D evidence and assert C stays selected.
+
+### Step 3.2 - RED: strong Statlocker WPA promotes optional terminal
+
+With the same family, give D strong sufficiently confident exact-enemy WPA and assert:
+
+```ts
+expect(result.families[0]).toMatchObject({
+  selectedTerminalItemId: D,
+  selectedTerminalKind: 'OPTIONAL_TERMINAL',
+});
+expect(result.families[0].reasonCodes).toContain('OPTIONAL_TERMINAL_WPA_SELECTED');
+```
+
+### Step 3.3 - RED: CHOICE selects only the required alternatives
+
+Create `CHOICE(X, Y)` with `minSelect=1,maxSelect=1`. Give Y stronger exact-enemy value. Assert only Y enters desired state.
+
+### Step 3.4 - RED: OPTIONAL/SITUATIONAL fill only remaining capacity
+
+Create:
+
+- 8 REQUIRED families;
+- one CHOICE group requiring one family;
+- four OPTIONAL/SITUATIONAL families.
+
+Capacity = 12. Assert desired state always includes the 9 mandatory slots and selects at most 3 optional/situational families. Give one candidate utility below the existing buy-improvement floor and assert the planner may intentionally leave a slot unused rather than add negative/noisy value.
+
+### Step 3.5 - Verify RED
+
+```bash
+yarn workspace @deadlock-live-probe/api test --runTestsByPath test/build-desired-state-v2.spec.ts
+```
+
+Expected: FAIL because desired-state service does not exist.
+
+### Step 3.6 - Add desired-state contracts and policy
+
+Define:
 
 ```ts
 export interface DesiredFamilyStateV2 {
@@ -363,34 +361,7 @@ export interface DesiredBuildStateV2 {
 }
 ```
 
-- [ ] **Step 1: Write failing default-vs-optional terminal tests**
-
-For one REQUIRED family with C default and D optional, assert low/noisy incremental D evidence keeps C:
-
-```ts
-expect(result.families[0]).toMatchObject({
-  selectedTerminalItemId: C,
-  selectedTerminalKind: 'DEFAULT_TERMINAL',
-});
-```
-
-Then supply strong sufficiently confident D WPA and assert D is selected with `OPTIONAL_TERMINAL_WPA_SELECTED`.
-
-- [ ] **Step 2: Write failing CHOICE test**
-
-Create one `CHOICE` group with family X and family Y, `minSelect=1,maxSelect=1`, give Y stronger exact-enemy WPA, and assert only Y enters the desired state.
-
-- [ ] **Step 3: Run desired-state tests and verify RED**
-
-```bash
-yarn workspace @deadlock-live-probe/api test --runTestsByPath test/build-desired-state-v2.spec.ts
-```
-
-Expected: FAIL because desired-state service does not exist.
-
-- [ ] **Step 4: Add centralized optional-terminal promotion policy**
-
-Initialize promotion policy from already-approved V2 thresholds rather than inventing a looser path:
+Initialize optional-terminal promotion policy from existing V2 scales:
 
 ```ts
 optionalTerminal: {
@@ -399,84 +370,56 @@ optionalTerminal: {
 }
 ```
 
-`0.08` matches the existing V2 plan-switch improvement scale and `0.35` matches existing V2 matchup-confidence policy. Keep these fields centralized so the frozen Billy fixture can expose whether later calibration is justified.
+These values reuse the existing V2 plan-switch and matchup-confidence scales; if frozen Billy evidence exposes a bad calibration, change them only with a focused regression.
 
-- [ ] **Step 5: Implement desired-state selection**
+### Step 3.7 - Implement desired state in this order
 
-Select REQUIRED families first. Resolve each CHOICE group by terminal utility/WPA and `minSelect/maxSelect`. For each selected family, start from its best default terminal. Compare Statlocker-backed optional terminals only against that family's selected default terminal; promote only when incremental utility meets both thresholds. Never consider a catalog-only terminal.
+1. include all REQUIRED families at their default terminal;
+2. resolve each CHOICE group according to `minSelect/maxSelect` using current Statlocker/WPA utility;
+3. evaluate OPTIONAL_TERMINAL promotion only within already-selected families and only against that family's default terminal;
+4. rank OPTIONAL/SITUATIONAL families for remaining capacity using Statlocker-backed utility;
+5. add only candidates that clear existing buy/improvement/confidence policy;
+6. include accepted outside-archetype candidates later through Task 6, never by catalog discovery.
 
-The service returns goals only; it must not emit BUY/UPGRADE/REPLACE actions.
+This service returns goals only. It must not generate BUY/UPGRADE/REPLACE actions.
 
-- [ ] **Step 6: Run tests**
+### Step 3.8 - GREEN
 
-Run the Step 3 command.
+Run Step 3.5. Expected: PASS.
 
-Expected: PASS.
-
-- [ ] **Step 7: Commit**
+### Step 3.9 - Commit
 
 ```bash
-git add apps/api/src/statlocker-adaptive/build-desired-state-v2.service.ts apps/api/test/build-desired-state-v2.spec.ts apps/api/src/statlocker-adaptive/statlocker-build-v2.config.ts apps/api/src/statlocker-adaptive/build-item-utility-v2.service.ts
+git add apps/api/src/statlocker-adaptive/build-desired-state-v2.service.ts apps/api/test/build-desired-state-v2.spec.ts apps/api/src/statlocker-adaptive/build-item-utility-v2.service.ts apps/api/src/statlocker-adaptive/statlocker-build-v2.config.ts
 git commit -m "feat(strategy-v2): select desired family terminals"
 ```
 
 ---
 
-### Task 4: Replace sticky completion with current family satisfaction and semantic validation
+## Task 4: Replace sticky completion with current family satisfaction and semantic validation
 
-**Files:**
+**Files**
+
 - Create: `apps/api/src/statlocker-adaptive/build-family-satisfaction-v2.ts`
 - Create: `apps/api/src/statlocker-adaptive/full-build-semantic-validator-v2.service.ts`
 - Create: `apps/api/test/build-family-satisfaction-v2.spec.ts`
 - Create: `apps/api/test/full-build-semantic-validator-v2.spec.ts`
 - Modify: `apps/api/src/statlocker-adaptive/full-build-plan-v2.ts`
 
-**Interfaces:**
-- Produces pure evaluation:
+### Step 4.1 - RED: current-inventory family status
 
-```ts
-export type BuildFamilySatisfactionStatusV2 =
-  | 'UNSATISFIED'
-  | 'IN_PROGRESS'
-  | 'DEFAULT_TERMINAL_SATISFIED'
-  | 'OPTIONAL_TERMINAL_SATISFIED';
+For `A -> B -> C -> D`, assert:
 
-export interface BuildFamilySatisfactionV2 {
-  familyId: number;
-  status: BuildFamilySatisfactionStatusV2;
-  heldItemIds: readonly number[];
-  satisfyingTerminalItemId?: number;
-}
+- B held -> `IN_PROGRESS`
+- C held -> `DEFAULT_TERMINAL_SATISFIED`
+- D held -> `OPTIONAL_TERMINAL_SATISFIED`
+- none held -> `UNSATISFIED`
 
-export function evaluateBuildFamilySatisfactionV2(
-  archetype: BuildArchetypeV2,
-  inventoryItemIds: readonly number[],
-  graph: RecommendationItemGraph,
-): readonly BuildFamilySatisfactionV2[];
-```
+### Step 4.2 - RED: no sticky completion
 
-- Produces semantic validator:
+Start with REQUIRED X satisfied by C. Apply a REPLACE that removes C for another family's Y. Assert final X is UNSATISFIED and validation contains `REQUIRED_FAMILY_REGRESSION`.
 
-```ts
-validate(input: {
-  archetype: BuildArchetypeV2;
-  desiredState: DesiredBuildStateV2;
-  initialInventoryItemIds: readonly number[];
-  steps: readonly FullBuildStepV2[];
-  finalInventoryItemIds: readonly number[];
-  itemGraph: RecommendationItemGraph;
-}): FullBuildSemanticValidationV2;
-```
-
-- [ ] **Step 1: Write failing satisfaction state tests**
-
-For `A -> B -> C -> D`, assert B=`IN_PROGRESS`, C=`DEFAULT_TERMINAL_SATISFIED`, D=`OPTIONAL_TERMINAL_SATISFIED`, and inventory without any family node=`UNSATISFIED`.
-
-- [ ] **Step 2: Write failing no-sticky-completion regression**
-
-Start with REQUIRED family X satisfied by C. Provide a trajectory that `REPLACE`s C with another family's Y. Assert final X is UNSATISFIED and semantic validation fails with `REQUIRED_FAMILY_REGRESSION`.
-
-- [ ] **Step 3: Write failing anti-churn regression**
+### Step 4.3 - RED: anti-churn
 
 Validate:
 
@@ -485,30 +428,47 @@ BUY X
 REPLACE X -> Y
 ```
 
-inside one plan and assert:
+Assert:
 
 ```ts
 expect(validation.valid).toBe(false);
 expect(validation.reasonCodes).toContain('IMMEDIATE_BUY_REPLACE_CHURN');
 ```
 
-Also prove `BUY A -> UPGRADE A -> B` is valid and not churn.
+Control case:
 
-- [ ] **Step 4: Run focused tests and verify RED**
+```text
+BUY A
+UPGRADE A -> B
+```
+
+must be valid and must not count as churn.
+
+### Step 4.4 - Verify RED
 
 ```bash
 yarn workspace @deadlock-live-probe/api test --runTestsByPath test/build-family-satisfaction-v2.spec.ts test/full-build-semantic-validator-v2.spec.ts
 ```
 
-Expected: FAIL because these components do not exist.
+Expected: FAIL because the pure satisfaction evaluator and semantic validator do not exist.
 
-- [ ] **Step 5: Implement current-inventory satisfaction**
+### Step 4.5 - Implement pure current satisfaction
 
-Determine held family nodes from the current inventory. A held optional terminal satisfies the family at the highest state; a held default terminal satisfies default; an ancestor/intermediate yields IN_PROGRESS. Historical ownership is not an input.
+Add:
 
-- [ ] **Step 6: Implement semantic validation**
+```ts
+export type BuildFamilySatisfactionStatusV2 =
+  | 'UNSATISFIED'
+  | 'IN_PROGRESS'
+  | 'DEFAULT_TERMINAL_SATISFIED'
+  | 'OPTIONAL_TERMINAL_SATISFIED';
+```
 
-Add reason codes at minimum:
+`evaluateBuildFamilySatisfactionV2()` receives only archetype, current inventory, and graph. Historical ownership is not an input.
+
+### Step 4.6 - Implement semantic validator
+
+Add reasons:
 
 ```ts
 'REQUIRED_FAMILY_UNSATISFIED'
@@ -519,33 +479,41 @@ Add reason codes at minimum:
 'UNSUPPORTED_STRATEGIC_TERMINAL'
 ```
 
-Track satisfaction after every `FullBuildStepV2`. REQUIRED satisfied-family count may not decrease. CHOICE groups must remain within their contract. A purchase that later disappears without being consumed by an upgrade is invalid in this first family-first version.
+Rules:
 
-- [ ] **Step 7: Extend full-build plan validation shape**
+- final projected inventory satisfies every desired REQUIRED family;
+- final CHOICE selections satisfy min/max;
+- REQUIRED satisfied-family count cannot decrease at any step;
+- a purchased item may disappear only if a legal UPGRADE consumes it in this first implementation;
+- every selected terminal is a Statlocker-observed terminal candidate of its family.
 
-Keep combined `validation.valid/reasonCodes` for existing consumers, and add explicit mechanical/semantic detail:
+### Step 4.7 - Extend `ResolvedFullBuildPlanV2`
+
+Keep combined `validation` for existing consumers, and add explicit layers:
 
 ```ts
 export interface ResolvedFullBuildPlanV2 {
-  // existing identity fields
+  planRevision: string;
+  matchId: string;
+  heroId: number;
+  archetypeId: string;
+  stateRevision: string;
   steps: readonly FullBuildStepV2[];
   desiredState: DesiredBuildStateV2;
+  degradedReasons: readonly string[];
   mechanicalValidation: FullBuildValidationV2;
   semanticValidation: FullBuildSemanticValidationV2;
   validation: FullBuildValidationV2;
-  degradedReasons: readonly string[];
 }
 ```
 
-Combined validation is valid only when both mechanical and semantic validation are valid.
+Combined `validation.valid` is true only when both layers are valid.
 
-- [ ] **Step 8: Run focused tests**
+### Step 4.8 - GREEN
 
-Run the Step 4 command.
+Run Step 4.4. Expected: PASS.
 
-Expected: PASS.
-
-- [ ] **Step 9: Commit**
+### Step 4.9 - Commit
 
 ```bash
 git add apps/api/src/statlocker-adaptive/build-family-satisfaction-v2.ts apps/api/src/statlocker-adaptive/full-build-semantic-validator-v2.service.ts apps/api/test/build-family-satisfaction-v2.spec.ts apps/api/test/full-build-semantic-validator-v2.spec.ts apps/api/src/statlocker-adaptive/full-build-plan-v2.ts
@@ -554,39 +522,40 @@ git commit -m "feat(strategy-v2): validate current family satisfaction"
 
 ---
 
-### Task 5: Implement family-aware transaction planning and real one-slot upgrades
+## Task 5: Implement family-aware transaction planning and one-slot Deadlock upgrades
 
-**Files:**
+**Files**
+
 - Create: `apps/api/src/statlocker-adaptive/full-build-transaction-planner-v2.service.ts`
 - Create: `apps/api/test/full-build-transaction-planner-v2.spec.ts`
-- Modify: `apps/api/src/statlocker-adaptive/full-build-inventory-simulator-v2.ts` only if a mechanics defect is exposed.
+- Modify only if mechanics regression proves necessary: `apps/api/src/statlocker-adaptive/full-build-inventory-simulator-v2.ts`
 - Modify: `apps/api/test/full-build-inventory-simulator-v2.spec.ts`
 - Modify: `apps/api/src/statlocker-adaptive/full-build-resolver-v2.service.ts`
 - Modify: `apps/api/test/full-build-resolver-v2.spec.ts`
 - Modify: `apps/api/test/full-build-resolver-v2-lifetime.spec.ts`
 - Modify: `apps/api/test/full-build-resolver-v2-replacement.spec.ts`
 - Modify: `apps/api/test/full-build-lifetime-ranked-fallback-v2.spec.ts`
-- Delete or replace: `apps/api/test/full-build-lifetime-mandatory-core-v2.spec.ts`
+- Replace/delete old semantic regression: `apps/api/test/full-build-lifetime-mandatory-core-v2.spec.ts`
 
-**Interfaces:**
-- Consumes: current inventory, desired build state, family archetype, item graph, capacity, item utility, transition policy.
-- Produces: ordered `FullBuildTransitionIntentV2[]`; `FullBuildResolverV2Service.resolve()` remains the public facade and returns `ResolvedFullBuildPlanV2`.
+### Step 5.1 - RED: 12/12 executable upgrade remains 12/12
 
-- [ ] **Step 1: Write the failing full-inventory upgrade regression**
-
-Build capacity 12 with 12 held items including C, legal observed `C -> D`, and desired terminal D. Assert the planner emits exactly one UPGRADE and keeps 12 held items:
+Capacity = 12. Inventory has 12 items including C. `C -> D` is a legal observed lineage and desired terminal is D. Assert first step:
 
 ```ts
-expect(plan.steps[0]).toMatchObject({ action: 'UPGRADE', buyItemId: D });
+expect(plan.steps[0]).toMatchObject({
+  action: 'UPGRADE',
+  buyItemId: D,
+});
 expect(plan.steps[0].consumedItemIds).toEqual([C]);
 expect(plan.steps[0].inventoryBefore).toHaveLength(12);
 expect(plan.steps[0].inventoryAfter).toHaveLength(12);
-expect(plan.steps[0].action).not.toBe('REPLACE');
 ```
 
-- [ ] **Step 2: Write the failing complete lineage regression**
+Assert no REPLACE and no `LIFETIME_PROGRESS_BLOCKED` solely due to full inventory.
 
-From empty inventory with desired D on `A -> B -> C -> D`, assert action semantics:
+### Step 5.2 - RED: full lineage uses BUY once then UPGRADE
+
+From empty inventory and desired D on `A -> B -> C -> D`:
 
 ```ts
 expect(plan.steps.map((step) => [step.action, step.buyItemId])).toEqual([
@@ -597,62 +566,70 @@ expect(plan.steps.map((step) => [step.action, step.buyItemId])).toEqual([
 ]);
 ```
 
-And when desired terminal is C, assert the sequence stops at C.
+When desired terminal is C, assert plan stops at C.
 
-- [ ] **Step 3: Write the failing replacement regression against required-family regression**
+### Step 5.3 - RED: optional family cannot destroy REQUIRED state
 
-With full inventory, REQUIRED family X satisfied and OPTIONAL target Z attractive, make the only free-slot path sell X. Assert no replacement is emitted and the branch is rejected with `REQUIRED_FAMILY_REGRESSION`/`NO_ACCEPTED_REPLACEMENT` trace evidence.
+At full capacity, make OPTIONAL Z attractive but make the only possible slot source the terminal of satisfied REQUIRED X. Assert no accepted replacement and trace reason includes `REQUIRED_FAMILY_REGRESSION`.
 
-- [ ] **Step 4: Run planner/resolver/simulator tests and verify RED**
+### Step 5.4 - Verify RED
 
 ```bash
 yarn workspace @deadlock-live-probe/api test --runTestsByPath test/full-build-transaction-planner-v2.spec.ts test/full-build-inventory-simulator-v2.spec.ts test/full-build-resolver-v2.spec.ts test/full-build-resolver-v2-lifetime.spec.ts test/full-build-resolver-v2-replacement.spec.ts test/full-build-lifetime-ranked-fallback-v2.spec.ts
 ```
 
-Expected: FAIL because the current lifetime resolver selects one flat semantic target at a time and uses sticky `completedSemanticItemIds`/mandatory-core replacement override.
+Expected: FAIL because current resolver uses flat one-target planning, sticky `completedSemanticItemIds`, and mandatory-core replacement override.
 
-- [ ] **Step 5: Implement deterministic next-upgrade path selection**
+### Step 5.5 - Implement observed lineage path search
 
-Within a family, find the shortest legal observed-node path from the held ancestor to `selectedTerminalItemId`. The next transaction is the direct child upgrade whose recipe consumes the currently held ancestor. Reject a family path if its next strategic node is not Statlocker-observed or no legal recipe exists.
+Within one selected family:
 
-Normal upgrade policy is atomic and one-slot:
+- find currently held family node, if any;
+- find shortest legal path through Statlocker-observed progression nodes to `selectedTerminalItemId`;
+- direct next descendant must have a legal graph recipe that consumes the currently held ancestor;
+- emit `UPGRADE` with that recipe;
+- do not check for an empty slot before an executable one-slot UPGRADE;
+- reject path if the next strategic node is not Statlocker-observed or mechanics are not legal.
 
-```ts
-if (ownedAncestor && nextUpgrade) {
-  return {
-    action: 'UPGRADE',
-    buyItemId: nextUpgrade.itemId,
-    recipeId: nextUpgrade.recipeId,
-    reasonCodes: ['FAMILY_PROGRESSION', 'RECIPE_UPGRADE_PREFERRED'],
-  };
-}
-```
+### Step 5.6 - Implement BUY entry and cross-family REPLACE
 
-No empty-slot check is performed for this executable upgrade.
+If selected family has no held ancestor:
 
-- [ ] **Step 6: Implement goal-first BUY/REPLACE planning**
+- BUY earliest Statlocker-observed purchasable entry when capacity is available;
+- when capacity is full, enumerate legal cross-family REPLACE candidates;
+- mechanically simulate candidate state;
+- recompute semantic family satisfaction;
+- hard-reject candidate if REQUIRED count decreases or CHOICE bounds break;
+- only then compare resulting whole-build utility and transition cost.
 
-For an unsatisfied desired family with no held ancestor, buy the earliest Statlocker-observed purchasable path entry when capacity is available. At full capacity, enumerate deliberate cross-family REPLACE candidates. Simulate resulting state and hard-reject any candidate that reduces REQUIRED satisfaction or violates CHOICE bounds before comparing utility.
+Remove from `full-build-resolver-v2.service.ts`:
 
-Remove `mandatoryCore` and `MANDATORY_CORE_PROGRESSION_REPLACEMENT`; no target may bypass utility/semantic constraints merely because its raw tier is CORE.
+- `mandatoryCore`
+- `MANDATORY_CORE_PROGRESSION_REPLACEMENT`
+- marginal-gain threshold override whose sole purpose is touching every raw CORE item.
 
-- [ ] **Step 7: Make `FullBuildResolverV2Service` an orchestration facade**
+### Step 5.7 - Refactor resolver into orchestration facade
 
-Inject/use `BuildDesiredStateV2Service`, `FullBuildTransactionPlannerV2Service`, the existing simulator, and `FullBuildSemanticValidatorV2Service`. Resolve desired state once per plan revision, generate transactions toward it, mechanically simulate them, semantically validate the trajectory, and return combined validation.
+`FullBuildResolverV2Service` should:
 
-Preserve the public overloaded transition-evaluation API only if existing production call sites still use it; otherwise remove the unused overload and keep one lifetime-plan contract. Do not preserve flat-goal state for compatibility.
+1. resolve `DesiredBuildStateV2` once per plan revision;
+2. call family-aware transaction planner;
+3. run existing mechanical simulator;
+4. run semantic validator;
+5. combine validation and degraded reasons;
+6. apply existing plan hysteresis without allowing hysteresis to override semantic hard rejections.
 
-- [ ] **Step 8: Replace the mandatory-core regression**
+Keep the old transition-evaluation overload only if an actual remaining call site requires it. Otherwise remove dead compatibility rather than preserving two planner semantics.
 
-Delete or rename `full-build-lifetime-mandatory-core-v2.spec.ts`. Its replacement must assert that a low-utility replacement cannot sacrifice a satisfied REQUIRED family merely to touch another raw CORE item.
+### Step 5.8 - Replace the old mandatory-core regression
 
-- [ ] **Step 9: Run focused tests**
+Delete `apps/api/test/full-build-lifetime-mandatory-core-v2.spec.ts` after adding equivalent mechanics coverage elsewhere. Its replacement regression must assert a satisfied REQUIRED family is not sacrificed merely to touch another raw CORE item.
 
-Run the Step 4 command.
+### Step 5.9 - GREEN
 
-Expected: PASS, including `12/12 -> UPGRADE -> 12/12`, complete lineage progression, no sticky completion, and no mandatory-core churn.
+Run Step 5.4. Expected: PASS.
 
-- [ ] **Step 10: Commit**
+### Step 5.10 - Commit
 
 ```bash
 git add apps/api/src/statlocker-adaptive/full-build-transaction-planner-v2.service.ts apps/api/src/statlocker-adaptive/full-build-resolver-v2.service.ts apps/api/src/statlocker-adaptive/full-build-inventory-simulator-v2.ts apps/api/test/full-build-transaction-planner-v2.spec.ts apps/api/test/full-build-inventory-simulator-v2.spec.ts apps/api/test/full-build-resolver-v2.spec.ts apps/api/test/full-build-resolver-v2-lifetime.spec.ts apps/api/test/full-build-resolver-v2-replacement.spec.ts apps/api/test/full-build-lifetime-ranked-fallback-v2.spec.ts apps/api/test/full-build-lifetime-mandatory-core-v2.spec.ts
@@ -661,24 +638,22 @@ git commit -m "refactor(strategy-v2): plan family-aware lifetime transactions"
 
 ---
 
-### Task 6: Integrate hysteresis, outside candidates, trace, and runtime orchestration with desired state
+## Task 6: Integrate outside candidates, hysteresis, trace, and runtime orchestration
 
-**Files:**
+**Files**
+
 - Modify: `apps/api/src/statlocker-adaptive/adaptive-recommendation-v2.service.ts`
 - Modify: `apps/api/src/statlocker-adaptive/full-build-hysteresis-v2.service.ts`
 - Modify: `apps/api/src/statlocker-adaptive/matchup-candidate-discovery-v2.service.ts`
 - Modify: `apps/api/src/statlocker-adaptive/build-decision-trace-v2.ts`
+- Modify: `apps/api/src/statlocker-adaptive/build-debug-trace-store-v2.service.ts` only if typed trace storage shape requires it
+- Modify: `apps/api/test/adaptive-recommendation-v2.e2e.spec.ts`
 - Modify: `apps/api/test/full-build-hysteresis-v2.spec.ts`
 - Modify: `apps/api/test/matchup-candidate-discovery-v2.spec.ts`
-- Modify: `apps/api/test/adaptive-recommendation-v2.e2e.spec.ts`
 
-**Interfaces:**
-- Consumes: locked family archetype, existing outside candidates, previous trace/plan revision.
-- Produces: one desired-state-backed plan per request plus typed trace evidence explaining terminal/choice/transaction decisions.
+### Step 6.1 - RED: runtime response contains desired state + semantic validation
 
-- [ ] **Step 1: Write failing runtime integration tests**
-
-Extend `adaptive-recommendation-v2.e2e.spec.ts` to assert:
+Extend `adaptive-recommendation-v2.e2e.spec.ts`:
 
 ```ts
 expect(result.fullBuild?.desiredState).toBeDefined();
@@ -686,71 +661,85 @@ expect(result.fullBuild?.semanticValidation.valid).toBe(true);
 expect(result.nextAction.type).toBe(result.fullBuild?.steps[0].action);
 ```
 
-Add a second request for the same match and assert the immutable archetype lock remains unchanged while a material live/WPA change may alter an optional terminal/CHOICE decision without changing `archetypeId`.
+Issue a second request for the same match. Assert lock/archetype ID is unchanged while a material live/WPA change may alter optional terminal or CHOICE decision inside that archetype.
 
-- [ ] **Step 2: Add a failing previous-plan hysteresis wiring test**
+### Step 6.2 - RED: previous-plan hysteresis is actually wired
 
-Put a previous full plan in `BuildDebugTraceStoreV2Service`, issue a new recommendation with a tiny desired-state improvement, and assert the near-term plan remains stable. With a material improvement above policy, assert a new plan revision is accepted.
+Store previous full plan in `BuildDebugTraceStoreV2Service`, then recompute with tiny improvement. Assert near-term plan is held. Recompute with improvement above policy and assert switch is accepted.
 
-- [ ] **Step 3: Run focused runtime tests and verify RED**
+### Step 6.3 - RED: outside candidate cannot break required families
+
+Provide a Statlocker-backed outside candidate with strong WPA but no free optional slot except by breaking a REQUIRED family. Assert it is not selected.
+
+### Step 6.4 - Verify RED
 
 ```bash
 yarn workspace @deadlock-live-probe/api test --runTestsByPath test/adaptive-recommendation-v2.e2e.spec.ts test/full-build-hysteresis-v2.spec.ts test/matchup-candidate-discovery-v2.spec.ts
 ```
 
-Expected: FAIL until desired state/semantic validation and previous-plan wiring are propagated.
+Expected: FAIL until desired-state/semantic fields and previous-plan wiring are propagated.
 
-- [ ] **Step 4: Preserve outside-archetype policy as situational desired-state candidates**
+### Step 6.5 - Integrate outside candidates as situational desired-state competitors
 
-Keep existing Statlocker provenance/confidence gates. An accepted outside candidate may compete only for OPTIONAL/SITUATIONAL capacity and may never reduce REQUIRED satisfaction. Do not turn it into a new archetype or a catalog-derived family.
+Keep existing Statlocker provenance/coverage/confidence gates. Outside candidates compete only for OPTIONAL/SITUATIONAL capacity. They cannot reduce REQUIRED satisfaction or mutate the immutable archetype ID.
 
-- [ ] **Step 5: Wire previous plan into hysteresis**
+### Step 6.6 - Wire previous plan into hysteresis
 
-Read `this.traceStore.get(matchId)?.finalPlan` before planning and pass the previous plan/revision into the resolver/hysteresis path. Near-term committed actions retain stronger protection than distant future changes; required-family regression is still a hard semantic rejection, not a hysteresis score.
-
-- [ ] **Step 6: Extend trace contracts**
-
-Add typed visibility for family semantics. Either add dedicated stages or typed payload sections; use dedicated stages for deterministic E2E/debugger visibility:
+Read existing trace/plan before resolving the new plan:
 
 ```ts
-| 'DESIRED_STATE'
-| 'SEMANTIC_VALIDATION'
+const previousPlan = this.traceStore.get(matchId)?.finalPlan;
 ```
 
-`DESIRED_STATE` must expose selected CHOICE families, default/optional terminal decisions, score/confidence, and reason codes. `PLAN_SEARCH`/`REPLACEMENT_SEARCH` must expose family-regression rejections. `SEMANTIC_VALIDATION` must expose final family statuses and semantic reason codes.
+Pass previous plan/revision through resolver/hysteresis. Near-term committed actions retain stronger protection than distant future changes. Semantic invalidity remains a hard reject, not a score penalty.
 
-- [ ] **Step 7: Run focused tests**
+### Step 6.7 - Add typed trace stages
 
-Run the Step 3 command.
+Extend stage union with:
 
-Expected: PASS.
+```ts
+'DESIRED_STATE'
+'SEMANTIC_VALIDATION'
+```
 
-- [ ] **Step 8: Commit**
+`DESIRED_STATE` exposes:
+
+- family requirement;
+- selected CHOICE families;
+- selected terminal and kind;
+- optional-terminal WPA promote/reject evidence;
+- score/confidence/reason codes.
+
+`PLAN_SEARCH` and `REPLACEMENT_SEARCH` expose family-regression rejection. `SEMANTIC_VALIDATION` exposes final family states and validation reason codes.
+
+### Step 6.8 - GREEN
+
+Run Step 6.4. Expected: PASS.
+
+### Step 6.9 - Commit
 
 ```bash
-git add apps/api/src/statlocker-adaptive/adaptive-recommendation-v2.service.ts apps/api/src/statlocker-adaptive/full-build-hysteresis-v2.service.ts apps/api/src/statlocker-adaptive/matchup-candidate-discovery-v2.service.ts apps/api/src/statlocker-adaptive/build-decision-trace-v2.ts apps/api/test/adaptive-recommendation-v2.e2e.spec.ts apps/api/test/full-build-hysteresis-v2.spec.ts apps/api/test/matchup-candidate-discovery-v2.spec.ts
+git add apps/api/src/statlocker-adaptive/adaptive-recommendation-v2.service.ts apps/api/src/statlocker-adaptive/full-build-hysteresis-v2.service.ts apps/api/src/statlocker-adaptive/matchup-candidate-discovery-v2.service.ts apps/api/src/statlocker-adaptive/build-decision-trace-v2.ts apps/api/src/statlocker-adaptive/build-debug-trace-store-v2.service.ts apps/api/test/adaptive-recommendation-v2.e2e.spec.ts apps/api/test/full-build-hysteresis-v2.spec.ts apps/api/test/matchup-candidate-discovery-v2.spec.ts
 git commit -m "feat(strategy-v2): integrate desired-state runtime planning"
 ```
 
 ---
 
-### Task 7: Propagate family semantics through shared API and production debugger
+## Task 7: Propagate family semantics through shared V2 API and production debugger
 
-**Files:**
+**Files**
+
 - Modify: `packages/shared/src/adaptive-recommendation-v2.ts`
-- Modify: `packages/shared/src/index.ts` only if new exported types require it.
+- Modify: `packages/shared/src/index.ts`
 - Modify: `apps/api/src/statlocker-adaptive/adaptive-recommendation-v2.service.ts`
 - Modify: `apps/api/src/build-debug-v2/build-debug-v2.client.ts`
 - Modify: `apps/api/src/build-debug-v2/build-debug-v2.ui.ts`
 - Modify: `apps/api/test/adaptive-recommendation-v2.e2e.spec.ts`
 - Modify: `apps/api/test/build-debug-v2.e2e.spec.ts`
 
-**Interfaces:**
-- Produces shared read-only summaries for desired family state and semantic validation while preserving ordered `fullBuild.steps` and `nextAction`.
+### Step 7.1 - RED: shared/API contract exposes both semantic and mechanical truth
 
-- [ ] **Step 1: Write failing shared/API assertions**
-
-Extend API E2E to assert `fullBuild` includes:
+Assert `fullBuild` contains:
 
 ```ts
 expect(result.fullBuild).toMatchObject({
@@ -761,11 +750,11 @@ expect(result.fullBuild).toMatchObject({
 });
 ```
 
-Assert every desired terminal has family ID, selected terminal item ID/kind, requirement/group context, and reason codes.
+Every desired family row must expose family ID, requirement/group context, selected terminal item ID/kind, score/confidence, and reason codes.
 
-- [ ] **Step 2: Write failing debugger UI assertions**
+### Step 7.2 - RED: debugger UI exposes family decisions
 
-Require the served UI/client to contain/render sections for:
+Extend debugger E2E to require visible/renderable labels/sections for:
 
 ```text
 Family progression
@@ -777,7 +766,7 @@ Semantic validation
 Anti-churn / family-regression rejection
 ```
 
-- [ ] **Step 3: Run focused API/debugger tests and verify RED**
+### Step 7.3 - Verify RED
 
 ```bash
 yarn workspace @deadlock-live-probe/api test --runTestsByPath test/adaptive-recommendation-v2.e2e.spec.ts test/build-debug-v2.e2e.spec.ts
@@ -786,21 +775,21 @@ yarn workspace @deadlock-live-probe/shared build
 
 Expected: FAIL until shared contracts and debugger rendering are updated.
 
-- [ ] **Step 4: Extend shared V2 contracts**
+### Step 7.4 - Extend shared V2 types
 
-Add explicit JSON-safe versions of `DesiredBuildStateV2`, desired family rows, and semantic validation summary to `AdaptiveFullBuildPlanV2`. Keep existing ordered step contract unchanged so downstream presentation can migrate without reconstructing planner state.
+Extend `AdaptiveFullBuildPlanV2` with JSON-safe desired-state and semantic-validation summaries while preserving existing ordered `steps`, `degradedReasons`, and combined `validation`.
 
-- [ ] **Step 5: Map API output and debugger trace**
+Do not make Overwolf reconstruct family state from reason strings.
 
-Map family IDs/requirements/terminal decisions and both validation layers from the resolver result. Update debugger rendering to read typed trace/API fields, not parse free-form reason strings.
+### Step 7.5 - Map API and debugger
 
-- [ ] **Step 6: Run focused tests/build**
+Map family IDs/requirements/terminal decisions and both validation layers in `AdaptiveRecommendationV2Service`. Update debugger to consume typed trace/API fields directly.
 
-Run the Step 3 commands.
+### Step 7.6 - GREEN
 
-Expected: PASS.
+Run Step 7.3. Expected: PASS.
 
-- [ ] **Step 7: Commit**
+### Step 7.7 - Commit
 
 ```bash
 git add packages/shared/src/adaptive-recommendation-v2.ts packages/shared/src/index.ts apps/api/src/statlocker-adaptive/adaptive-recommendation-v2.service.ts apps/api/src/build-debug-v2/build-debug-v2.client.ts apps/api/src/build-debug-v2/build-debug-v2.ui.ts apps/api/test/adaptive-recommendation-v2.e2e.spec.ts apps/api/test/build-debug-v2.e2e.spec.ts
@@ -809,21 +798,18 @@ git commit -m "feat(strategy-v2): expose family-first build diagnostics"
 
 ---
 
-### Task 8: Reopen old Task 17 and prove the corrected pipeline on frozen Billy data
+## Task 8: Reopen original Task 17 and prove the corrected pipeline on frozen Billy data
 
-**Files:**
+**Files**
+
 - Modify: `apps/api/test/statlocker-build-v2-real-data.e2e.spec.ts`
 - Read-only input: `apps/api/test/fixtures/statlocker-build-v2/billy-real.fixture.json`
 - Read-only request: `apps/api/test/fixtures/statlocker-build-v2/billy-real.request.json`
-- Do not create/finalize: `apps/api/test/fixtures/statlocker-build-v2/billy-real.expected.json` until the human-review step is approved.
+- Do not create yet: `apps/api/test/fixtures/statlocker-build-v2/billy-real.expected.json`
 
-**Interfaces:**
-- Executes the complete existing real-data path plus family-first compilation, desired-state selection, transaction planning, mechanical simulation, and semantic validation.
-- Prints stable report markers `BUILD_V2_E2E_REPORT_START` / `BUILD_V2_E2E_REPORT_END`.
+### Step 8.1 - Replace obsolete CORE-history assertions
 
-- [ ] **Step 1: Replace obsolete CORE-history assertions with family-final-state assertions**
-
-The E2E must assert at minimum:
+Assert at minimum:
 
 ```ts
 expect(fixture.proBuildAnalyses).toHaveLength(10);
@@ -836,24 +822,27 @@ expect(result.nextAction.type).toBe(result.fullBuild?.steps[0].action);
 
 Additionally assert:
 
-- all strategic terminals are Statlocker-backed
-- minimum required occupancy <= request capacity
-- every REQUIRED family is satisfied in final inventory
-- every CHOICE group satisfies min/max
-- no `REQUIRED_FAMILY_REGRESSION`
-- no `IMMEDIATE_BUY_REPLACE_CHURN`/`POINTLESS_PURCHASE_CHURN`
-- every UPGRADE consumes its held ancestor and does not exceed capacity
-- inventory never exceeds 12 for the Billy request
-- immutable lock is reused on the second request
-- trace contains existing required stages plus `DESIRED_STATE` and `SEMANTIC_VALIDATION`
+- build evidence/provenance remains Statlocker-only;
+- all strategic terminal candidates are Statlocker-observed;
+- minimum required occupancy <= request capacity;
+- every REQUIRED family is final-satisfied;
+- every CHOICE group satisfies min/max;
+- no `REQUIRED_FAMILY_REGRESSION`;
+- no `IMMEDIATE_BUY_REPLACE_CHURN` or `POINTLESS_PURCHASE_CHURN`;
+- every UPGRADE consumes its held ancestor atomically;
+- every projected inventory length <= 12;
+- every REPLACE has sell/buy IDs;
+- immutable lock is reused on second request;
+- trace includes original required stages plus `DESIRED_STATE` and `SEMANTIC_VALIDATION`.
 
-Delete any assertion whose meaning is only "every raw CORE item appeared at least once somewhere in trajectory".
+Delete any assertion whose only meaning is "every raw CORE item appeared at least once somewhere in the trajectory".
 
-- [ ] **Step 2: Expand the human-readable report**
+### Step 8.2 - Expand stable human-readable report
 
-Print:
+Between existing markers print:
 
 ```text
+BUILD_V2_E2E_REPORT_START
 Hero: Billy (72)
 Source profiles: 10
 Archetypes found: ...
@@ -874,36 +863,38 @@ FAMILY SATISFACTION:
 Inventory simulation: PASS|FAIL
 Semantic validation: PASS|FAIL
 Degraded reasons: ...
+BUILD_V2_E2E_REPORT_END
 ```
 
-- [ ] **Step 3: Run the real Billy E2E and gather the actual report**
+The actual values come from the test run; do not hardcode a desired Billy answer before execution.
 
-Run:
+### Step 8.3 - Run real Billy E2E
 
 ```bash
 yarn workspace @deadlock-live-probe/api test --runTestsByPath test/statlocker-build-v2-real-data.e2e.spec.ts
 ```
 
-Expected: the test reaches the complete family-first plan. If a focused invariant fails or the printed build is strategically poor, stop and fix the responsible earlier task with a focused RED test; do not weaken this E2E.
+Expected: complete family-first plan and report. If a focused invariant fails or the build is strategically poor, stop and repair the responsible earlier task with a focused RED test. Do not weaken the E2E.
 
-- [ ] **Step 4: Present the exact actual Billy report to the user and stop for approval**
+### Step 8.4 - Hard human gate
 
-This is a hard human gate. Show the selected archetype/families, WPA evidence, every transaction, final inventory, and both validation results. Do not create the golden file in the same step.
+Present the exact report to the user including selected archetype/families, WPA evidence, every transaction, final inventory, mechanical validation, and semantic validation.
 
-- [ ] **Step 5: After explicit approval, commit the corrected E2E assertions/reporting**
+**STOP. Do not create `billy-real.expected.json` and do not start production cutover until the user explicitly approves that actual report.**
+
+### Step 8.5 - After approval, commit corrected E2E behavior
 
 ```bash
 git add apps/api/test/statlocker-build-v2-real-data.e2e.spec.ts
 git commit -m "test(strategy-v2): validate family-first Billy build"
 ```
 
-Expected: no Billy golden has been frozen yet unless the user explicitly approved the printed output.
-
 ---
 
-### Task 9: Freeze the human-approved Billy golden and resume original Task 18 production cutover
+## Task 9: Freeze the approved Billy golden and resume original Task 18 production cutover
 
-**Files:**
+**Files**
+
 - Create: `apps/api/test/fixtures/statlocker-build-v2/billy-real.expected.json`
 - Modify: `apps/api/test/statlocker-build-v2-real-data.e2e.spec.ts`
 - Modify: `apps/overwolf-client/src/adaptive-recommendation-client.ts`
@@ -911,30 +902,37 @@ Expected: no Billy golden has been frozen yet unless the user explicitly approve
 - Modify: `apps/overwolf-client/src/adaptive-recommendation-full-build-client.integration.spec.ts`
 - Modify: `apps/overwolf-client/src/adaptive-recommendation-full-build-path.spec.ts`
 - Modify: `apps/api/src/statlocker-adaptive/statlocker-adaptive.module.ts`
-- Modify V1 serving/controller registrations only as required to remove runtime fallback authority.
+- Modify/retire from serving path as required:
+  - `apps/api/src/statlocker-adaptive/adaptive-recommendation-v1.controller.ts`
+  - `apps/api/src/statlocker-adaptive/adaptive-recommendation-v1.service.ts`
+  - `apps/api/src/statlocker-adaptive/adaptive-planner-serving-router-v1.service.ts`
+  - `apps/api/src/statlocker-adaptive/build-archetype-miner-v1.service.ts`
+  - `apps/api/src/statlocker-adaptive/build-contract-v1.service.ts`
+  - `apps/api/src/statlocker-adaptive/build-strategy-compiler-v1.service.ts`
+  - `apps/api/src/statlocker-adaptive/build-strategy-mining-pipeline-v1.service.ts`
+  - `apps/api/src/statlocker-adaptive/build-strategy-selector-v1.service.ts`
+  - `apps/api/src/statlocker-adaptive/build-strategy-session-v1.service.ts`
+  - `apps/api/src/statlocker-adaptive/consensus-strategy-fallback-v1.service.ts`
+  - `apps/api/src/statlocker-adaptive/strategy-first-adaptive-planner-facade-v1.service.ts`
+  - `apps/api/src/statlocker-adaptive/strategy-first-build-planner-v1.service.ts`
+  - `apps/api/src/statlocker-adaptive/strategy-first-situational-overlay-v1.service.ts`
+- Create: `apps/api/test/adaptive-recommendation-v2-production-wiring.spec.ts`
 
-**Interfaces:**
-- Billy golden stores approved deterministic semantic identity/action expectations.
-- Overwolf production client consumes `AdaptiveRecommendationRequestV2/AdaptiveRecommendationResultV2` from `/deadlock/adaptive/v2/recommend`.
+### Step 9.1 - Freeze only the exact approved Billy semantics
 
-- [ ] **Step 1: Freeze only stable approved Billy semantics**
+Create `billy-real.expected.json` by copying deterministic facts from the user-approved Task 8 report. Store:
 
-Write `billy-real.expected.json` with:
+- selected archetype ID;
+- ordered desired family IDs and selected terminal item IDs/kinds;
+- selected CHOICE family IDs per group;
+- ordered action semantic keys (`BUY:item`, `UPGRADE:item:recipe`, `REPLACE:sell->buy`);
+- final required/choice satisfaction summary;
+- mechanical validation = true;
+- semantic validation = true.
 
-```json
-{
-  "archetypeId": "<approved deterministic id>",
-  "desiredFamilies": [],
-  "orderedActionKeys": [],
-  "finalFamilySatisfaction": [],
-  "mechanicalValidationValid": true,
-  "semanticValidationValid": true
-}
-```
+Do not invent values and do not auto-generate the golden during ordinary CI. The exact values must be the ones already approved by the user in Task 8.
 
-Populate the arrays/ID from the approved Step 8 report exactly; do not auto-regenerate this fixture in ordinary CI.
-
-- [ ] **Step 2: Add exact deterministic golden comparison and rerun Billy**
+### Step 9.2 - Add deterministic golden comparison
 
 Run:
 
@@ -942,78 +940,95 @@ Run:
 yarn workspace @deadlock-live-probe/api test --runTestsByPath test/statlocker-build-v2-real-data.e2e.spec.ts
 ```
 
-Expected: PASS and report matches the approved golden.
+Expected: PASS and emitted report matches the approved golden.
 
-- [ ] **Step 3: Update Overwolf client tests first**
+### Step 9.3 - RED: Overwolf must use V2 and preserve full lifetime path
 
-Change imports/request/result expectations to V2. Assert URL `/deadlock/adaptive/v2/recommend`, preserve all ordered BUY/UPGRADE/REPLACE steps, preserve explicit `sellItemId` on REPLACE, and preserve a plan with 15 transitions even when simultaneous capacity is 12.
+Update client tests first. Assert:
 
-- [ ] **Step 4: Run Overwolf tests and verify RED**
+- request/result types are V2;
+- URL is `/deadlock/adaptive/v2/recommend`;
+- ordered BUY/UPGRADE/REPLACE steps are preserved;
+- REPLACE preserves both `sellItemId` and `buyItemId`;
+- a 15-step plan remains 15 steps even when simultaneous capacity is 12;
+- `nextAction` remains separate from full future plan.
+
+Run:
 
 ```bash
 yarn workspace @deadlock-live-probe/overwolf-client test
 ```
 
-Expected: FAIL because the current client still imports V1 types and calls `/deadlock/adaptive/v1/recommend`.
+Expected: FAIL because current client imports V1 and calls `/deadlock/adaptive/v1/recommend`.
 
-- [ ] **Step 5: Switch `AdaptiveRecommendationClient` to V2**
+### Step 9.4 - Switch Overwolf client to V2
 
-Use:
+In `adaptive-recommendation-client.ts` use:
 
 ```ts
 AdaptiveRecommendationRequestV2
 AdaptiveRecommendationResultV2
 ```
 
-and fetch:
+and:
 
 ```ts
 `${this.apiBaseUrl}/deadlock/adaptive/v2/recommend`
 ```
 
-Keep debounce/retry/cancellation behavior unchanged. Downstream presentation must consume `fullBuild.steps` as the full lifetime path and `nextAction` as the immediate transaction; never slice the lifetime path to current capacity.
+Keep debounce/retry/cancellation semantics unchanged. Presentation consumes `fullBuild.steps` as the full lifetime trajectory and `nextAction` as immediate action. Never truncate the trajectory to held-item capacity.
 
-- [ ] **Step 6: Remove V1 runtime fallback authority from production wiring**
+### Step 9.5 - RED: production serving wiring has no V1 fallback authority
 
-Ensure the production recommendation route resolves through `AdaptiveRecommendationV2Service`. Remove V1 planner/compiler/fallback providers from the serving path. Old files may remain only for historical tests/tools. Add or update a static wiring regression proving a V2 failure cannot invoke V1 strategy planning.
+Create `adaptive-recommendation-v2-production-wiring.spec.ts` that instantiates production module wiring and asserts:
 
-- [ ] **Step 7: Run API + client release-contract tests**
+- `AdaptiveRecommendationV2Controller` resolves through `AdaptiveRecommendationV2Service`;
+- a V2 not-ready/error path does not invoke `ConsensusStrategyFallbackV1Service`, `BuildStrategyCompilerV1Service`, or `StrategyFirstBuildPlannerV1Service`;
+- no V1 plan/result is mapped into the V2 response.
+
+### Step 9.6 - Remove V1 serving authority
+
+Update `statlocker-adaptive.module.ts` and V1 route/service registration so production recommendation serving does not call V1 planner/compiler/fallback services. Old files may remain for historical tests/tools, but they are not production fallback.
+
+The V1 controller may be retired or kept only as an explicitly legacy endpoint; Overwolf production path must not call it and V2 failures must not route into it.
+
+### Step 9.7 - Verify cutover
 
 ```bash
-yarn workspace @deadlock-live-probe/api test --runTestsByPath test/adaptive-recommendation-v2.e2e.spec.ts test/statlocker-build-v2-real-data.e2e.spec.ts
+yarn workspace @deadlock-live-probe/api test --runTestsByPath test/adaptive-recommendation-v2.e2e.spec.ts test/adaptive-recommendation-v2-production-wiring.spec.ts test/statlocker-build-v2-real-data.e2e.spec.ts
 yarn workspace @deadlock-live-probe/overwolf-client test
 ```
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit**
+### Step 9.8 - Commit
 
 ```bash
-git add apps/api/test/fixtures/statlocker-build-v2/billy-real.expected.json apps/api/test/statlocker-build-v2-real-data.e2e.spec.ts apps/overwolf-client/src apps/api/src/statlocker-adaptive/statlocker-adaptive.module.ts apps/api/test
+git add apps/api/test/fixtures/statlocker-build-v2/billy-real.expected.json apps/api/test/statlocker-build-v2-real-data.e2e.spec.ts apps/api/test/adaptive-recommendation-v2-production-wiring.spec.ts apps/overwolf-client/src apps/api/src/statlocker-adaptive/statlocker-adaptive.module.ts apps/api/src/statlocker-adaptive/adaptive-recommendation-v1.controller.ts apps/api/src/statlocker-adaptive/adaptive-recommendation-v1.service.ts apps/api/src/statlocker-adaptive/adaptive-planner-serving-router-v1.service.ts
 git commit -m "feat(strategy-v2): approve Billy build and cut client to V2"
 ```
 
+If additional V1 registration files were changed in Step 9.6, add those exact changed paths to the commit as well; do not stage unrelated V1 code.
+
 ---
 
-### Task 10: Finish original Task 19 production-readiness verification
+## Task 10: Finish original Task 19 production-readiness verification
 
-**Files:**
-- Modify only if verification exposes a scoped defect.
+**Files**
+
+- Modify only when verification exposes a scoped defect.
 - Review: `docs/superpowers/specs/2026-09-11-statlocker-build-strategy-v2-family-first-design.md`
-- Review: this plan.
+- Review: `docs/superpowers/plans/2026-09-11-statlocker-build-strategy-v2-family-first.md`
 
-**Interfaces:**
-- Release gate only; no new production interface.
-
-- [ ] **Step 1: Run all focused family/planner regressions**
+### Step 10.1 - Focused family/planner release gate
 
 ```bash
-yarn workspace @deadlock-live-probe/api test --runTestsByPath test/build-archetype-compiler-v2.spec.ts test/build-archetype-quality-gate-v2.spec.ts test/build-desired-state-v2.spec.ts test/build-family-satisfaction-v2.spec.ts test/full-build-transaction-planner-v2.spec.ts test/full-build-semantic-validator-v2.spec.ts test/full-build-inventory-simulator-v2.spec.ts test/full-build-resolver-v2.spec.ts test/statlocker-vs-hero-wpa-v2.integration.spec.ts test/statlocker-build-v2-real-data.e2e.spec.ts
+yarn workspace @deadlock-live-probe/api test --runTestsByPath test/build-archetype-compiler-v2.spec.ts test/build-archetype-quality-gate-v2.spec.ts test/build-archetype-selector-v2.spec.ts test/build-desired-state-v2.spec.ts test/build-family-satisfaction-v2.spec.ts test/full-build-transaction-planner-v2.spec.ts test/full-build-semantic-validator-v2.spec.ts test/full-build-inventory-simulator-v2.spec.ts test/full-build-resolver-v2.spec.ts test/statlocker-vs-hero-wpa-v2.integration.spec.ts test/statlocker-build-v2-real-data.e2e.spec.ts
 ```
 
 Expected: PASS.
 
-- [ ] **Step 2: Run the complete API suite**
+### Step 10.2 - Complete API suite
 
 ```bash
 yarn workspace @deadlock-live-probe/api test
@@ -1021,7 +1036,7 @@ yarn workspace @deadlock-live-probe/api test
 
 Expected: PASS.
 
-- [ ] **Step 3: Run the complete Overwolf suite**
+### Step 10.3 - Complete Overwolf suite
 
 ```bash
 yarn workspace @deadlock-live-probe/overwolf-client test
@@ -1029,54 +1044,68 @@ yarn workspace @deadlock-live-probe/overwolf-client test
 
 Expected: PASS.
 
-- [ ] **Step 4: Build all workspaces**
+### Step 10.4 - Build all workspaces
 
 ```bash
 yarn build
 ```
 
-Expected: PASS with no TypeScript/Nest/client build errors.
+Expected: PASS.
 
-- [ ] **Step 5: Validate migrations against a disposable/test database**
+### Step 10.5 - Validate migrations on disposable/test DB
 
 ```bash
 yarn workspace @deadlock-live-probe/api migration:run
+yarn workspace @deadlock-live-probe/api migration:show
 ```
 
-Then run the repository migration status command used by the project and verify no V2 migration remains pending. Expected: existing archetype snapshot/match-lock schema remains valid; add a migration only if the family-first persistence shape is stored in concrete DB columns rather than the existing serialized snapshot payload.
+Expected: V2 snapshot/match-lock migration is applied and no required V2 migration remains pending. Add a new migration only if family-first changes require concrete DB schema columns rather than the existing serialized snapshot payload.
 
-- [ ] **Step 6: Smoke-test debugger in production-like mode**
+### Step 10.6 - Production-like debugger smoke test
 
-Start API with non-secret local test values for `BUILD_DEBUG_PASSWORD` and `BUILD_DEBUG_SESSION_SECRET`. Open `/debug/build-v2`, authenticate, load a trace, and verify family progression, requirements, terminal decisions, WPA promotion/rejection, desired state, transaction branches, final plan, mechanical validation, and semantic validation are visible. Verify unauthenticated `/debug/build-v2/matches` returns 401.
+Start API with non-secret local values for `BUILD_DEBUG_PASSWORD` and `BUILD_DEBUG_SESSION_SECRET`. In browser:
 
-- [ ] **Step 7: Verify no V1 production fallback**
+1. open `/debug/build-v2`;
+2. authenticate;
+3. select a trace/match;
+4. verify family progression, requirement classification, terminal decisions, optional-terminal WPA promote/reject, desired state, transaction branches, final plan, mechanical validation, and semantic validation are visible;
+5. in an unauthenticated/private context request `/debug/build-v2/matches` and verify HTTP 401.
 
-Run the static wiring regression plus a V2 not-ready/error case. Confirm no V1 compiler/planner/fallback service is invoked and no V1 plan appears in the response/trace.
+### Step 10.7 - Verify no V1 production fallback
 
-- [ ] **Step 8: Inspect one production-like recommendation end to end**
+Run `adaptive-recommendation-v2-production-wiring.spec.ts` plus a V2 not-ready/error case. Confirm no V1 compiler/planner/fallback service is invoked and no V1 plan appears in V2 response/trace.
 
-Confirm:
+### Step 10.8 - Inspect one production-like recommendation end-to-end
+
+Verify:
 
 ```text
-valid V2 snapshot
+valid V2 archetype snapshot
 immutable match lock
-nonzero WPA query activity when rows exist
-family-first desired state
+VS_HERO_WPA query activity nonzero when rows exist
+family-first desired state present
 full lifetime plan not truncated to capacity
-12/12 upgrades remain legal
+12/12 executable upgrades legal
 no immediate buy-replace churn
 mechanical validation PASS
 semantic validation PASS
 no V1 fallback
 ```
 
-- [ ] **Step 9: Show the final approved Billy report to the user again**
+### Step 10.9 - Show final approved Billy report again
 
-Paste the exact Task 8/9 report including every BUY/UPGRADE/REPLACE step and final inventory. If it differs from the approved golden or is visibly poor, reopen the responsible task instead of claiming completion.
+Paste the exact current report with every BUY/UPGRADE/REPLACE step and final inventory. If it differs from approved golden or is visibly poor, reopen the responsible task instead of claiming completion.
 
-- [ ] **Step 10: Commit verification-only fixes individually, then verify a clean tree**
+### Step 10.10 - Verification-only fixes and clean state
 
-For each scoped defect found during Steps 1-8, add a focused regression and commit that fix separately. Finish with:
+For each scoped defect found during Tasks 10.1-10.8:
+
+1. add a focused RED regression;
+2. implement only the root-cause fix;
+3. rerun focused test and affected release gate;
+4. commit separately.
+
+Finish with:
 
 ```bash
 git status --short
@@ -1086,10 +1115,15 @@ Expected: empty output.
 
 ---
 
-## Plan Self-Review Results
+## Plan self-review
 
-- **Spec coverage:** Sections 3-7 map to Tasks 1-3; current satisfaction/upgrade/planner/anti-churn/validation map to Tasks 4-5; runtime/trace/debugger map to Tasks 6-7; resumed Billy Task 17 maps to Task 8 plus the golden gate in Task 9; resumed old Task 18 maps to Task 9; resumed old Task 19 maps to Task 10.
-- **Roadmap preservation:** Existing V2 sourcing, mining, lock, WPA, fixture, trace/debugger, API, and persistence responsibilities are reused rather than rebuilt. The frozen Billy fixture remains canonical. Overwolf cutover and final release verification remain after Billy approval exactly as required by the original roadmap.
-- **Superseded semantics:** The plan explicitly removes flat CORE lifetime completion, sticky `completedSemanticItemIds`, mandatory-core utility override, catalog-only strategic terminal promotion, and the false notion that 12/12 blocks one-slot upgrades.
-- **Type consistency:** `BuildArchetypeV2.families` flows compiler -> quality gate -> selector -> lock snapshot -> desired-state selector -> transaction planner -> semantic validator -> trace/API/debugger. `DesiredBuildStateV2` is created before transactions and is carried into `ResolvedFullBuildPlanV2`; semantic/mechanical validation are separately exposed and combined at the existing `validation` field.
-- **Human gate:** Billy golden creation and production cutover are explicitly blocked until the user approves the actual corrected report.
+- **Old roadmap preserved:** already-built V2 source/mining/lock/WPA/persistence/trace/debugger/API/fixture work is reused. Old Task 17 is explicitly reopened. Old Task 18 is resumed only after Billy approval. Old Task 19 remains the final release gate.
+- **No placeholder golden:** the plan never invents Billy IDs/actions. Golden values are copied only after the actual report has been approved.
+- **Exact migration commands:** `migration:run` and `migration:show` are the scripts defined by `apps/api/package.json`.
+- **Exact cutover scope:** the plan names the current V1 controller/service/router and the known V1 strategy authorities that must lose production serving authority, while allowing untouched historical files to remain for tests/tools.
+- **Source boundary:** every strategic terminal requires Statlocker evidence; catalog mechanics cannot create strategy.
+- **Family semantics:** raw frequency, final requirement, and progression role are separate. One upgrade lineage consumes one final slot.
+- **Upgrade mechanics:** full inventory does not block atomic one-slot `UPGRADE C -> D`.
+- **No sticky completion:** semantic truth comes from current projected inventory.
+- **No churn:** immediate buy-replace and required-family regression are both hard semantic failures.
+- **Human gate:** Billy golden and Overwolf cutover are blocked until explicit user approval of the real corrected build report.
