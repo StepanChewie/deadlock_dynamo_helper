@@ -223,6 +223,9 @@ function resolveGroupFamilyIds(
 }
 
 function compareFamilyEvaluation(left: FamilyEvaluationV2, right: FamilyEvaluationV2): number {
+  const leftHasEvidence = left.state.confidence > 0;
+  const rightHasEvidence = right.state.confidence > 0;
+  if (leftHasEvidence !== rightHasEvidence) return leftHasEvidence ? -1 : 1;
   return right.state.score - left.state.score ||
     right.state.confidence - left.state.confidence ||
     left.state.familyId - right.state.familyId;
