@@ -10,7 +10,7 @@ import { BuildArchetypeSessionV2Service } from '../src/statlocker-adaptive/build
 import { BuildDebugTraceStoreV2Service } from '../src/statlocker-adaptive/build-debug-trace-store-v2.service';
 import { BuildItemUtilityV2Service } from '../src/statlocker-adaptive/build-item-utility-v2.service';
 import { EnemyThreatV1Service } from '../src/statlocker-adaptive/enemy-threat-v1.service';
-import { FullBuildResolverV2Service } from '../src/statlocker-adaptive/full-build-resolver-v2.service';
+import { FamilyFirstFullBuildResolverV2Service } from '../src/statlocker-adaptive/family-first-full-build-resolver-v2.service';
 import { MatchupCandidateDiscoveryV2Service } from '../src/statlocker-adaptive/matchup-candidate-discovery-v2.service';
 import { ThreatWeightedMatchupV1Service } from '../src/statlocker-adaptive/threat-weighted-matchup-v1.service';
 
@@ -68,7 +68,7 @@ const itemGraph = createRecommendationItemGraph([
 
 function archetype(
   archetypeId: string,
-  targetItemIds: readonly number[],
+  familyInputs: readonly { componentItemId: number; targetItemId: number }[],
   support: number,
 ): BuildArchetypeV2 {
   return {
@@ -78,9 +78,54 @@ function archetype(
     catalogSha256: CATALOG_SHA,
     statlockerPatchId: PATCH_ID,
     sourceProfileAccountIds: Array.from({ length: 10 }, (_, index) => `profile-${index + 1}`),
-    items: targetItemIds.map((itemId, index) => ({
-      itemId,
-      familyId: itemId,
+    families: familyInputs.map((family, index) => ({
+      familyId: family.componentItemId,
+      requirement: 'REQUIRED',
+      aggregateFrequencyTier: index < 5 ? 'CORE' : 'FREQUENT',
+      sourceProfileCount: 10,
+      profileCoverage: 1,
+      purchaseRate: 1,
+      structuralPriority: 1,
+      progressionNodes: [
+        {
+          itemId: family.componentItemId,
+          rawFrequencyTier: index < 5 ? 'CORE' : 'FREQUENT',
+          progressionRole: 'ENTRY',
+          sourceProfileCount: 10,
+          profileCoverage: 1,
+          purchaseRate: 1,
+          timing: {
+            medianBuyTimeS: 120 + index * 120,
+            spreadS: 60,
+            phase: index < 3 ? 'EARLY' : index < 6 ? 'MID' : 'LATE',
+          },
+        },
+        {
+          itemId: family.targetItemId,
+          rawFrequencyTier: index < 5 ? 'CORE' : 'FREQUENT',
+          progressionRole: 'DEFAULT_TERMINAL',
+          sourceProfileCount: 10,
+          profileCoverage: 1,
+          purchaseRate: 1,
+          timing: {
+            medianBuyTimeS: 180 + index * 120,
+            spreadS: 60,
+            phase: index < 3 ? 'EARLY' : index < 6 ? 'MID' : 'LATE',
+          },
+        },
+      ],
+      terminalCandidates: [{
+        itemId: family.targetItemId,
+        kind: 'DEFAULT_TERMINAL',
+        sourceProfileCount: 10,
+        profileCoverage: 1,
+        purchaseRate: 1,
+        rawFrequencyTier: index < 5 ? 'CORE' : 'FREQUENT',
+      }],
+    })),
+    items: familyInputs.map((family, index) => ({
+      itemId: family.targetItemId,
+      familyId: family.componentItemId,
       role: index < 5 ? 'CORE' : 'FREQUENT',
       sourceProfileCount: 10,
       profileCoverage: 1,
@@ -104,16 +149,8 @@ function archetype(
   };
 }
 
-const buildA = archetype(
-  ARCHETYPE_A,
-  archetypeAFamilies.map((family) => family.targetItemId),
-  0.6,
-);
-const buildB = archetype(
-  ARCHETYPE_B,
-  archetypeBFamilies.map((family) => family.targetItemId),
-  0.4,
-);
+const buildA = archetype(ARCHETYPE_A, archetypeAFamilies, 0.6);
+const buildB = archetype(ARCHETYPE_B, archetypeBFamilies, 0.4);
 const snapshot: BuildArchetypeSnapshotV2 = {
   snapshotId: 'snapshot-v2-a',
   heroId: HERO_ID,
@@ -297,7 +334,7 @@ function harness() {
   const session = new BuildArchetypeSessionV2Service(sessionRepository as any);
   const threat = new EnemyThreatV1Service();
   const discovery = new MatchupCandidateDiscoveryV2Service(utility, matchup);
-  const resolver = new FullBuildResolverV2Service(utility);
+  const resolver = new FamilyFirstFullBuildResolverV2Service(utility);
   const traceStore = new BuildDebugTraceStoreV2Service();
   const service = new AdaptiveRecommendationV2Service(
     decisionState as any,
@@ -337,7 +374,7 @@ describe('Adaptive recommendation V2 endpoint', () => {
     expect(result.fullBuild).toBeUndefined();
   });
 
-  it('locks once, keeps the same archetype after matchup evidence changes, and returns the complete lifetime plan', async () => {
+  it('locks once, keeps the same archetype after matchup evidence changes, and returns the family-first lifetime plan', async () => {
     const h = harness();
     h.setFullRoster();
     h.preferArchetype(ARCHETYPE_A);
@@ -347,7 +384,10 @@ describe('Adaptive recommendation V2 endpoint', () => {
     expect(first.ready).toBe(true);
     expect(first.lock?.archetypeId).toBe(ARCHETYPE_A);
     expect(first.lock?.selectionMode).toBe('VS_HERO_WPA');
-    expect(first.fullBuild?.steps.length).toBeGreaterThan(CAPACITY);
+    expect(first.fullBuild?.desiredState).toBeDefined();
+    expect(first.fullBuild?.mechanicalValidation?.valid).toBe(true);
+    expect(first.fullBuild?.semanticValidation?.valid).toBe(true);
+    expect(first.fullBuild?.steps.length).toBe(16);
     expect(first.fullBuild?.steps.every((step) => step.inventoryAfter.length <= CAPACITY)).toBe(true);
     expect(first.fullBuild?.validation.valid).toBe(true);
     expect(first.nextAction.type).toBe(first.fullBuild?.steps[0].action);
@@ -359,9 +399,12 @@ describe('Adaptive recommendation V2 endpoint', () => {
     expect(second.ready).toBe(true);
     expect(second.lock?.archetypeId).toBe(ARCHETYPE_A);
     expect(second.lock?.snapshotId).toBe(first.lock?.snapshotId);
+    expect(second.fullBuild?.desiredState).toBeDefined();
+    expect(second.fullBuild?.semanticValidation?.valid).toBe(true);
     expect(second.fullBuild?.steps.map((step) => step.buyItemId))
       .toEqual(first.fullBuild?.steps.map((step) => step.buyItemId));
     expect(h.traceStore.revisions('match-v2-a')).toHaveLength(2);
-    expect(h.traceStore.get('match-v2-a')?.finalPlan?.steps.length).toBeGreaterThan(CAPACITY);
+    expect(h.traceStore.get('match-v2-a')?.finalPlan?.desiredState).toBeDefined();
+    expect(h.traceStore.get('match-v2-a')?.finalPlan?.semanticValidation?.valid).toBe(true);
   });
 });
