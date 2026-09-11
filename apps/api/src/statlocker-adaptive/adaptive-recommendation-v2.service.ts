@@ -416,6 +416,13 @@ function readyRecommendation(input: {
     steps: input.plan.steps,
     degradedReasons: input.plan.degradedReasons,
     validation: input.plan.validation,
+    ...(input.plan.desiredState === undefined ? {} : { desiredState: input.plan.desiredState }),
+    ...(input.plan.mechanicalValidation === undefined
+      ? {}
+      : { mechanicalValidation: input.plan.mechanicalValidation }),
+    ...(input.plan.semanticValidation === undefined
+      ? {}
+      : { semanticValidation: input.plan.semanticValidation }),
   };
   const selectionScore = input.selection.scores.find((entry) => entry.archetypeId === input.lock.archetypeId);
   const degradedReasons = unique([
