@@ -9,8 +9,10 @@ export type BuildDecisionTraceStageV2 =
   | 'CANDIDATE_DISCOVERY'
   | 'CHOICE_RESOLUTION'
   | 'ITEM_SCORING'
+  | 'DESIRED_STATE'
   | 'PLAN_SEARCH'
   | 'REPLACEMENT_SEARCH'
+  | 'SEMANTIC_VALIDATION'
   | 'FINAL_PLAN';
 
 export type BuildDecisionTraceDispositionV2 =
@@ -113,6 +115,21 @@ export interface BuildItemScoringTracePayloadV2 {
   }[];
 }
 
+export interface BuildDesiredStateTracePayloadV2 {
+  families: readonly {
+    familyId: number;
+    requirement: 'REQUIRED' | 'CHOICE' | 'OPTIONAL' | 'SITUATIONAL';
+    groupId?: string;
+    selectedTerminalItemId: number;
+    selectedTerminalKind: 'DEFAULT_TERMINAL' | 'OPTIONAL_TERMINAL';
+    score: number;
+    confidence: number;
+    reasonCodes: readonly string[];
+  }[];
+  selectedChoiceFamilyIdsByGroup: Readonly<Record<string, readonly number[]>>;
+  reasonCodes: readonly string[];
+}
+
 export interface BuildPlanSearchTracePayloadV2 {
   branches: readonly {
     sequence: number;
@@ -142,6 +159,16 @@ export interface BuildReplacementSearchTracePayloadV2 {
   }[];
 }
 
+export interface BuildSemanticValidationTracePayloadV2 {
+  valid: boolean;
+  reasonCodes: readonly string[];
+  finalFamilyStates: readonly {
+    familyId: number;
+    status: string;
+    heldItemIds: readonly number[];
+  }[];
+}
+
 export interface BuildFinalPlanTracePayloadV2 {
   planRevision: string;
   stepCount: number;
@@ -163,8 +190,10 @@ export type BuildDecisionTraceStageEntryV2 =
   | (BuildDecisionTraceStageBaseV2 & { stage: 'CANDIDATE_DISCOVERY'; payload: BuildCandidateDiscoveryTracePayloadV2 })
   | (BuildDecisionTraceStageBaseV2 & { stage: 'CHOICE_RESOLUTION'; payload: BuildChoiceResolutionTracePayloadV2 })
   | (BuildDecisionTraceStageBaseV2 & { stage: 'ITEM_SCORING'; payload: BuildItemScoringTracePayloadV2 })
+  | (BuildDecisionTraceStageBaseV2 & { stage: 'DESIRED_STATE'; payload: BuildDesiredStateTracePayloadV2 })
   | (BuildDecisionTraceStageBaseV2 & { stage: 'PLAN_SEARCH'; payload: BuildPlanSearchTracePayloadV2 })
   | (BuildDecisionTraceStageBaseV2 & { stage: 'REPLACEMENT_SEARCH'; payload: BuildReplacementSearchTracePayloadV2 })
+  | (BuildDecisionTraceStageBaseV2 & { stage: 'SEMANTIC_VALIDATION'; payload: BuildSemanticValidationTracePayloadV2 })
   | (BuildDecisionTraceStageBaseV2 & { stage: 'FINAL_PLAN'; payload: BuildFinalPlanTracePayloadV2 });
 
 export interface BuildDecisionTraceV2 {
