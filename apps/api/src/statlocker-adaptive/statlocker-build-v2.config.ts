@@ -78,6 +78,11 @@ export interface ArchetypePublicationV2Config {
   heldItemCapacity: number;
 }
 
+export interface OptionalTerminalV2Config {
+  minImprovement: number;
+  minConfidence: number;
+}
+
 export interface StatlockerBuildV2Config {
   profileLinkSimilarity: number;
   minClusterSize: number;
@@ -98,6 +103,7 @@ export interface StatlockerBuildV2Config {
   offlineArchetypeSupportWeight: number;
   offlineArchetypeCoherenceWeight: number;
   archetypePublication: ArchetypePublicationV2Config;
+  optionalTerminal: OptionalTerminalV2Config;
   itemUtility: BuildItemUtilityV2Config;
   outsideMatchupDiscovery: OutsideMatchupDiscoveryV2Config;
   fullBuildResolver: FullBuildResolverV2Config;
@@ -136,6 +142,10 @@ export const STATLOCKER_BUILD_V2_CONFIG: Readonly<StatlockerBuildV2Config> = Obj
   offlineArchetypeCoherenceWeight: 0.40,
   archetypePublication: Object.freeze({
     heldItemCapacity: 12,
+  }),
+  optionalTerminal: Object.freeze({
+    minImprovement: 0.08,
+    minConfidence: 0.35,
   }),
   itemUtility: Object.freeze({
     layerWeights: Object.freeze({
