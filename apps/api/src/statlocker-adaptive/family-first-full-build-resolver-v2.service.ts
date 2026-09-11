@@ -2,6 +2,8 @@ import { createHash } from 'crypto';
 import { Injectable } from '@nestjs/common';
 import {
   BuildDesiredStateV2Service,
+  DesiredBuildStateV2,
+  DesiredFamilyStateV2,
 } from './build-desired-state-v2.service';
 import { BuildItemUtilityV2Service } from './build-item-utility-v2.service';
 import { FullBuildHysteresisV2Service } from './full-build-hysteresis-v2.service';
@@ -11,15 +13,25 @@ import {
   FullBuildResolverV2Input,
   FullBuildResolverV2Service,
 } from './full-build-resolver-v2.service';
-import { ResolvedFullBuildPlanV2 } from './full-build-plan-v2';
+import {
+  FullBuildTransitionIntentV2,
+  ResolvedFullBuildPlanV2,
+} from './full-build-plan-v2';
 import { simulateFullBuildInventoryV2 } from './full-build-inventory-simulator-v2';
 import { FullBuildSemanticValidatorV2Service } from './full-build-semantic-validator-v2.service';
 import { FullBuildTransactionPlannerV2Service } from './full-build-transaction-planner-v2.service';
+import type { MatchupCandidateV2 } from './matchup-candidate-discovery-v2.service';
 import { STATLOCKER_BUILD_V2_CONFIG } from './statlocker-build-v2.config';
 import { ThreatWeightedMatchupV1Service } from './threat-weighted-matchup-v1.service';
 
 export interface FamilyFirstFullBuildLifetimeResolverV2Input extends FullBuildLifetimeResolverV2Input {
   previousPlan?: ResolvedFullBuildPlanV2;
+}
+
+interface OutsideCompetitionV2 {
+  desiredState: DesiredBuildStateV2;
+  selectedOutsideCandidates: readonly MatchupCandidateV2[];
+  rejectedOutsideCandidates: readonly MatchupCandidateV2[];
 }
 
 @Injectable()
@@ -65,7 +77,7 @@ export class FamilyFirstFullBuildResolverV2Service extends FullBuildResolverV2Se
       },
     });
 
-    const desiredState = this.desiredState.resolve({
+    const baseDesiredState = this.desiredState.resolve({
       heroId: input.heroId,
       archetype: input.archetype,
       totalCapacity: input.capacity,
@@ -76,6 +88,13 @@ export class FamilyFirstFullBuildResolverV2Service extends FullBuildResolverV2Se
       })),
       vsHeroRows: input.vsHeroRows,
     });
+    const outsideCompetition = resolveOutsideCompetition(
+      baseDesiredState,
+      input.outsideCandidates ?? [],
+      input.capacity,
+    );
+    const desiredState = outsideCompetition.desiredState;
+
     input.trace?.record({
       stage: 'DESIRED_STATE',
       reasonCodes: [...desiredState.reasonCodes],
@@ -85,6 +104,28 @@ export class FamilyFirstFullBuildResolverV2Service extends FullBuildResolverV2Se
         reasonCodes: [...desiredState.reasonCodes],
       },
     });
+
+    if ((input.outsideCandidates ?? []).length > 0) {
+      const selectedIds = new Set(outsideCompetition.selectedOutsideCandidates.map((candidate) => candidate.targetItemId));
+      input.trace?.record({
+        stage: 'CANDIDATE_DISCOVERY',
+        reasonCodes: [],
+        payload: {
+          candidates: (input.outsideCandidates ?? []).map((candidate) => ({
+            candidateId: `outside:${candidate.targetItemId}`,
+            itemId: candidate.targetItemId,
+            score: candidate.utility.total,
+            confidence: candidate.matchup.confidence,
+            coverage: candidate.matchup.coverage,
+            disposition: selectedIds.has(candidate.targetItemId) ? 'SELECTED' : 'REJECTED',
+            reasonCodes: selectedIds.has(candidate.targetItemId)
+              ? uniqueStrings([...candidate.reasonCodes, 'OUTSIDE_SITUATIONAL_SELECTED'])
+              : uniqueStrings([...candidate.reasonCodes, 'OUTSIDE_SITUATIONAL_NOT_SELECTED']),
+            insideLockedArchetype: false,
+          })),
+        },
+      });
+    }
 
     const transactionPlan = this.transactionPlanner.plan({
       archetype: input.archetype,
@@ -96,11 +137,49 @@ export class FamilyFirstFullBuildResolverV2Service extends FullBuildResolverV2Se
     });
     for (const reasonCode of transactionPlan.reasonCodes) degradedReasons.add(reasonCode);
 
+    const actions = [...transactionPlan.actions];
+    const rejectedOutsideReasonCodes = new Set<string>();
+    for (const candidate of outsideCompetition.selectedOutsideCandidates) {
+      const action = outsideCandidateAction(candidate);
+      if (!action) {
+        rejectedOutsideReasonCodes.add('OUTSIDE_CANDIDATE_ACTION_UNSUPPORTED');
+        continue;
+      }
+      const trialActions = [...actions, action];
+      const trialSimulation = simulateFullBuildInventoryV2({
+        rulesetId: input.rulesetId,
+        itemGraph: input.itemGraph,
+        capacity: input.capacity,
+        initialInventoryItemIds: input.currentInventoryItemIds,
+        actions: trialActions,
+      });
+      if (!trialSimulation.validation.valid) {
+        rejectedOutsideReasonCodes.add('OUTSIDE_CANDIDATE_MECHANICALLY_INVALID');
+        continue;
+      }
+      const trialSemanticValidation = this.semanticValidator.validate({
+        archetype: input.archetype,
+        desiredState,
+        initialInventoryItemIds: input.currentInventoryItemIds,
+        steps: trialSimulation.steps,
+        itemGraph: input.itemGraph,
+      });
+      if (!trialSemanticValidation.valid) {
+        for (const reasonCode of trialSemanticValidation.reasonCodes) {
+          rejectedOutsideReasonCodes.add(reasonCode);
+        }
+        rejectedOutsideReasonCodes.add('OUTSIDE_CANDIDATE_SEMANTICALLY_INVALID');
+        continue;
+      }
+      actions.push(action);
+    }
+    for (const reasonCode of rejectedOutsideReasonCodes) degradedReasons.add(reasonCode);
+
     input.trace?.record({
       stage: 'PLAN_SEARCH',
-      reasonCodes: [...transactionPlan.reasonCodes],
+      reasonCodes: uniqueStrings([...transactionPlan.reasonCodes, ...rejectedOutsideReasonCodes]),
       payload: {
-        branches: transactionPlan.actions.map((action, index) => ({
+        branches: actions.map((action, index) => ({
           sequence: index + 1,
           targetItemId: action.buyItemId,
           action: action.action,
@@ -115,7 +194,7 @@ export class FamilyFirstFullBuildResolverV2Service extends FullBuildResolverV2Se
       itemGraph: input.itemGraph,
       capacity: input.capacity,
       initialInventoryItemIds: input.currentInventoryItemIds,
-      actions: transactionPlan.actions,
+      actions,
     });
     const semanticValidation = this.semanticValidator.validate({
       archetype: input.archetype,
@@ -142,7 +221,7 @@ export class FamilyFirstFullBuildResolverV2Service extends FullBuildResolverV2Se
       valid: simulation.validation.valid && semanticValidation.valid,
       reasonCodes: validationReasonCodes,
     };
-    const planRevision = createPlanRevision(input, transactionPlan.actions);
+    const planRevision = createPlanRevision(input, actions);
     const candidate: ResolvedFullBuildPlanV2 = {
       planRevision,
       matchId: input.matchId,
@@ -195,6 +274,109 @@ export class FamilyFirstFullBuildResolverV2Service extends FullBuildResolverV2Se
     });
     return { plan: decision.selected, reasonCodes: decision.reasonCodes };
   }
+}
+
+function resolveOutsideCompetition(
+  desiredState: DesiredBuildStateV2,
+  outsideCandidates: readonly MatchupCandidateV2[],
+  capacity: number,
+): OutsideCompetitionV2 {
+  const mandatoryFamilies = desiredState.families.filter((family) =>
+    family.requirement === 'REQUIRED' || family.requirement === 'CHOICE',
+  );
+  const adaptiveFamilies = desiredState.families.filter((family) =>
+    family.requirement === 'OPTIONAL' || family.requirement === 'SITUATIONAL',
+  );
+  const eligibleOutside = dedupeOutsideCandidates(outsideCandidates)
+    .filter((candidate) => candidate.utility.total >= candidate.requiredImprovement);
+  const adaptiveCapacity = Math.max(0, capacity - mandatoryFamilies.length);
+  const competitors = [
+    ...adaptiveFamilies.map((family) => ({
+      kind: 'FAMILY' as const,
+      score: family.score,
+      confidence: family.confidence,
+      stableId: family.familyId,
+      family,
+    })),
+    ...eligibleOutside.map((candidate) => ({
+      kind: 'OUTSIDE' as const,
+      score: candidate.utility.total,
+      confidence: candidate.matchup.confidence,
+      stableId: candidate.targetItemId,
+      candidate,
+    })),
+  ].sort((left, right) =>
+    right.score - left.score ||
+    right.confidence - left.confidence ||
+    left.stableId - right.stableId,
+  );
+  const selectedCompetitors = competitors.slice(0, adaptiveCapacity);
+  const selectedFamilyIds = new Set(
+    selectedCompetitors
+      .filter((entry): entry is Extract<typeof entry, { kind: 'FAMILY' }> => entry.kind === 'FAMILY')
+      .map((entry) => entry.family.familyId),
+  );
+  const selectedOutsideCandidates = selectedCompetitors
+    .filter((entry): entry is Extract<typeof entry, { kind: 'OUTSIDE' }> => entry.kind === 'OUTSIDE')
+    .map((entry) => entry.candidate);
+  const selectedOutsideIds = new Set(selectedOutsideCandidates.map((candidate) => candidate.targetItemId));
+  const selectedFamilies = [
+    ...mandatoryFamilies,
+    ...adaptiveFamilies.filter((family) => selectedFamilyIds.has(family.familyId)),
+  ];
+  const reasonCodes = new Set(desiredState.reasonCodes);
+  if (selectedOutsideCandidates.length > 0) reasonCodes.add('OUTSIDE_SITUATIONAL_SELECTED');
+  if (selectedFamilies.length + selectedOutsideCandidates.length < capacity) {
+    reasonCodes.add('DESIRED_STATE_UNDER_CAPACITY');
+  }
+
+  return {
+    desiredState: {
+      ...desiredState,
+      families: selectedFamilies,
+      reasonCodes: [...reasonCodes].sort(),
+    },
+    selectedOutsideCandidates,
+    rejectedOutsideCandidates: eligibleOutside.filter((candidate) => !selectedOutsideIds.has(candidate.targetItemId)),
+  };
+}
+
+function dedupeOutsideCandidates(candidates: readonly MatchupCandidateV2[]): MatchupCandidateV2[] {
+  const byTarget = new Map<number, MatchupCandidateV2>();
+  for (const candidate of candidates) {
+    const current = byTarget.get(candidate.targetItemId);
+    if (
+      !current ||
+      candidate.utility.total > current.utility.total ||
+      (
+        candidate.utility.total === current.utility.total &&
+        candidate.matchup.confidence > current.matchup.confidence
+      )
+    ) {
+      byTarget.set(candidate.targetItemId, candidate);
+    }
+  }
+  return [...byTarget.values()];
+}
+
+function outsideCandidateAction(candidate: MatchupCandidateV2): FullBuildTransitionIntentV2 | undefined {
+  const action = candidate.candidate.action;
+  if (action.type === 'BUY_ITEM') {
+    return {
+      action: 'BUY',
+      buyItemId: action.itemId,
+      reasonCodes: uniqueStrings([...candidate.reasonCodes, 'OUTSIDE_SITUATIONAL_SELECTED']),
+    };
+  }
+  if (action.type === 'REPLACE_ITEM') {
+    return {
+      action: 'REPLACE',
+      sellItemId: action.sellItemId,
+      buyItemId: action.buyItemId,
+      reasonCodes: uniqueStrings([...candidate.reasonCodes, 'OUTSIDE_SITUATIONAL_SELECTED']),
+    };
+  }
+  return undefined;
 }
 
 function isLifetimeInput(
