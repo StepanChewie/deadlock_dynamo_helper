@@ -1,3 +1,6 @@
+import type { DesiredBuildStateV2 } from './build-desired-state-v2.service';
+import type { FullBuildSemanticValidationV2 } from './full-build-semantic-validator-v2.service';
+
 export type FullBuildActionV2 = 'BUY' | 'UPGRADE' | 'REPLACE';
 
 export type FullBuildTransitionIntentV2 =
@@ -51,4 +54,8 @@ export interface ResolvedFullBuildPlanV2 {
   steps: readonly FullBuildStepV2[];
   degradedReasons: readonly string[];
   validation: FullBuildValidationV2;
+  /** Family-first fields become required when the resolver switches to the transaction planner in Task 5. */
+  desiredState?: DesiredBuildStateV2;
+  mechanicalValidation?: FullBuildValidationV2;
+  semanticValidation?: FullBuildSemanticValidationV2;
 }
