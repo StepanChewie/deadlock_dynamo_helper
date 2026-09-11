@@ -137,6 +137,7 @@ export class BuildArchetypeRefreshV2Service {
       rulesetVersion: normalizedIdentity.rulesetVersion,
       statlockerPatchId: normalizedIdentity.statlockerPatchId,
       catalogSha256: normalizedIdentity.catalogSha256,
+      itemGraph: catalogGraph,
     }));
 
     const snapshot: BuildArchetypeSnapshotV2 = {
