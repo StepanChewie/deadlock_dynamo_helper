@@ -26,6 +26,7 @@ import { AdaptiveRecommendationObservabilityV1Service } from './adaptive-recomme
 import { AdaptiveRecommendationV2Controller } from './adaptive-recommendation-v2.controller';
 import { AdaptiveRecommendationV2Service } from './adaptive-recommendation-v2.service';
 import { AdaptiveReplayV1Service } from './adaptive-replay-v1.service';
+import { AdaptiveStatusCompatibilityV1Controller } from './adaptive-status-compatibility-v1.controller';
 import { BuildArchetypeCompilerV2Service } from './build-archetype-compiler-v2.service';
 import { BuildArchetypeMinerV1Service } from './build-archetype-miner-v1.service';
 import { BuildArchetypeMinerV2Service } from './build-archetype-miner-v2.service';
@@ -103,7 +104,7 @@ import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-
       MatchPlayer,
     ]),
   ],
-  controllers: [AdaptiveRecommendationV2Controller],
+  controllers: [AdaptiveRecommendationV2Controller, AdaptiveStatusCompatibilityV1Controller],
   providers: [
     {
       provide: STATLOCKER_BROWSER_LAUNCHER_V1,
