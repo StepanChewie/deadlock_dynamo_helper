@@ -165,7 +165,8 @@ export interface BuildSemanticValidationTracePayloadV2 {
   finalFamilyStates: readonly {
     familyId: number;
     status: string;
-    heldItemIds: readonly number[];
+    currentItemIds: readonly number[];
+    terminalItemId?: number;
   }[];
 }
 
