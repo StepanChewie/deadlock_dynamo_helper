@@ -23,8 +23,6 @@ import { AdaptiveEvidenceScorerV1Service } from './adaptive-evidence-scorer-v1.s
 import { AdaptivePhaseEligibilityV1Service } from './adaptive-phase-eligibility-v1.service';
 import { AdaptivePlannerServingRouterV1Service } from './adaptive-planner-serving-router-v1.service';
 import { AdaptiveRecommendationObservabilityV1Service } from './adaptive-recommendation-observability-v1.service';
-import { AdaptiveRecommendationV1Controller } from './adaptive-recommendation-v1.controller';
-import { AdaptiveRecommendationV1Service } from './adaptive-recommendation-v1.service';
 import { AdaptiveRecommendationV2Controller } from './adaptive-recommendation-v2.controller';
 import { AdaptiveRecommendationV2Service } from './adaptive-recommendation-v2.service';
 import { AdaptiveReplayV1Service } from './adaptive-replay-v1.service';
@@ -105,7 +103,7 @@ import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-
       MatchPlayer,
     ]),
   ],
-  controllers: [AdaptiveRecommendationV1Controller, AdaptiveRecommendationV2Controller],
+  controllers: [AdaptiveRecommendationV2Controller],
   providers: [
     {
       provide: STATLOCKER_BROWSER_LAUNCHER_V1,
@@ -181,10 +179,8 @@ import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-
       useExisting: AdaptivePlannerServingRouterV1Service,
     },
     AdaptiveReplayV1Service,
-    AdaptiveRecommendationV1Service,
   ],
   exports: [
-    AdaptiveRecommendationV1Service,
     AdaptiveRecommendationV2Service,
     AdaptiveRecommendationObservabilityV1Service,
     BuildDebugTraceStoreV2Service,

@@ -116,7 +116,7 @@ export class AdaptiveRecommendationClient {
       }
       shouldRetry = false;
       const raw = await response.json() as AdaptiveRecommendationResultV2;
-      result = decorateV2ForExistingPresentation(raw);
+      result = projectAdaptiveRecommendationV2ForPresentation(raw);
     } catch (error) {
       if (pending.cancellationRevision !== this.cancellationRevision) return;
       if (
@@ -156,7 +156,7 @@ function normalizeRequest(request: AdaptiveRecommendationRequestV2): AdaptiveRec
   };
 }
 
-function decorateV2ForExistingPresentation(
+export function projectAdaptiveRecommendationV2ForPresentation(
   result: AdaptiveRecommendationResultV2,
 ): AdaptiveRecommendationResultV2 {
   if (!result || typeof result !== 'object' || !result.score) {
