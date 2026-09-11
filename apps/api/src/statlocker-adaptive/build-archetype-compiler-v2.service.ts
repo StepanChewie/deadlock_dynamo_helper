@@ -464,7 +464,7 @@ function compileOrderEdges(
   representativeByFamily: ReadonlyMap<number, number>,
 ): BuildOrderEdgeV2[] {
   const families = [...familyEvidence.keys()].sort((a, b) => a - b);
-  const result: BuildOrderEdgeV2[] = [];
+  const candidates: BuildOrderEdgeV2[] = [];
   for (let leftIndex = 0; leftIndex < families.length; leftIndex += 1) {
     for (let rightIndex = leftIndex + 1; rightIndex < families.length; rightIndex += 1) {
       const leftFamily = families[leftIndex];
@@ -493,7 +493,7 @@ function compileOrderEdges(
 
       const beforeFamily = leftBefore >= rightBefore ? leftFamily : rightFamily;
       const afterFamily = leftBefore >= rightBefore ? rightFamily : leftFamily;
-      result.push({
+      candidates.push({
         beforeItemId: representativeByFamily.get(beforeFamily)!,
         afterItemId: representativeByFamily.get(afterFamily)!,
         confidence,
@@ -503,10 +503,51 @@ function compileOrderEdges(
     }
   }
 
-  return result.sort((left, right) =>
+  return pruneOrderCycles(candidates).sort((left, right) =>
     left.beforeItemId - right.beforeItemId ||
     left.afterItemId - right.afterItemId,
   );
+}
+
+function pruneOrderCycles(candidates: readonly BuildOrderEdgeV2[]): BuildOrderEdgeV2[] {
+  const accepted: BuildOrderEdgeV2[] = [];
+  const ordered = [...candidates].sort((left, right) =>
+    (left.strength === right.strength ? 0 : left.strength === 'HARD' ? -1 : 1) ||
+    right.confidence - left.confidence ||
+    right.sourceProfileCount - left.sourceProfileCount ||
+    left.beforeItemId - right.beforeItemId ||
+    left.afterItemId - right.afterItemId,
+  );
+
+  for (const candidate of ordered) {
+    if (wouldCreateOrderCycle(accepted, candidate)) continue;
+    accepted.push(candidate);
+  }
+  return accepted;
+}
+
+function wouldCreateOrderCycle(
+  accepted: readonly BuildOrderEdgeV2[],
+  candidate: BuildOrderEdgeV2,
+): boolean {
+  if (candidate.beforeItemId === candidate.afterItemId) return true;
+  const adjacency = new Map<number, number[]>();
+  for (const edge of accepted) {
+    const next = adjacency.get(edge.beforeItemId) ?? [];
+    next.push(edge.afterItemId);
+    adjacency.set(edge.beforeItemId, next);
+  }
+
+  const pending = [candidate.afterItemId];
+  const visited = new Set<number>();
+  while (pending.length > 0) {
+    const current = pending.pop()!;
+    if (current === candidate.beforeItemId) return true;
+    if (visited.has(current)) continue;
+    visited.add(current);
+    for (const next of adjacency.get(current) ?? []) pending.push(next);
+  }
+  return false;
 }
 
 function familyTime(
