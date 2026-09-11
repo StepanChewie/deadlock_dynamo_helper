@@ -1,3 +1,7 @@
+import {
+  RecommendationItemGraph,
+  createRecommendationItemGraph,
+} from '@deadlock-live-probe/build-domain';
 import { BuildArchetypeCompilerV2Service } from '../src/statlocker-adaptive/build-archetype-compiler-v2.service';
 import { StatlockerBuildProfileItemV2, StatlockerBuildProfileV2 } from '../src/statlocker-adaptive/build-archetype-v2';
 import { BuildArchetypeClusterV2 } from '../src/statlocker-adaptive/build-archetype-miner-v2.service';
@@ -39,14 +43,38 @@ function clusterFor(profiles: readonly StatlockerBuildProfileV2[]): BuildArchety
   };
 }
 
-function compile(profiles: readonly StatlockerBuildProfileV2[]) {
-  return new BuildArchetypeCompilerV2Service().compile({
+function lineageGraph(): RecommendationItemGraph {
+  return createRecommendationItemGraph(
+    [A, B, C, D].map((itemId) => ({
+      itemId,
+      name: `item-${itemId}`,
+      slotType: 'weapon' as const,
+      active: true,
+      availableRulesetIds: ['r1'],
+      directPurchaseCost: 500,
+      upgradeRecipes: [],
+    })),
+    [
+      { parentItemId: B, componentItemId: A },
+      { parentItemId: C, componentItemId: B },
+      { parentItemId: D, componentItemId: C },
+    ],
+  );
+}
+
+function compile(
+  profiles: readonly StatlockerBuildProfileV2[],
+  itemGraph?: RecommendationItemGraph,
+) {
+  const input = {
     cluster: clusterFor(profiles),
     profiles,
     rulesetVersion: 'r1',
     statlockerPatchId: 'p1',
     catalogSha256: 'a'.repeat(64),
-  });
+    itemGraph,
+  };
+  return new BuildArchetypeCompilerV2Service().compile(input);
 }
 
 type ExpectedFamily = {
@@ -104,5 +132,21 @@ describe('BuildArchetypeCompilerV2Service family semantics', () => {
       expect.objectContaining({ itemId: D, kind: 'OPTIONAL_TERMINAL' }),
     ]));
     expect(family.progressionNodes.find((node) => node.itemId === D)?.progressionRole).toBe('OPTIONAL_TERMINAL');
+  });
+
+  it('uses catalog ancestry only to order Statlocker-observed progression nodes', () => {
+    const archetype = compile([
+      profile('p1', [itemAt(C, 300, 'FREQUENT'), itemAt(B, 700, 'CORE'), itemAt(A, 1_200, 'CORE')]),
+      profile('p2', [itemAt(C, 320, 'FREQUENT'), itemAt(B, 720, 'CORE'), itemAt(A, 1_180, 'CORE')]),
+      profile('p3', [itemAt(C, 310, 'FREQUENT'), itemAt(B, 710, 'CORE'), itemAt(A, 1_210, 'CORE')]),
+    ], lineageGraph());
+
+    const family = familiesOf(archetype)[0];
+    expect(family.progressionNodes.map((node) => [node.itemId, node.progressionRole])).toEqual([
+      [A, 'ENTRY'],
+      [B, 'INTERMEDIATE'],
+      [C, 'DEFAULT_TERMINAL'],
+    ]);
+    expect(family.terminalCandidates.some((candidate) => candidate.itemId === D)).toBe(false);
   });
 });
