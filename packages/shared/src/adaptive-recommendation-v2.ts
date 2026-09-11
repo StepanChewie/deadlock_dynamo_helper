@@ -22,11 +22,58 @@ export interface AdaptiveFullBuildValidationV2 {
   reasonCodes: readonly string[];
 }
 
+export type AdaptiveBuildFamilyRequirementV2 =
+  | 'REQUIRED'
+  | 'CHOICE'
+  | 'OPTIONAL'
+  | 'SITUATIONAL';
+
+export type AdaptiveBuildTerminalKindV2 = 'DEFAULT_TERMINAL' | 'OPTIONAL_TERMINAL';
+
+export interface AdaptiveDesiredFamilyStateV2 {
+  familyId: number;
+  requirement: AdaptiveBuildFamilyRequirementV2;
+  selectedTerminalItemId: number;
+  selectedTerminalKind: AdaptiveBuildTerminalKindV2;
+  groupId?: string;
+  score: number;
+  confidence: number;
+  reasonCodes: readonly string[];
+}
+
+export interface AdaptiveDesiredBuildStateV2 {
+  families: readonly AdaptiveDesiredFamilyStateV2[];
+  selectedChoiceFamilyIdsByGroup: Readonly<Record<string, readonly number[]>>;
+  reasonCodes: readonly string[];
+}
+
+export type AdaptiveBuildFamilySatisfactionStatusV2 =
+  | 'UNSATISFIED'
+  | 'IN_PROGRESS'
+  | 'DEFAULT_TERMINAL_SATISFIED'
+  | 'OPTIONAL_TERMINAL_SATISFIED';
+
+export interface AdaptiveBuildFamilySatisfactionV2 {
+  familyId: number;
+  status: AdaptiveBuildFamilySatisfactionStatusV2;
+  currentItemIds: readonly number[];
+  terminalItemId?: number;
+}
+
+export interface AdaptiveFullBuildSemanticValidationV2 {
+  valid: boolean;
+  reasonCodes: readonly string[];
+  finalFamilyStates: readonly AdaptiveBuildFamilySatisfactionV2[];
+}
+
 export interface AdaptiveFullBuildPlanV2 {
   planRevision: string;
   steps: readonly AdaptiveFullBuildStepV2[];
   degradedReasons: readonly string[];
   validation: AdaptiveFullBuildValidationV2;
+  desiredState?: AdaptiveDesiredBuildStateV2;
+  mechanicalValidation?: AdaptiveFullBuildValidationV2;
+  semanticValidation?: AdaptiveFullBuildSemanticValidationV2;
 }
 
 export type AdaptiveArchetypeSelectionModeV2 = 'VS_HERO_WPA' | 'OFFLINE_DEFAULT';
