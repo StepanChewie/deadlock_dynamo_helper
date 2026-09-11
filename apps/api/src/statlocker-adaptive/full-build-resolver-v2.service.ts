@@ -517,6 +517,8 @@ export class FullBuildResolverV2Service {
     baseReasonCodes: readonly string[],
   ): FullBuildTransitionIntentV2 | undefined {
     const currentState = this.scoreLifetimeInventory(state.inventoryItemIds, input);
+    const targetRole = archetypeRoleForItem(selected.targetItemId, input.archetype, input.itemGraph);
+    const mandatoryCore = targetRole === 'CORE' && selected.outsideReasonCodes === undefined;
     const options: LifetimeReplacementOptionV2[] = [];
     const traceCandidates: Array<BuildReplacementSearchTracePayloadV2['candidates'][number]> = [];
 
@@ -548,6 +550,7 @@ export class FullBuildResolverV2Service {
         reasonCodes: [
           ...baseReasonCodes,
           'WHOLE_INVENTORY_REPLACEMENT_SELECTED',
+          ...(mandatoryCore ? ['MANDATORY_CORE_PROGRESSION_REPLACEMENT'] : []),
           ...(soldRole === 'CORE' ? ['CORE_REPLACEMENT_HIGHER_THRESHOLD'] : []),
         ],
       };
@@ -580,7 +583,8 @@ export class FullBuildResolverV2Service {
         { replacementPenalty: 1 },
       );
       const marginalGain = roundUtility(resultingState.total - currentState.total);
-      if (marginalGain < requiredImprovement) {
+      const gainBelowThreshold = marginalGain < requiredImprovement;
+      if (gainBelowThreshold && !mandatoryCore) {
         traceCandidates.push({
           sellItemId,
           buyItemId: selected.targetItemId,
@@ -609,13 +613,16 @@ export class FullBuildResolverV2Service {
         requiredImprovement,
         disposition: 'REJECTED',
         reasonCodes: [
-          'MARGINAL_GAIN_ACCEPTED',
+          ...(gainBelowThreshold ? ['MARGINAL_GAIN_THRESHOLD_OVERRIDDEN'] : ['MARGINAL_GAIN_ACCEPTED']),
+          ...(mandatoryCore ? ['MANDATORY_CORE_PROGRESSION_REPLACEMENT'] : []),
           ...(soldRole === 'CORE' ? ['CORE_REPLACEMENT_HIGHER_THRESHOLD'] : []),
         ],
       });
     }
 
-    const ranked = options.sort(compareLifetimeReplacements);
+    const ranked = options.sort(mandatoryCore
+      ? compareMandatoryCoreReplacements
+      : compareLifetimeReplacements);
     const winner = ranked[0];
     input.trace?.record({
       stage: 'REPLACEMENT_SEARCH',
@@ -857,6 +864,18 @@ function compareLifetimeReplacements(
     right.marginalGain - left.marginalGain ||
     right.resultingState.confidence - left.resultingState.confidence ||
     left.sellItemId - right.sellItemId;
+}
+
+function compareMandatoryCoreReplacements(
+  left: LifetimeReplacementOptionV2,
+  right: LifetimeReplacementOptionV2,
+): number {
+  return replacementPreservationRank(left.soldRole) - replacementPreservationRank(right.soldRole) ||
+    compareLifetimeReplacements(left, right);
+}
+
+function replacementPreservationRank(role: BuildArchetypeRoleV2 | undefined): number {
+  return role === undefined ? 0 : roleRank(role);
 }
 
 function lifetimeReplacementThreshold(soldRole: BuildArchetypeRoleV2 | undefined): number {
