@@ -11,6 +11,7 @@ const HERO_ID = 72;
 const A = 101;
 const B = 102;
 const C = 103;
+const D = 104;
 
 function item(
   itemId: number,
@@ -33,6 +34,7 @@ const itemGraph = createRecommendationItemGraph([
   item(A),
   item(B, { recipeId: 'A-to-B', consumedItemIds: [A] }),
   item(C, { recipeId: 'B-to-C', consumedItemIds: [B] }),
+  item(D, { recipeId: 'C-to-D', consumedItemIds: [C] }),
 ]);
 
 function archetype(): BuildArchetypeV2 {
@@ -55,9 +57,11 @@ function archetype(): BuildArchetypeV2 {
         { itemId: A, rawFrequencyTier: 'CORE', progressionRole: 'ENTRY', sourceProfileCount: 2, profileCoverage: 1, purchaseRate: 1, timing: { medianBuyTimeS: 300, spreadS: 30, phase: 'EARLY' } },
         { itemId: B, rawFrequencyTier: 'CORE', progressionRole: 'INTERMEDIATE', sourceProfileCount: 2, profileCoverage: 1, purchaseRate: 1, timing: { medianBuyTimeS: 700, spreadS: 30, phase: 'MID' } },
         { itemId: C, rawFrequencyTier: 'FREQUENT', progressionRole: 'DEFAULT_TERMINAL', sourceProfileCount: 2, profileCoverage: 1, purchaseRate: 0.9, timing: { medianBuyTimeS: 1_200, spreadS: 60, phase: 'MID' } },
+        { itemId: D, rawFrequencyTier: 'SOMETIMES', progressionRole: 'OPTIONAL_TERMINAL', sourceProfileCount: 1, profileCoverage: 0.5, purchaseRate: 0.4, timing: { medianBuyTimeS: 1_800, spreadS: 90, phase: 'LATE' } },
       ],
       terminalCandidates: [
         { itemId: C, kind: 'DEFAULT_TERMINAL', sourceProfileCount: 2, profileCoverage: 1, purchaseRate: 0.9, rawFrequencyTier: 'FREQUENT' },
+        { itemId: D, kind: 'OPTIONAL_TERMINAL', sourceProfileCount: 1, profileCoverage: 0.5, purchaseRate: 0.4, rawFrequencyTier: 'SOMETIMES' },
       ],
     }],
     items: [],
@@ -68,26 +72,40 @@ function archetype(): BuildArchetypeV2 {
   };
 }
 
+function input(vsHeroRows: readonly any[] = []) {
+  return {
+    matchId: 'match-1',
+    stateRevision: 'state-1',
+    heroId: HERO_ID,
+    rulesetId: 'r1',
+    archetype: archetype(),
+    itemGraph,
+    capacity: 12,
+    gameTimeSec: 1_000,
+    currentInventoryItemIds: [] as readonly number[],
+    enemyHeroIds: [1, 2, 3, 4, 5, 6],
+    enemyThreats: [],
+    vsHeroRows,
+    outsideCandidates: [],
+  };
+}
+
+function optionalTerminalRows(deltaWpa: number) {
+  return [1, 2, 3, 4, 5, 6].map((enemyHeroId) => ({
+    heroId: HERO_ID,
+    enemyHeroId,
+    itemId: D,
+    count: 100_000,
+    deltaWpa,
+  }));
+}
+
 describe('FamilyFirstFullBuildResolverV2Service lifetime mode', () => {
   it('returns desired state and semantic validation for a required family lineage', () => {
     const matchup = new ThreatWeightedMatchupV1Service();
     const resolver = new FamilyFirstFullBuildResolverV2Service(new BuildItemUtilityV2Service(matchup));
 
-    const result = resolver.resolve({
-      matchId: 'match-1',
-      stateRevision: 'state-1',
-      heroId: HERO_ID,
-      rulesetId: 'r1',
-      archetype: archetype(),
-      itemGraph,
-      capacity: 12,
-      gameTimeSec: 1_000,
-      currentInventoryItemIds: [],
-      enemyHeroIds: [1, 2, 3, 4, 5, 6],
-      enemyThreats: [],
-      vsHeroRows: [],
-      outsideCandidates: [],
-    });
+    const result = resolver.resolve(input());
 
     expect(result.desiredState?.families).toEqual([
       expect.objectContaining({
@@ -104,5 +122,25 @@ describe('FamilyFirstFullBuildResolverV2Service lifetime mode', () => {
     expect(result.mechanicalValidation?.valid).toBe(true);
     expect(result.semanticValidation?.valid).toBe(true);
     expect(result.validation.valid).toBe(true);
+  });
+
+  it('holds a near-term previous plan for a small optional-terminal improvement and switches for a material one', () => {
+    const matchup = new ThreatWeightedMatchupV1Service();
+    const resolver = new FamilyFirstFullBuildResolverV2Service(new BuildItemUtilityV2Service(matchup));
+    const previous = resolver.resolve(input());
+
+    const held = resolver.resolve({
+      ...input(optionalTerminalRows(0.015)),
+      previousPlan: previous,
+    });
+    expect(held.planRevision).toBe(previous.planRevision);
+    expect(held.desiredState?.families[0].selectedTerminalItemId).toBe(C);
+
+    const switched = resolver.resolve({
+      ...input(optionalTerminalRows(0.06)),
+      previousPlan: previous,
+    });
+    expect(switched.planRevision).not.toBe(previous.planRevision);
+    expect(switched.desiredState?.families[0].selectedTerminalItemId).toBe(D);
   });
 });
