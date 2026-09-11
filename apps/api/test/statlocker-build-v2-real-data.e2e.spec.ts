@@ -476,5 +476,6 @@ describe('Statlocker Build V2 real Billy fixture', () => {
     expect(new Set(combinedStages)).toEqual(expect.objectContaining({}));
     expect(combinedStages).toEqual(expect.arrayContaining(REQUIRED_TRACE_STAGES));
     expect(legalStrategicCandidates(decision)).toBeInstanceOf(Map);
+    throw new Error(report);
   });
 });
