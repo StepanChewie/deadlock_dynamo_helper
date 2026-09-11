@@ -303,7 +303,7 @@ function observedStrategicItemIds(fixture: StatlockerBuildV2Fixture): Set<number
 }
 
 function minimumRequiredOccupancy(archetype: BuildArchetypeV2): number {
-  const required = archetype.families.filter((family) => family.requirement === 'REQUIRED').length;
+  const required = (archetype.families ?? []).filter((family) => family.requirement === 'REQUIRED').length;
   const choice = archetype.groups
     .filter((group) => group.type === 'CHOICE')
     .reduce((sum, group) => sum + group.minSelect, 0);
@@ -436,7 +436,7 @@ describe('Statlocker Build V2 real Billy fixture', () => {
 
     const observedItemIds = observedStrategicItemIds(fixture);
     for (const archetype of archetypes) {
-      for (const family of archetype.families) {
+      for (const family of archetype.families ?? []) {
         for (const terminal of family.terminalCandidates) {
           expect(observedItemIds.has(terminal.itemId)).toBe(true);
         }
