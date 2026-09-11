@@ -34,7 +34,7 @@ const itemGraph = createRecommendationItemGraph([
   item(A),
   item(B, { recipeId: 'A-to-B', consumedItemIds: [A] }),
   item(C, { recipeId: 'B-to-C', consumedItemIds: [B] }),
-  item(D, { recipeId: 'C-to-D', consumedItemIds: [C] }),
+  item(D, { recipeId: 'A-to-D', consumedItemIds: [A] }),
 ]);
 
 function archetype(): BuildArchetypeV2 {
