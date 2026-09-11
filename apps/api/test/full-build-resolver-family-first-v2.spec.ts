@@ -4,7 +4,7 @@ import {
 } from '@deadlock-live-probe/build-domain';
 import { BuildArchetypeV2 } from '../src/statlocker-adaptive/build-archetype-v2';
 import { BuildItemUtilityV2Service } from '../src/statlocker-adaptive/build-item-utility-v2.service';
-import { FullBuildResolverV2Service } from '../src/statlocker-adaptive/full-build-resolver-v2.service';
+import { FamilyFirstFullBuildResolverV2Service } from '../src/statlocker-adaptive/family-first-full-build-resolver-v2.service';
 import { ThreatWeightedMatchupV1Service } from '../src/statlocker-adaptive/threat-weighted-matchup-v1.service';
 
 const HERO_ID = 72;
@@ -68,10 +68,10 @@ function archetype(): BuildArchetypeV2 {
   };
 }
 
-describe('FullBuildResolverV2Service family-first lifetime mode', () => {
+describe('FamilyFirstFullBuildResolverV2Service lifetime mode', () => {
   it('returns desired state and semantic validation for a required family lineage', () => {
     const matchup = new ThreatWeightedMatchupV1Service();
-    const resolver = new FullBuildResolverV2Service(new BuildItemUtilityV2Service(matchup));
+    const resolver = new FamilyFirstFullBuildResolverV2Service(new BuildItemUtilityV2Service(matchup));
 
     const result = resolver.resolve({
       matchId: 'match-1',
