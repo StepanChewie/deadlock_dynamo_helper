@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { RecommendationItemGraph } from '@deadlock-live-probe/build-domain';
 import {
   BuildArchetypeFamilyV2,
   BuildArchetypeGroupV2,
@@ -20,6 +21,7 @@ export interface BuildArchetypeCompilerV2Input {
   rulesetVersion: string;
   statlockerPatchId: string;
   catalogSha256: string;
+  itemGraph?: RecommendationItemGraph;
 }
 
 interface FamilyEvidenceV2 {
@@ -57,7 +59,7 @@ export class BuildArchetypeCompilerV2Service {
     validateIdentity(input);
     const members = resolveClusterMembers(input.cluster, input.profiles);
     const familyEvidence = collectFamilyEvidence(members);
-    const families = compileFamilies(familyEvidence, members.length);
+    const families = compileFamilies(familyEvidence, members.length, input.itemGraph);
     const items = compileItems(familyEvidence, members.length);
     if (families.length === 0 || items.length === 0) {
       throw new Error(`Build archetype v2 compiler: cluster ${input.cluster.clusterId} contains no semantic items`);
@@ -162,9 +164,10 @@ function collectFamilyEvidence(
 function compileFamilies(
   familyEvidence: ReadonlyMap<number, FamilyEvidenceV2>,
   profileCount: number,
+  itemGraph?: RecommendationItemGraph,
 ): BuildArchetypeFamilyV2[] {
   return [...familyEvidence.values()]
-    .map((family) => compileFamily(family, profileCount))
+    .map((family) => compileFamily(family, profileCount, itemGraph))
     .sort((left, right) =>
       firstFamilyTiming(left) - firstFamilyTiming(right) || left.familyId - right.familyId,
     );
@@ -173,6 +176,7 @@ function compileFamilies(
 function compileFamily(
   family: FamilyEvidenceV2,
   profileCount: number,
+  itemGraph?: RecommendationItemGraph,
 ): BuildArchetypeFamilyV2 {
   const observedByItemId = new Map<number, StatlockerBuildProfileItemV2[]>();
   for (const values of family.profiles.values()) {
@@ -183,11 +187,12 @@ function compileFamily(
     }
   }
 
-  const rawNodes = [...observedByItemId.entries()]
-    .map(([itemId, observed]) => compileProgressionNode(itemId, observed, profileCount))
-    .sort((left, right) =>
-      left.timing.medianBuyTimeS - right.timing.medianBuyTimeS || left.itemId - right.itemId,
-    );
+  const rawNodes = orderProgressionNodes(
+    [...observedByItemId.entries()].map(([itemId, observed]) =>
+      compileProgressionNode(itemId, observed, profileCount),
+    ),
+    itemGraph,
+  );
   const strongTerminalIndexes = rawNodes
     .map((node, index) => ({ node, index }))
     .filter(({ node }) => node.rawFrequencyTier === 'CORE' || node.rawFrequencyTier === 'FREQUENT')
@@ -257,6 +262,58 @@ function compileProgressionNode(
       phase: modePhase(observed.map((item) => item.phase)),
     },
   };
+}
+
+function orderProgressionNodes(
+  nodes: readonly Omit<BuildProgressionNodeV2, 'progressionRole'>[],
+  itemGraph?: RecommendationItemGraph,
+): Omit<BuildProgressionNodeV2, 'progressionRole'>[] {
+  const fallback = [...nodes].sort(compareProgressionNodeFallback);
+  if (!itemGraph || nodes.length < 2) return fallback;
+
+  const byId = new Map(nodes.map((node) => [node.itemId, node]));
+  const indegree = new Map(nodes.map((node) => [node.itemId, 0]));
+  const outgoing = new Map<number, Set<number>>();
+
+  for (const ancestor of nodes) {
+    for (const descendant of nodes) {
+      if (ancestor.itemId === descendant.itemId) continue;
+      if (!itemGraph.isComponentAncestor(ancestor.itemId, descendant.itemId)) continue;
+      const next = outgoing.get(ancestor.itemId) ?? new Set<number>();
+      if (next.has(descendant.itemId)) continue;
+      next.add(descendant.itemId);
+      outgoing.set(ancestor.itemId, next);
+      indegree.set(descendant.itemId, (indegree.get(descendant.itemId) ?? 0) + 1);
+    }
+  }
+
+  const ready = nodes
+    .filter((node) => (indegree.get(node.itemId) ?? 0) === 0)
+    .sort(compareProgressionNodeFallback);
+  const ordered: Omit<BuildProgressionNodeV2, 'progressionRole'>[] = [];
+
+  while (ready.length > 0) {
+    const current = ready.shift()!;
+    ordered.push(current);
+    for (const nextId of [...(outgoing.get(current.itemId) ?? [])].sort((a, b) => a - b)) {
+      const nextIndegree = (indegree.get(nextId) ?? 0) - 1;
+      indegree.set(nextId, nextIndegree);
+      if (nextIndegree !== 0) continue;
+      const next = byId.get(nextId);
+      if (!next) continue;
+      ready.push(next);
+      ready.sort(compareProgressionNodeFallback);
+    }
+  }
+
+  return ordered.length === nodes.length ? ordered : fallback;
+}
+
+function compareProgressionNodeFallback(
+  left: Omit<BuildProgressionNodeV2, 'progressionRole'>,
+  right: Omit<BuildProgressionNodeV2, 'progressionRole'>,
+): number {
+  return left.timing.medianBuyTimeS - right.timing.medianBuyTimeS || left.itemId - right.itemId;
 }
 
 function terminalCandidate(
