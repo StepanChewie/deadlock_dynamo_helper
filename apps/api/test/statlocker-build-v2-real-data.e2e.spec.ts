@@ -27,12 +27,12 @@ import { BuildArchetypeQualityGateV2Service } from '../src/statlocker-adaptive/b
 import { BuildArchetypeSelectorV2Service } from '../src/statlocker-adaptive/build-archetype-selector-v2.service';
 import { BuildArchetypeSessionV2Service } from '../src/statlocker-adaptive/build-archetype-session-v2.service';
 import { BuildArchetypeSnapshotStoreV2Service } from '../src/statlocker-adaptive/build-archetype-snapshot-store-v2.service';
-import { BuildArchetypeSnapshotV2 } from '../src/statlocker-adaptive/build-archetype-v2';
+import { BuildArchetypeSnapshotV2, BuildArchetypeV2 } from '../src/statlocker-adaptive/build-archetype-v2';
 import { BuildDebugTraceStoreV2Service } from '../src/statlocker-adaptive/build-debug-trace-store-v2.service';
 import { BuildDecisionTraceCollectorV2, BuildDecisionTraceStageV2 } from '../src/statlocker-adaptive/build-decision-trace-v2';
 import { BuildItemUtilityV2Service } from '../src/statlocker-adaptive/build-item-utility-v2.service';
 import { EnemyThreatV1Service } from '../src/statlocker-adaptive/enemy-threat-v1.service';
-import { FullBuildResolverV2Service } from '../src/statlocker-adaptive/full-build-resolver-v2.service';
+import { FamilyFirstFullBuildResolverV2Service } from '../src/statlocker-adaptive/family-first-full-build-resolver-v2.service';
 import { MatchupCandidateDiscoveryV2Service } from '../src/statlocker-adaptive/matchup-candidate-discovery-v2.service';
 import { ThreatWeightedMatchupV1Service } from '../src/statlocker-adaptive/threat-weighted-matchup-v1.service';
 import { toStatlockerBuildProfileV2 } from '../src/statlocker-adaptive/statlocker-build-profile-v2';
@@ -44,10 +44,17 @@ const REQUIRED_TRACE_STAGES: readonly BuildDecisionTraceStageV2[] = [
   'ARCHETYPE_SELECTION',
   'LIVE_CONTEXT',
   'CANDIDATE_DISCOVERY',
-  'ITEM_SCORING',
+  'DESIRED_STATE',
   'PLAN_SEARCH',
+  'SEMANTIC_VALIDATION',
   'FINAL_PLAN',
 ];
+
+const FORBIDDEN_CHURN_REASON_CODES = new Set([
+  'REQUIRED_FAMILY_REGRESSION',
+  'IMMEDIATE_BUY_REPLACE_CHURN',
+  'POINTLESS_PURCHASE_CHURN',
+]);
 
 function loadFixture(): StatlockerBuildV2Fixture {
   return JSON.parse(readFileSync(
@@ -287,6 +294,32 @@ function candidateTargetItemId(candidate: RecommendationCandidate): number | und
   return undefined;
 }
 
+function observedStrategicItemIds(fixture: StatlockerBuildV2Fixture): Set<number> {
+  const observed = new Set<number>();
+  for (const analysis of fixture.proBuildAnalyses) {
+    for (const item of analysis.items) observed.add(Number(item.itemId));
+  }
+  return observed;
+}
+
+function minimumRequiredOccupancy(archetype: BuildArchetypeV2): number {
+  const required = archetype.families.filter((family) => family.requirement === 'REQUIRED').length;
+  const choice = archetype.groups
+    .filter((group) => group.type === 'CHOICE')
+    .reduce((sum, group) => sum + group.minSelect, 0);
+  return required + choice;
+}
+
+function allPlanReasonCodes(result: any): string[] {
+  return [
+    ...(result.fullBuild?.validation?.reasonCodes ?? []),
+    ...(result.fullBuild?.mechanicalValidation?.reasonCodes ?? []),
+    ...(result.fullBuild?.semanticValidation?.reasonCodes ?? []),
+    ...(result.fullBuild?.degradedReasons ?? []),
+    ...(result.fullBuild?.steps ?? []).flatMap((step: any) => step.reasonCodes ?? []),
+  ];
+}
+
 function renderReport(input: {
   fixture: StatlockerBuildV2Fixture;
   snapshot: BuildArchetypeSnapshotV2;
@@ -295,38 +328,48 @@ function renderReport(input: {
   result: any;
   stages: readonly BuildDecisionTraceStageV2[];
 }): string {
-  const names = new Map(input.fixture.catalog.items.map((item) => [item.itemId, item.name]));
+  const names = new Map(input.fixture.catalog.items.map((catalogItem) => [catalogItem.itemId, catalogItem.name]));
   const item = (itemId: number) => `${names.get(itemId) ?? 'Unknown item'} [${itemId}]`;
+  const selectedArchetype = input.snapshot.archetypes.find((archetype) => archetype.archetypeId === input.selection.archetypeId);
+  const finalInventory = input.result.fullBuild?.steps?.at(-1)?.inventoryAfter ?? input.fixture.request.ownedItemIds;
   const lines: string[] = [];
+
   lines.push('BUILD_V2_E2E_REPORT_START');
-  lines.push(`Hero: Billy [${input.fixture.request.heroId}]`);
-  lines.push(`Enemies: ${input.fixture.request.enemyHeroIds.join(', ')}`);
-  lines.push(`Source profiles (10): ${input.snapshot.sourceProfileAccountIds.join(', ')}`);
+  lines.push(`Hero: Billy (${input.fixture.request.heroId})`);
+  lines.push(`Source profiles: ${input.snapshot.sourceProfileAccountIds.length}`);
   lines.push(`Statlocker VS_HERO_WPA rows: ${input.fixture.vsHeroWpaRows.length}`);
-  lines.push('Archetypes:');
-  for (const archetype of input.snapshot.archetypes) {
-    const core = archetype.items.filter((entry) => entry.role === 'CORE').map((entry) => item(entry.itemId));
-    const frequent = archetype.items.filter((entry) => entry.role === 'FREQUENT').map((entry) => item(entry.itemId));
-    lines.push(
-      `  ${archetype.archetypeId}: profiles=${archetype.sourceProfileAccountIds.length}, support=${archetype.quality.support.toFixed(4)}, coherence=${archetype.quality.coherence.toFixed(4)}, separation=${archetype.quality.separation.toFixed(4)}`,
-    );
-    lines.push(`    CORE: ${core.join(' | ') || 'none'}`);
-    lines.push(`    FREQUENT: ${frequent.join(' | ') || 'none'}`);
-    for (const group of archetype.groups) {
-      lines.push(`    ${group.type} ${group.groupId}: ${group.candidateItemIds.map(item).join(' OR ')}`);
-    }
-  }
+  lines.push(`Archetypes found: ${input.snapshot.archetypes.map((archetype) => archetype.archetypeId).join(', ')}`);
   for (const rejected of input.mining.rejected) {
     lines.push(`Rejected cluster ${rejected.clusterId}: ${rejected.reasonCodes.join(', ')}`);
   }
-  lines.push(`Selected archetype: ${input.selection.archetypeId} (${input.selection.mode})`);
-  for (const score of input.selection.scores) {
-    lines.push(`  WPA ${score.archetypeId}: score=${score.score.toFixed(6)}, confidence=${score.confidence.toFixed(4)}, coverage=${score.coverage.toFixed(4)}`);
+
+  lines.push('FAMILY SEMANTICS:');
+  for (const family of selectedArchetype?.families ?? []) {
+    const progression = family.progressionNodes.map((node) => item(node.itemId)).join(' -> ');
+    const defaultTerminal = family.terminalCandidates.find((terminal) => terminal.kind === 'DEFAULT_TERMINAL');
+    const optionalTerminals = family.terminalCandidates.filter((terminal) => terminal.kind === 'OPTIONAL_TERMINAL');
+    lines.push(
+      `  family ${family.familyId}: requirement=${family.requirement}, progression=${progression || 'none'}, default=${defaultTerminal ? item(defaultTerminal.itemId) : 'none'}, optional=${optionalTerminals.map((terminal) => item(terminal.itemId)).join(' | ') || 'none'}`,
+    );
   }
-  const runtimeTrace = input.result.trace;
-  if (runtimeTrace) lines.push(`Trace revision: ${runtimeTrace.revision}`);
-  lines.push(`Trace stages: ${input.stages.join(', ')}`);
-  lines.push('Full build:');
+
+  lines.push(`Selected archetype: ${input.selection.archetypeId} (${input.selection.mode})`);
+  lines.push('Selection evidence:');
+  for (const score of input.selection.scores) {
+    lines.push(`  VS_HERO_WPA ${score.archetypeId}: score=${score.score.toFixed(6)}, confidence=${score.confidence.toFixed(4)}, coverage=${score.coverage.toFixed(4)}`);
+  }
+
+  lines.push('DESIRED BUILD STATE:');
+  const desiredState = input.result.fullBuild?.desiredState;
+  const choiceEntries = Object.entries(desiredState?.selectedChoiceFamilyIdsByGroup ?? {});
+  lines.push(`  selected CHOICE families: ${choiceEntries.length ? choiceEntries.map(([groupId, ids]) => `${groupId}=[${(ids as number[]).join(', ')}]`).join('; ') : 'none'}`);
+  for (const family of desiredState?.families ?? []) {
+    lines.push(
+      `  family ${family.familyId}: requirement=${family.requirement}, terminal=${item(family.selectedTerminalItemId)}, kind=${family.selectedTerminalKind}, score=${family.score.toFixed(6)}, confidence=${family.confidence.toFixed(4)}, reasons=${family.reasonCodes.join(', ') || 'none'}`,
+    );
+  }
+
+  lines.push('FULL BUILD:');
   for (const step of input.result.fullBuild?.steps ?? []) {
     if (step.action === 'BUY') {
       lines.push(`  ${step.sequence}. BUY ${item(step.buyItemId)} -> [${step.inventoryAfter.map(item).join(', ')}]`);
@@ -336,19 +379,38 @@ function renderReport(input: {
       lines.push(`  ${step.sequence}. REPLACE ${item(step.sellItemId)} -> ${item(step.buyItemId)} -> [${step.inventoryAfter.map(item).join(', ')}]`);
     }
   }
-  lines.push(`Inventory simulation: ${input.result.fullBuild?.validation?.valid ? 'PASS' : 'FAIL'}`);
-  lines.push(`Full progression validation: ${input.result.fullBuild?.validation?.valid ? 'PASS' : 'FAIL'}`);
+
+  lines.push('FINAL INVENTORY:');
+  for (const itemId of finalInventory) lines.push(`  ${item(itemId)}`);
+
+  lines.push('FAMILY SATISFACTION:');
+  for (const state of input.result.fullBuild?.semanticValidation?.finalFamilyStates ?? []) {
+    const desired = desiredState?.families?.find((family: any) => family.familyId === state.familyId);
+    if (desired?.requirement !== 'REQUIRED' && desired?.requirement !== 'CHOICE') continue;
+    lines.push(
+      `  family ${state.familyId}: requirement=${desired.requirement}, status=${state.status}, terminal=${state.terminalItemId ? item(state.terminalItemId) : 'none'}, current=[${state.currentItemIds.map(item).join(', ')}]`,
+    );
+  }
+
+  const runtimeTrace = input.result.trace;
+  if (runtimeTrace) lines.push(`Trace revision: ${runtimeTrace.revision}`);
+  lines.push(`Trace stages: ${input.stages.join(', ')}`);
+  lines.push(`Inventory simulation: ${input.result.fullBuild?.mechanicalValidation?.valid ? 'PASS' : 'FAIL'}`);
+  lines.push(`Semantic validation: ${input.result.fullBuild?.semanticValidation?.valid ? 'PASS' : 'FAIL'}`);
+  lines.push(`Combined validation: ${input.result.fullBuild?.validation?.valid ? 'PASS' : 'FAIL'}`);
+  lines.push(`Degraded reasons: ${(input.result.fullBuild?.degradedReasons ?? []).join(', ') || 'none'}`);
   lines.push('BUILD_V2_E2E_REPORT_END');
   return lines.join('\n');
 }
 
 describe('Statlocker Build V2 real Billy fixture', () => {
-  it('runs top-10 Statlocker evidence through archetypes, immutable selection and the full lifetime plan', async () => {
+  it('runs frozen Statlocker evidence through immutable family-first selection and a validated lifetime plan', async () => {
     const fixture = loadFixture();
     expect(fixture.metadata.buildEvidenceSource).toBe('STATLOCKER_ONLY');
     expect(fixture.metadata.liveContextSource).toBe('REQUEST');
     expect(fixture.request.heroId).toBe(72);
     expect(fixture.proBuildAnalyses).toHaveLength(10);
+    expect(fixture.request.enemyHeroIds).toHaveLength(6);
     expect(fixture.vsHeroWpaRows.length).toBeGreaterThan(0);
 
     const compiled = buildGraph(fixture);
@@ -369,9 +431,17 @@ describe('Statlocker Build V2 real Billy fixture', () => {
       rulesetVersion: fixture.metadata.identity.rulesetVersion,
       statlockerPatchId: fixture.metadata.identity.statlockerPatchId,
       catalogSha256: fixture.metadata.identity.catalogSha256,
+      itemGraph: compiled.graph,
     }));
+
+    const observedItemIds = observedStrategicItemIds(fixture);
     for (const archetype of archetypes) {
-      expect(new Set(archetype.items.map((entry) => entry.familyId)).size).toBe(archetype.items.length);
+      for (const family of archetype.families) {
+        for (const terminal of family.terminalCandidates) {
+          expect(observedItemIds.has(terminal.itemId)).toBe(true);
+        }
+      }
+      expect(minimumRequiredOccupancy(archetype)).toBeLessThanOrEqual(fixture.request.totalCapacity);
     }
 
     const snapshot: BuildArchetypeSnapshotV2 = {
@@ -415,7 +485,7 @@ describe('Statlocker Build V2 real Billy fixture', () => {
     const utility = new BuildItemUtilityV2Service(matchup);
     const threat = new EnemyThreatV1Service();
     const discovery = new MatchupCandidateDiscoveryV2Service(utility, matchup);
-    const resolver = new FullBuildResolverV2Service(utility);
+    const resolver = new FamilyFirstFullBuildResolverV2Service(utility);
     const traceStore = new BuildDebugTraceStoreV2Service();
     const evidence = evidenceBundle(fixture);
     const service = new AdaptiveRecommendationV2Service(
@@ -442,6 +512,9 @@ describe('Statlocker Build V2 real Billy fixture', () => {
       ...(runtimeTrace?.stages.map((entry) => entry.stage) ?? []),
     ];
     const selection = (lockDb.get()?.selection ?? {}) as any;
+    const selectedArchetype = snapshot.archetypes.find((archetype) => archetype.archetypeId === selection.archetypeId);
+    expect(selectedArchetype).toBeDefined();
+
     const report = renderReport({
       fixture,
       snapshot,
@@ -455,9 +528,31 @@ describe('Statlocker Build V2 real Billy fixture', () => {
     expect(result.ready).toBe(true);
     expect(result.lock?.archetypeId).toBe(selection.archetypeId);
     expect(result.lock?.selectionMode).toBe('VS_HERO_WPA');
+    expect(result.fullBuild?.mechanicalValidation?.valid).toBe(true);
+    expect(result.fullBuild?.semanticValidation?.valid).toBe(true);
     expect(result.fullBuild?.validation.valid).toBe(true);
     expect(result.fullBuild?.steps.length).toBeGreaterThan(0);
+    expect(result.nextAction.type).toBe(result.fullBuild?.steps[0].action);
     expect(result.fullBuild?.steps.every((step) => step.inventoryAfter.length <= fixture.request.totalCapacity)).toBe(true);
+
+    const desiredState = result.fullBuild?.desiredState;
+    expect(desiredState).toBeDefined();
+    const finalFamilyStates = new Map(
+      (result.fullBuild?.semanticValidation?.finalFamilyStates ?? []).map((state) => [state.familyId, state]),
+    );
+    for (const family of desiredState?.families ?? []) {
+      if (family.requirement !== 'REQUIRED') continue;
+      expect(finalFamilyStates.get(family.familyId)?.status).not.toBe('UNSATISFIED');
+    }
+    for (const group of selectedArchetype?.groups.filter((entry) => entry.type === 'CHOICE') ?? []) {
+      const selected = desiredState?.selectedChoiceFamilyIdsByGroup[group.groupId] ?? [];
+      expect(selected.length).toBeGreaterThanOrEqual(group.minSelect);
+      expect(selected.length).toBeLessThanOrEqual(group.maxSelect);
+    }
+
+    for (const reasonCode of allPlanReasonCodes(result)) {
+      expect(FORBIDDEN_CHURN_REASON_CODES.has(reasonCode)).toBe(false);
+    }
     for (const step of result.fullBuild?.steps ?? []) {
       if (step.action === 'REPLACE') {
         expect(step.sellItemId).toBeDefined();
@@ -467,13 +562,18 @@ describe('Statlocker Build V2 real Billy fixture', () => {
         expect(step.recipeId).toBeDefined();
         expect(step.consumedItemIds.length).toBeGreaterThan(0);
         expect(step.sellItemId).toBeUndefined();
+        for (const consumedItemId of step.consumedItemIds) {
+          expect(step.inventoryBefore).toContain(consumedItemId);
+          expect(step.inventoryAfter).not.toContain(consumedItemId);
+        }
+        expect(step.inventoryAfter).toContain(step.buyItemId);
       }
     }
+
     expect(lockDb.get()).toBeDefined();
     const second = await controller.recommend({ matchId: fixture.request.matchId });
     expect(second.lock?.archetypeId).toBe(result.lock?.archetypeId);
     expect(lockDb.repository.save).toHaveBeenCalledTimes(1);
-    expect(new Set(combinedStages)).toEqual(expect.objectContaining({}));
     expect(combinedStages).toEqual(expect.arrayContaining(REQUIRED_TRACE_STAGES));
     expect(legalStrategicCandidates(decision)).toBeInstanceOf(Map);
   });
