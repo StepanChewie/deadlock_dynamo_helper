@@ -139,6 +139,61 @@ describe('FullBuildTransactionPlannerV2Service', () => {
     ]);
   });
 
+  it('interleaves family transactions by Statlocker purchase timing instead of terminal WPA score', () => {
+    const otherItemId = 999;
+    const otherFamily: BuildArchetypeFamilyV2 = {
+      familyId: otherItemId,
+      requirement: 'REQUIRED',
+      aggregateFrequencyTier: 'CORE',
+      sourceProfileCount: 10,
+      profileCoverage: 1,
+      purchaseRate: 0.95,
+      structuralPriority: 1,
+      progressionNodes: [{
+        itemId: otherItemId,
+        rawFrequencyTier: 'CORE',
+        progressionRole: 'DEFAULT_TERMINAL',
+        sourceProfileCount: 10,
+        profileCoverage: 1,
+        purchaseRate: 0.95,
+        timing: { medianBuyTimeS: 500, spreadS: 30, phase: 'EARLY' },
+      }],
+      terminalCandidates: [{
+        itemId: otherItemId,
+        kind: 'DEFAULT_TERMINAL',
+        sourceProfileCount: 10,
+        profileCoverage: 1,
+        purchaseRate: 0.95,
+        rawFrequencyTier: 'CORE',
+      }],
+    };
+    const value = archetype([family(), otherFamily]);
+    const target: DesiredBuildStateV2 = {
+      families: [
+        { familyId: A, requirement: 'REQUIRED', selectedTerminalItemId: C, selectedTerminalKind: 'DEFAULT_TERMINAL', score: 0.9, confidence: 1, reasonCodes: [] },
+        { familyId: otherItemId, requirement: 'REQUIRED', selectedTerminalItemId: otherItemId, selectedTerminalKind: 'DEFAULT_TERMINAL', score: 0.1, confidence: 1, reasonCodes: [] },
+      ],
+      selectedChoiceFamilyIdsByGroup: {},
+      reasonCodes: [],
+    };
+
+    const result = planner.plan({
+      archetype: value,
+      desiredState: target,
+      itemGraph: graph([otherItemId]),
+      rulesetId: 'r1',
+      capacity: 12,
+      currentInventoryItemIds: [],
+    });
+
+    expect(result.actions.map((action) => [action.action, action.buyItemId])).toEqual([
+      ['BUY', A],
+      ['BUY', otherItemId],
+      ['UPGRADE', B],
+      ['UPGRADE', C],
+    ]);
+  });
+
   it('stops at the selected default terminal instead of upgrading to an unselected optional terminal', () => {
     const result = planner.plan({
       archetype: archetype(),
