@@ -63,6 +63,29 @@ function hasHardEdge(
   );
 }
 
+function hasOrderCycle(archetype: ReturnType<BuildArchetypeCompilerV2Service['compile']>): boolean {
+  const adjacency = new Map<number, number[]>();
+  for (const edge of archetype.orderEdges) {
+    const next = adjacency.get(edge.beforeItemId) ?? [];
+    next.push(edge.afterItemId);
+    adjacency.set(edge.beforeItemId, next);
+  }
+  const visiting = new Set<number>();
+  const visited = new Set<number>();
+  const visit = (itemId: number): boolean => {
+    if (visiting.has(itemId)) return true;
+    if (visited.has(itemId)) return false;
+    visiting.add(itemId);
+    for (const next of adjacency.get(itemId) ?? []) {
+      if (visit(next)) return true;
+    }
+    visiting.delete(itemId);
+    visited.add(itemId);
+    return false;
+  };
+  return archetype.items.some((item) => visit(item.itemId));
+}
+
 describe('BuildArchetypeCompilerV2Service', () => {
   it('retains semantic milestones when B and C swap purchase order', () => {
     const archetype = compile([
@@ -77,6 +100,17 @@ describe('BuildArchetypeCompilerV2Service', () => {
     expect(hasHardEdge(archetype, B, C)).toBe(false);
     expect(hasHardEdge(archetype, C, B)).toBe(false);
     expect(hasHardEdge(archetype, A, D)).toBe(true);
+  });
+
+  it('keeps the compiled precedence graph acyclic under Condorcet-style profile disagreement', () => {
+    const archetype = compile([
+      profile('p1', [itemAt(A, 300), itemAt(B, 600), itemAt(C, 900)]),
+      profile('p2', [itemAt(B, 300), itemAt(C, 600), itemAt(A, 900)]),
+      profile('p3', [itemAt(C, 300), itemAt(A, 600), itemAt(B, 900)]),
+    ]);
+
+    expect(archetype.orderEdges).toHaveLength(2);
+    expect(hasOrderCycle(archetype)).toBe(false);
   });
 
   it('deduplicates repeated item variants from one semantic upgrade family', () => {
