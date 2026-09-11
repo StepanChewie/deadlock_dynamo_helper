@@ -105,10 +105,6 @@ export class BuildDesiredStateV2Service {
         state: this.evaluateFamily(input, family, family.requirement),
         familyOrder: index,
       }))
-      .filter((entry) =>
-        entry.state.score >= STATLOCKER_BUILD_V2_CONFIG.fullBuildResolver.buyMinImprovement &&
-        entry.state.confidence >= STATLOCKER_BUILD_V2_CONFIG.optionalTerminal.minConfidence,
-      )
       .sort(compareFamilyEvaluation);
 
     const remainingCapacity = Math.max(0, input.totalCapacity - selected.length);
@@ -116,7 +112,7 @@ export class BuildDesiredStateV2Service {
       ...entry,
       state: {
         ...entry.state,
-        reasonCodes: [...new Set([...entry.state.reasonCodes, 'OPTIONAL_FAMILY_WPA_SELECTED'])].sort(),
+        reasonCodes: [...new Set([...entry.state.reasonCodes, 'OPTIONAL_FAMILY_CAPACITY_SELECTED'])].sort(),
       },
     }));
     selected.push(...acceptedOptional);
