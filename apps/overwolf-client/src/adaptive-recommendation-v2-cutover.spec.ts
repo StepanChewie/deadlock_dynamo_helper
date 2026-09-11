@@ -77,22 +77,24 @@ describe('Overwolf adaptive recommendation V2 cutover', () => {
       ok: true,
       status: 201,
       json: jest.fn().mockResolvedValue(result),
-    } as Response);
+    } as any);
     let presentation: ReturnType<typeof buildAdaptiveRecommendationPresentation> | undefined;
     const client = new AdaptiveRecommendationClient('https://api.example', fetcher, 10);
 
     client.schedule({ matchId: 'match-a', localSteamId: 'steam-a' }, {
       onResult: (value) => {
-        presentation = buildAdaptiveRecommendationPresentation(value as AdaptiveRecommendationResultV2);
+        presentation = buildAdaptiveRecommendationPresentation(value as any);
       },
     });
     jest.advanceTimersByTime(10);
     await flush();
 
+    expect(fetcher).toHaveBeenCalledTimes(1);
     expect(fetcher).toHaveBeenCalledWith(
       'https://api.example/deadlock/adaptive/v2/recommend',
       expect.objectContaining({ method: 'POST' }),
     );
+    expect(fetcher.mock.calls[0][0]).not.toContain('/deadlock/adaptive/v1/');
     expect(presentation?.plan.items.map((entry) => entry.item.id)).toEqual([
       1009965641,
       1342610602,
