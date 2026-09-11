@@ -31,8 +31,8 @@ import {
 import { BuildDebugTraceStoreV2Service } from './build-debug-trace-store-v2.service';
 import { BuildDecisionTraceCollectorV2 } from './build-decision-trace-v2';
 import { EnemyThreatV1Service } from './enemy-threat-v1.service';
+import { FamilyFirstFullBuildResolverV2Service } from './family-first-full-build-resolver-v2.service';
 import { ResolvedFullBuildPlanV2 } from './full-build-plan-v2';
-import { FullBuildResolverV2Service } from './full-build-resolver-v2.service';
 import { MatchupCandidateDiscoveryV2Service } from './matchup-candidate-discovery-v2.service';
 import {
   StatlockerEvidenceBundleV1,
@@ -71,7 +71,7 @@ export class AdaptiveRecommendationV2Service {
     private readonly session: BuildArchetypeSessionV2Service,
     private readonly enemyThreat: EnemyThreatV1Service,
     private readonly discovery: MatchupCandidateDiscoveryV2Service,
-    private readonly resolver: FullBuildResolverV2Service,
+    private readonly resolver: FamilyFirstFullBuildResolverV2Service,
     private readonly traceStore: BuildDebugTraceStoreV2Service,
   ) {}
 
@@ -127,6 +127,7 @@ export class AdaptiveRecommendationV2Service {
       return notReadyRecommendation(decision, ['SLOT_CAPACITY_UNAVAILABLE']);
     }
 
+    const previousTrace = this.traceStore.get(request.matchId);
     const plan = this.resolver.resolve({
       matchId: request.matchId,
       stateRevision: decision.stateRevision,
@@ -143,9 +144,9 @@ export class AdaptiveRecommendationV2Service {
       wpaPatchData,
       t4Chains,
       outsideCandidates,
+      previousPlan: previousTrace?.finalPlan,
       trace,
     });
-    const previousTrace = this.traceStore.get(request.matchId);
     this.traceStore.put({
       matchId: request.matchId,
       revision: (previousTrace?.revision ?? 0) + 1,
