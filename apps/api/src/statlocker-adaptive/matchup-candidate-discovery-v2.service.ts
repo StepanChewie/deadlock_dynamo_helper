@@ -152,11 +152,17 @@ function semanticArchetypeItemIds(
   itemGraph: RecommendationItemGraph,
 ): Set<number> {
   const itemIds = new Set<number>();
-  for (const item of archetype.items) {
-    itemIds.add(item.itemId);
-    for (const componentId of itemGraph.getTransitiveComponentIds(item.itemId)) itemIds.add(componentId);
-    for (const upgradeId of itemGraph.getTransitiveUpgradeIds(item.itemId)) itemIds.add(upgradeId);
+  const addSemanticItem = (itemId: number): void => {
+    itemIds.add(itemId);
+    for (const componentId of itemGraph.getTransitiveComponentIds(itemId)) itemIds.add(componentId);
+    for (const upgradeId of itemGraph.getTransitiveUpgradeIds(itemId)) itemIds.add(upgradeId);
+  };
+
+  for (const family of archetype.families ?? []) {
+    for (const node of family.progressionNodes) addSemanticItem(node.itemId);
+    for (const terminal of family.terminalCandidates) addSemanticItem(terminal.itemId);
   }
+  for (const item of archetype.items) addSemanticItem(item.itemId);
   return itemIds;
 }
 
@@ -165,6 +171,23 @@ function archetypeRoleForItem(
   archetype: BuildArchetypeV2,
   itemGraph: RecommendationItemGraph,
 ): BuildArchetypeRoleV2 | undefined {
+  for (const family of archetype.families ?? []) {
+    const familyItemIds = [
+      ...family.progressionNodes.map((node) => node.itemId),
+      ...family.terminalCandidates.map((terminal) => terminal.itemId),
+    ];
+    for (const familyItemId of familyItemIds) {
+      if (
+        familyItemId === itemId ||
+        itemGraph.getTransitiveComponentIds(familyItemId).includes(itemId) ||
+        itemGraph.getTransitiveUpgradeIds(familyItemId).includes(itemId)
+      ) {
+        if (family.requirement === 'REQUIRED') return 'CORE';
+        if (family.requirement === 'SITUATIONAL') return 'SITUATIONAL';
+        return 'FLEX';
+      }
+    }
+  }
   for (const item of archetype.items) {
     if (item.itemId === itemId) return item.role;
     if (itemGraph.getTransitiveComponentIds(item.itemId).includes(itemId)) return item.role;
