@@ -90,6 +90,9 @@ export interface BuildArchetypeItemV2 {
 export interface BuildArchetypeGroupV2 {
   groupId: string;
   type: BuildArchetypeGroupTypeV2;
+  /** Family identity is the V2 strategic authority. */
+  candidateFamilyIds?: readonly number[];
+  /** Legacy representative-item projection for staged migration only. */
   candidateItemIds: readonly number[];
   minSelect: number;
   maxSelect: number;
@@ -98,6 +101,8 @@ export interface BuildArchetypeGroupV2 {
 }
 
 export interface BuildOrderEdgeV2 {
+  beforeFamilyId?: number;
+  afterFamilyId?: number;
   beforeItemId: number;
   afterItemId: number;
   confidence: number;
@@ -106,6 +111,8 @@ export interface BuildOrderEdgeV2 {
 }
 
 export interface BuildArchetypeRelationshipV2 {
+  leftFamilyId?: number;
+  rightFamilyId?: number;
   leftItemId: number;
   rightItemId: number;
   strength: number;
