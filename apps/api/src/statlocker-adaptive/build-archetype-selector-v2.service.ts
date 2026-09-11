@@ -193,7 +193,10 @@ function defaultTerminal(family: BuildArchetypeFamilyV2): BuildArchetypeFamilyV2
 }
 
 function structuralFamilyWeight(family: BuildArchetypeFamilyV2): number {
-  const tierWeight = STATLOCKER_BUILD_V2_CONFIG.archetypeSelectionRoleWeights[family.aggregateFrequencyTier];
+  const role = family.aggregateFrequencyTier === 'SOMETIMES'
+    ? 'SITUATIONAL'
+    : family.aggregateFrequencyTier;
+  const tierWeight = STATLOCKER_BUILD_V2_CONFIG.archetypeSelectionRoleWeights[role];
   return tierWeight * Math.max(family.structuralPriority, 0.05);
 }
 
