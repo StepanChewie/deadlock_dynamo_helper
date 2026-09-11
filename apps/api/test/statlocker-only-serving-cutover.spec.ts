@@ -90,9 +90,10 @@ describe('Statlocker-only recommendation serving cutover', () => {
     expect(composeSource).toContain('/deadlock/adaptive/v1/status');
   });
 
-  test('adaptive client remains pinned to the only recommendation endpoint', () => {
+  test('adaptive client remains pinned to the V2 recommendation endpoint', () => {
     const adaptiveClientSource = readRepoFile('overwolf-client/src/adaptive-recommendation-client.ts');
 
-    expect(adaptiveClientSource).toContain('/deadlock/adaptive/v1/recommend');
+    expect(adaptiveClientSource).toContain('/deadlock/adaptive/v2/recommend');
+    expect(adaptiveClientSource).not.toContain('/deadlock/adaptive/v1/recommend');
   });
 });
