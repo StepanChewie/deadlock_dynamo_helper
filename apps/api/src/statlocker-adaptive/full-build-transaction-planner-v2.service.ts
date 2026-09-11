@@ -28,16 +28,16 @@ export class FullBuildTransactionPlannerV2Service {
   plan(input: FullBuildTransactionPlannerV2Input): FullBuildTransactionPlannerV2Result {
     const actions: FullBuildTransitionIntentV2[] = [];
     const reasonCodes = new Set<string>();
+    const families = input.archetype.families ?? [];
     let projectedInventory = [...input.currentInventoryItemIds];
 
     const desiredFamilies = [...input.desiredState.families].sort(compareDesiredFamilies);
     for (const desiredFamily of desiredFamilies) {
-      const family = input.archetype.families.find((entry) => entry.familyId === desiredFamily.familyId);
+      const family = families.find((entry) => entry.familyId === desiredFamily.familyId);
       if (!family) {
         reasonCodes.add('DESIRED_FAMILY_NOT_IN_ARCHETYPE');
         continue;
       }
-
       if (projectedInventory.includes(desiredFamily.selectedTerminalItemId)) continue;
 
       const progression = findObservedLineagePath(
@@ -52,33 +52,31 @@ export class FullBuildTransactionPlannerV2Service {
         continue;
       }
 
-      if (!progression.heldItemId && projectedInventory.length >= input.capacity) {
-        const replacement = this.findSafeReplacement(input, projectedInventory, desiredFamily, progression.path[0]);
+      if (progression.heldItemId === undefined && projectedInventory.length >= input.capacity) {
+        const replacement = this.findSafeReplacement(input, families, projectedInventory, desiredFamily, progression.path[0]);
         if (!replacement) {
           reasonCodes.add('REQUIRED_FAMILY_REGRESSION');
           continue;
         }
-
-        const replaceAction: FullBuildTransitionIntentV2 = {
+        const action: FullBuildTransitionIntentV2 = {
           action: 'REPLACE',
           sellItemId: replacement.sellItemId,
           buyItemId: progression.path[0],
           reasonCodes: ['FAMILY_ENTRY_REPLACEMENT'],
         };
-        actions.push(replaceAction);
-        projectedInventory = simulateOne(input, projectedInventory, replaceAction);
-      } else if (!progression.heldItemId) {
-        const buyAction: FullBuildTransitionIntentV2 = {
+        actions.push(action);
+        projectedInventory = simulateOne(input, projectedInventory, action);
+      } else if (progression.heldItemId === undefined) {
+        const action: FullBuildTransitionIntentV2 = {
           action: 'BUY',
           buyItemId: progression.path[0],
           reasonCodes: ['FAMILY_ENTRY_PURCHASE'],
         };
-        actions.push(buyAction);
-        projectedInventory = simulateOne(input, projectedInventory, buyAction);
+        actions.push(action);
+        projectedInventory = simulateOne(input, projectedInventory, action);
       }
 
-      const startIndex = progression.heldItemId ? 1 : 1;
-      for (let index = startIndex; index < progression.path.length; index += 1) {
+      for (let index = 1; index < progression.path.length; index += 1) {
         const previousItemId = progression.path[index - 1];
         const buyItemId = progression.path[index];
         const recipe = executableOneSlotRecipe(
@@ -92,38 +90,35 @@ export class FullBuildTransactionPlannerV2Service {
           reasonCodes.add('NO_LEGAL_OBSERVED_LINEAGE');
           break;
         }
-
-        const upgradeAction: FullBuildTransitionIntentV2 = {
+        const action: FullBuildTransitionIntentV2 = {
           action: 'UPGRADE',
           buyItemId,
           recipeId: recipe.recipeId,
           reasonCodes: ['OBSERVED_FAMILY_UPGRADE'],
         };
-        actions.push(upgradeAction);
-        projectedInventory = simulateOne(input, projectedInventory, upgradeAction);
+        actions.push(action);
+        projectedInventory = simulateOne(input, projectedInventory, action);
       }
     }
 
-    return {
-      actions,
-      reasonCodes: [...reasonCodes].sort(),
-    };
+    return { actions, reasonCodes: [...reasonCodes].sort() };
   }
 
   private findSafeReplacement(
     input: FullBuildTransactionPlannerV2Input,
+    families: readonly BuildArchetypeFamilyV2[],
     projectedInventory: readonly number[],
     desiredFamily: DesiredFamilyStateV2,
     buyItemId: number,
   ): { sellItemId: number } | undefined {
-    const strategicHeldItems = input.archetype.families.flatMap((family) =>
+    const strategicHeldItems = families.flatMap((family) =>
       family.progressionNodes
         .map((node) => node.itemId)
         .filter((itemId) => projectedInventory.includes(itemId)),
     );
 
     for (const sellItemId of strategicHeldItems) {
-      const sellFamily = input.archetype.families.find((family) =>
+      const sellFamily = families.find((family) =>
         family.progressionNodes.some((node) => node.itemId === sellItemId),
       );
       if (!sellFamily || sellFamily.familyId === desiredFamily.familyId) continue;
@@ -135,10 +130,9 @@ export class FullBuildTransactionPlannerV2Service {
         reasonCodes: ['FAMILY_ENTRY_REPLACEMENT'],
       };
       const nextInventory = simulateOne(input, projectedInventory, action);
-      if (requiredFamilyCount(input.archetype, nextInventory, input.itemGraph)
-        < requiredFamilyCount(input.archetype, projectedInventory, input.itemGraph)) {
-        continue;
-      }
+      const beforeRequired = requiredFamilyCount(input.archetype, projectedInventory, input.itemGraph);
+      const afterRequired = requiredFamilyCount(input.archetype, nextInventory, input.itemGraph);
+      if (afterRequired < beforeRequired) continue;
       return { sellItemId };
     }
 
@@ -156,19 +150,17 @@ function findObservedLineagePath(
   const observedIds = new Set(family.progressionNodes.map((node) => node.itemId));
   if (!observedIds.has(terminalItemId)) return undefined;
 
-  const heldCandidates = family.progressionNodes
+  const heldItemId = family.progressionNodes
     .map((node) => node.itemId)
     .filter((itemId) => inventoryItemIds.includes(itemId))
-    .filter((itemId) => itemId === terminalItemId || itemGraph.isComponentAncestor(itemId, terminalItemId));
-
-  const heldItemId = heldCandidates.sort((left, right) =>
-    lineageDepth(right, terminalItemId, observedIds, itemGraph, rulesetId)
-      - lineageDepth(left, terminalItemId, observedIds, itemGraph, rulesetId),
-  )[0];
+    .filter((itemId) => itemId === terminalItemId || itemGraph.isComponentAncestor(itemId, terminalItemId))
+    .sort((left, right) =>
+      lineageDepth(left, terminalItemId, observedIds, itemGraph, rulesetId)
+        - lineageDepth(right, terminalItemId, observedIds, itemGraph, rulesetId),
+    )[0];
 
   if (heldItemId === terminalItemId) return { heldItemId, path: [heldItemId] };
-
-  if (heldItemId) {
+  if (heldItemId !== undefined) {
     const path = shortestObservedPath(heldItemId, terminalItemId, observedIds, itemGraph, rulesetId);
     return path ? { heldItemId, path } : undefined;
   }
@@ -199,7 +191,6 @@ function shortestObservedPath(
     const path = queue.shift()!;
     const current = path[path.length - 1];
     if (current === targetItemId) return path;
-
     for (const nextItemId of itemGraph.getDirectUpgradeIds(current)) {
       if (!observedIds.has(nextItemId) || visited.has(nextItemId)) continue;
       if (!executableOneSlotRecipe(nextItemId, current, [current], itemGraph, rulesetId)) continue;
@@ -228,12 +219,7 @@ function executableOneSlotRecipe(
 
 function directPurchasable(itemId: number, itemGraph: RecommendationItemGraph, rulesetId: string): boolean {
   const item = itemGraph.getItem(itemId);
-  return Boolean(
-    item
-      && item.active
-      && item.availableRulesetIds.includes(rulesetId)
-      && item.directPurchaseCost !== undefined,
-  );
+  return Boolean(item?.active && item.availableRulesetIds.includes(rulesetId) && item.directPurchaseCost !== undefined);
 }
 
 function lineageDepth(
@@ -243,8 +229,8 @@ function lineageDepth(
   itemGraph: RecommendationItemGraph,
   rulesetId: string,
 ): number {
-  const path = shortestObservedPath(startItemId, targetItemId, observedIds, itemGraph, rulesetId);
-  return path?.length ?? Number.MAX_SAFE_INTEGER;
+  return shortestObservedPath(startItemId, targetItemId, observedIds, itemGraph, rulesetId)?.length
+    ?? Number.MAX_SAFE_INTEGER;
 }
 
 function simulateOne(
@@ -252,14 +238,13 @@ function simulateOne(
   inventoryItemIds: readonly number[],
   action: FullBuildTransitionIntentV2,
 ): number[] {
-  const result = simulateFullBuildInventoryV2({
+  return [...simulateFullBuildInventoryV2({
     rulesetId: input.rulesetId,
     itemGraph: input.itemGraph,
     capacity: input.capacity,
     initialInventoryItemIds: inventoryItemIds,
     actions: [action],
-  });
-  return [...result.finalInventoryItemIds];
+  }).finalInventoryItemIds];
 }
 
 function requiredFamilyCount(
@@ -271,7 +256,7 @@ function requiredFamilyCount(
     evaluateBuildFamilySatisfactionV2(archetype, inventoryItemIds, itemGraph)
       .map((entry) => [entry.familyId, entry.status] as const),
   );
-  return archetype.families.filter((family) =>
+  return (archetype.families ?? []).filter((family) =>
     family.requirement === 'REQUIRED'
       && isTerminalFamilySatisfactionV2(statusByFamily.get(family.familyId) ?? 'UNSATISFIED'),
   ).length;
