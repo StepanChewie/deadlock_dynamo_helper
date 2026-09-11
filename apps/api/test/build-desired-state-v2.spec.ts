@@ -163,7 +163,7 @@ describe('BuildDesiredStateV2Service', () => {
     });
   });
 
-  it('fills only remaining capacity with worthwhile optional families and may leave a slot unused', () => {
+  it('fills remaining capacity with Statlocker-backed optional families even when WPA is below the buy-improvement floor', () => {
     const required = Array.from({ length: 8 }, (_, index) => family(3000 + index, 4000 + index));
     const choiceLeft = family(3100, 4100, undefined, 'OPTIONAL');
     const choiceRight = family(3101, 4101, undefined, 'OPTIONAL');
@@ -199,9 +199,9 @@ describe('BuildDesiredStateV2Service', () => {
     expect(result.selectedChoiceFamilyIdsByGroup['choice:one']).toEqual([3101]);
     expect(selectedFamilyIds.has(3200)).toBe(true);
     expect(selectedFamilyIds.has(3201)).toBe(true);
-    expect(selectedFamilyIds.has(3202)).toBe(false);
+    expect(selectedFamilyIds.has(3202)).toBe(true);
     expect(selectedFamilyIds.has(3203)).toBe(false);
-    expect(result.families).toHaveLength(11);
-    expect(result.families.length).toBeLessThanOrEqual(12);
+    expect(result.families).toHaveLength(12);
+    expect(result.reasonCodes).not.toContain('DESIRED_STATE_UNDER_CAPACITY');
   });
 });
