@@ -129,7 +129,7 @@ function outsideBuyCandidate() {
       },
     },
     matchup: { normalized: 0.4, confidence: 1, coverage: 1, score: 0.4, reasonCodes: [] },
-    utility: { total: 0.4, confidence: 1, layers: {} },
+    utility: { total: 0.04, confidence: 1, layers: {} },
     replacement: false,
     requiredImprovement: 0.08,
     reasonCodes: [
@@ -150,6 +150,7 @@ function outsideRequiredReplacementCandidate() {
     },
     replacement: true,
     sellItemId: REQUIRED,
+    requiredImprovement: 0.45,
     reasonCodes: [
       'MATCHUP_DISCOVERY_OUTSIDE_ARCHETYPE',
       'MATCHUP_DISCOVERY_STATLOCKER_VS_HERO_WPA',
@@ -160,7 +161,7 @@ function outsideRequiredReplacementCandidate() {
 }
 
 describe('FamilyFirstFullBuildResolverV2Service outside candidates', () => {
-  it('uses a strong Statlocker-backed outside candidate when optional capacity remains', () => {
+  it('uses a Statlocker-backed outside BUY below the WPA improvement floor when capacity remains', () => {
     const result = service().resolve({
       ...baseInput(),
       outsideCandidates: [outsideBuyCandidate()],
