@@ -494,6 +494,8 @@ function compileRelationships(
       const rightItemId = representativeByFamily.get(entry.rightFamilyId);
       if (leftItemId === undefined || rightItemId === undefined) return [];
       return [{
+        leftFamilyId: entry.leftFamilyId,
+        rightFamilyId: entry.rightFamilyId,
         leftItemId: Math.min(leftItemId, rightItemId),
         rightItemId: Math.max(leftItemId, rightItemId),
         strength: mean([...entry.valuesByProfile.values()]),
@@ -558,6 +560,7 @@ function compileExplicitGroups(
     .map(([groupId, value]) => ({
       groupId,
       type: value.type,
+      candidateFamilyIds: [...value.familyIds].sort((a, b) => a - b),
       candidateItemIds: [...value.familyIds]
         .map((familyId) => representativeByFamily.get(familyId))
         .filter((itemId): itemId is number => itemId !== undefined)
@@ -613,6 +616,7 @@ function compileInferredChoiceGroups(
       result.push({
         groupId: `inferred-choice:${left.itemId}:${right.itemId}`,
         type: 'CHOICE',
+        candidateFamilyIds: [leftFamilyId, rightFamilyId].sort((a, b) => a - b),
         candidateItemIds: [left.itemId, right.itemId],
         minSelect: 1,
         maxSelect: 1,
@@ -690,6 +694,8 @@ function compileOrderEdges(
       const beforeFamily = leftBefore >= rightBefore ? leftFamily : rightFamily;
       const afterFamily = leftBefore >= rightBefore ? rightFamily : leftFamily;
       candidates.push({
+        beforeFamilyId: beforeFamily,
+        afterFamilyId: afterFamily,
         beforeItemId: representativeByFamily.get(beforeFamily)!,
         afterItemId: representativeByFamily.get(afterFamily)!,
         confidence,
