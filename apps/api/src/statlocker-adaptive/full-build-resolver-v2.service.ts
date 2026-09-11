@@ -285,11 +285,11 @@ export class FullBuildResolverV2Service {
             return {
               sequence: iteration + 1,
               targetItemId: option.targetItemId,
-              ...(isSelected ? { action: action.action } : {}),
+              ...(isSelected ? { action: action!.action } : {}),
               score: option.utility.total,
               disposition: isSelected ? 'SELECTED' : 'REJECTED',
               reasonCodes: isSelected
-                ? [...optionReasonCodes(option), ...action.reasonCodes]
+                ? [...optionReasonCodes(option), ...action!.reasonCodes]
                 : wasBlocked
                   ? [...optionReasonCodes(option), 'NO_LEGAL_TRANSITION']
                   : [...optionReasonCodes(option), 'LOWER_PLAN_BRANCH_UTILITY'],
