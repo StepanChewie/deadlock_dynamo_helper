@@ -469,6 +469,23 @@ describe('Statlocker Build V2 real Billy fixture', () => {
         expect(step.sellItemId).toBeUndefined();
       }
     }
+
+    const selectedArchetype = snapshot.archetypes.find(
+      (entry) => entry.archetypeId === result.lock?.archetypeId,
+    );
+    expect(selectedArchetype).toBeDefined();
+    const unresolvedCoreItemIds = (selectedArchetype?.items ?? [])
+      .filter((entry) => entry.role === 'CORE')
+      .filter((entry) =>
+        !compiled.graph.isTargetSatisfied(entry.itemId, fixture.request.ownedItemIds) &&
+        !(result.fullBuild?.steps ?? []).some((step) =>
+          compiled.graph.isTargetSatisfied(entry.itemId, step.inventoryAfter),
+        ),
+      )
+      .map((entry) => entry.itemId);
+    expect(unresolvedCoreItemIds).toEqual([]);
+    expect(result.fullBuild?.degradedReasons).not.toContain('LIFETIME_PROGRESS_BLOCKED');
+
     expect(lockDb.get()).toBeDefined();
     const second = await controller.recommend({ matchId: fixture.request.matchId });
     expect(second.lock?.archetypeId).toBe(result.lock?.archetypeId);
@@ -476,6 +493,5 @@ describe('Statlocker Build V2 real Billy fixture', () => {
     expect(new Set(combinedStages)).toEqual(expect.objectContaining({}));
     expect(combinedStages).toEqual(expect.arrayContaining(REQUIRED_TRACE_STAGES));
     expect(legalStrategicCandidates(decision)).toBeInstanceOf(Map);
-    throw new Error(report);
   });
 });
