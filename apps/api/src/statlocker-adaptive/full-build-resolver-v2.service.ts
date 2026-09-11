@@ -228,10 +228,30 @@ export class FullBuildResolverV2Service {
       const options = this.readySemanticOptions(input, state, outsideCandidates);
       if (options.length === 0) break;
       const rankedOptions = [...options].sort(compareLifetimeOptions);
-      const selected = rankedOptions[0];
-      const action = this.transitionForSemanticTarget(input, state, selected);
+      const blockedTargetIds = new Set<number>();
+      let selected = rankedOptions[0];
+      let action: FullBuildTransitionIntentV2 | undefined;
 
-      if (selected.group) {
+      for (const option of rankedOptions) {
+        const candidateAction = this.transitionForSemanticTarget(input, state, option);
+        if (!candidateAction) {
+          blockedTargetIds.add(option.targetItemId);
+          continue;
+        }
+        selected = option;
+        action = option.targetItemId === rankedOptions[0].targetItemId
+          ? candidateAction
+          : {
+              ...candidateAction,
+              reasonCodes: uniqueStrings([
+                ...candidateAction.reasonCodes,
+                'HIGHER_RANKED_BRANCH_BLOCKED',
+              ]),
+            };
+        break;
+      }
+
+      if (selected.group && action) {
         const groupOptions = rankedOptions.filter((option) => option.group?.groupId === selected.group?.groupId);
         input.trace?.record({
           stage: 'CHOICE_RESOLUTION',
@@ -259,18 +279,22 @@ export class FullBuildResolverV2Service {
         stage: 'PLAN_SEARCH',
         reasonCodes: action ? [] : ['LIFETIME_PROGRESS_BLOCKED'],
         payload: {
-          branches: rankedOptions.map((option) => ({
-            sequence: iteration + 1,
-            targetItemId: option.targetItemId,
-            ...(option.targetItemId === selected.targetItemId && action ? { action: action.action } : {}),
-            score: option.utility.total,
-            disposition: option.targetItemId === selected.targetItemId
-              ? action ? 'SELECTED' : 'REJECTED'
-              : 'REJECTED',
-            reasonCodes: option.targetItemId === selected.targetItemId
-              ? [...optionReasonCodes(option), ...(action?.reasonCodes ?? [])]
-              : [...optionReasonCodes(option), 'LOWER_PLAN_BRANCH_UTILITY'],
-          })),
+          branches: rankedOptions.map((option) => {
+            const isSelected = option.targetItemId === selected.targetItemId && action !== undefined;
+            const wasBlocked = blockedTargetIds.has(option.targetItemId);
+            return {
+              sequence: iteration + 1,
+              targetItemId: option.targetItemId,
+              ...(isSelected ? { action: action.action } : {}),
+              score: option.utility.total,
+              disposition: isSelected ? 'SELECTED' : 'REJECTED',
+              reasonCodes: isSelected
+                ? [...optionReasonCodes(option), ...action.reasonCodes]
+                : wasBlocked
+                  ? [...optionReasonCodes(option), 'NO_LEGAL_TRANSITION']
+                  : [...optionReasonCodes(option), 'LOWER_PLAN_BRANCH_UTILITY'],
+            };
+          }),
         },
       });
 
