@@ -204,6 +204,7 @@ export const BUILD_DEBUG_V2_CLIENT_JS = String.raw`(() => {
 
   function renderStage(entry) {
     const defaultOpen = entry.stage === 'ARCHETYPE_SELECTION' || entry.stage === 'CHOICE_RESOLUTION' ||
+      entry.stage === 'DESIRED_STATE' || entry.stage === 'SEMANTIC_VALIDATION' ||
       entry.stage === 'ITEM_SCORING' || entry.stage === 'FINAL_PLAN';
     return '<details id="trace-section-' + escapeHtml(entry.stage) + '" data-debug-section="' +
       escapeHtml(entry.stage) + '" class="trace-stage"' + (defaultOpen ? ' open' : '') + '>' +
@@ -238,12 +239,16 @@ export const BUILD_DEBUG_V2_CLIENT_JS = String.raw`(() => {
         return renderCandidateDiscovery(payload);
       case 'CHOICE_RESOLUTION':
         return renderChoiceResolution(payload);
+      case 'DESIRED_STATE':
+        return renderDesiredState(payload);
       case 'ITEM_SCORING':
         return renderItemScoring(payload);
       case 'PLAN_SEARCH':
         return renderPlanSearch(payload);
       case 'REPLACEMENT_SEARCH':
         return renderReplacementSearch(payload);
+      case 'SEMANTIC_VALIDATION':
+        return renderSemanticValidation(payload);
       case 'FINAL_PLAN':
         return renderFinalPlan(payload);
       default:
@@ -334,6 +339,37 @@ export const BUILD_DEBUG_V2_CLIENT_JS = String.raw`(() => {
     }).join('');
   }
 
+  function renderDesiredState(payload) {
+    const families = payload.families || [];
+    const choiceGroups = payload.selectedChoiceFamilyIdsByGroup || {};
+    return '<div class="score-equation">Desired build state | REQUIRED / CHOICE / OPTIONAL / SITUATIONAL</div>' +
+      '<h3>Family progression</h3>' + cards(families, (family) => {
+        const terminalDecision = family.selectedTerminalKind === 'OPTIONAL_TERMINAL'
+          ? 'Optional terminal WPA decision'
+          : 'Default terminal';
+        return '<article class="candidate selected">' +
+          '<div class="candidate-title"><strong>Family ' + escapeHtml(family.familyId) + '</strong>' +
+          '<span class="badge selected">' + escapeHtml(family.requirement) + '</span></div>' +
+          keyValueRows([
+            ['group', family.groupId],
+            [terminalDecision, family.selectedTerminalItemId],
+            ['terminal kind', family.selectedTerminalKind],
+            ['score', formatNumber(family.score)],
+            ['confidence', formatPercent(family.confidence)],
+          ]) + reasonCodes(family.reasonCodes) + '</article>';
+      }) +
+      '<h3>Selected CHOICE families</h3>' + renderChoiceFamilyMap(choiceGroups) +
+      '<h3>Desired-state reason codes</h3>' + reasonCodes(payload.reasonCodes);
+  }
+
+  function renderChoiceFamilyMap(choiceGroups) {
+    const entries = Object.entries(choiceGroups || {});
+    if (!entries.length) return '<div class="empty-inline">No selected CHOICE families.</div>';
+    return cards(entries, ([groupId, familyIds]) =>
+      '<article class="candidate info"><div class="candidate-title"><strong>' + escapeHtml(groupId) + '</strong></div>' +
+      keyValueRows([['selected family IDs', (familyIds || []).join(', ')]]) + '</article>');
+  }
+
   function renderItemScoring(payload) {
     const items = payload.items || [];
     if (!items.length) return '<div class="empty-inline">No item score rows.</div>';
@@ -382,6 +418,21 @@ export const BUILD_DEBUG_V2_CLIENT_JS = String.raw`(() => {
         ]) + reasonCodes(candidate.reasonCodes) + '</article>');
   }
 
+  function renderSemanticValidation(payload) {
+    const states = payload.finalFamilyStates || [];
+    return '<div class="validation ' + (payload.valid ? 'pass' : 'fail') + '">Semantic validation: ' +
+      (payload.valid ? 'PASS' : 'FAIL') + '</div>' +
+      '<h3>Family progression</h3>' + cards(states, (state) =>
+        '<article class="candidate ' + (state.status === 'UNSATISFIED' ? 'rejected' : 'selected') + '">' +
+        '<div class="candidate-title"><strong>Family ' + escapeHtml(state.familyId) + '</strong>' +
+        '<span class="badge ' + (state.status === 'UNSATISFIED' ? 'rejected' : 'selected') + '">' + escapeHtml(state.status) + '</span></div>' +
+        keyValueRows([
+          ['current items', (state.currentItemIds || []).join(', ') || 'none'],
+          ['terminal item', state.terminalItemId],
+        ]) + '</article>') +
+      '<h3>Anti-churn / family-regression rejection</h3>' + reasonCodes(payload.reasonCodes);
+  }
+
   function renderFinalPlan(payload) {
     return '<div class="metric-grid">' +
       metric('Plan revision', payload.planRevision) +
@@ -412,13 +463,20 @@ export const BUILD_DEBUG_V2_CLIENT_JS = String.raw`(() => {
     const plan = trace.finalPlan;
     if (!plan) return '<div class="empty-inline">This trace has no resolved full plan.</div>';
     const steps = plan.steps || [];
+    const mechanicalValidation = plan.mechanicalValidation || plan.validation || { valid: false, reasonCodes: [] };
+    const semanticValidation = plan.semanticValidation;
     return '<div class="build-summary">' +
       '<strong>' + escapeHtml(plan.planRevision) + '</strong>' +
       '<span>archetype ' + escapeHtml(plan.archetypeId) + '</span>' +
       '<span>' + escapeHtml(steps.length) + ' lifetime steps</span>' +
       '</div>' +
       '<div class="build-steps">' + steps.map(renderBuildStep).join('') + '</div>' +
-      '<div class="validation ' + (plan.validation?.valid ? 'pass' : 'fail') + '">Inventory simulation: ' +
+      (plan.desiredState ? '<div class="section-caption">Desired build state</div>' + renderDesiredState(plan.desiredState) : '') +
+      '<div class="validation ' + (mechanicalValidation.valid ? 'pass' : 'fail') + '">Inventory simulation: ' +
+      (mechanicalValidation.valid ? 'PASS' : 'FAIL') + '</div>' +
+      '<div class="section-caption">Mechanical validation reason codes</div>' + reasonCodes(mechanicalValidation.reasonCodes || []) +
+      (semanticValidation ? '<div class="section-caption">Semantic validation</div>' + renderSemanticValidation(semanticValidation) : '') +
+      '<div class="validation ' + (plan.validation?.valid ? 'pass' : 'fail') + '">Combined validation: ' +
       (plan.validation?.valid ? 'PASS' : 'FAIL') + '</div>' +
       '<div class="section-caption">Validation reason codes</div>' + reasonCodes(plan.validation?.reasonCodes || []) +
       '<div class="section-caption">Degraded evidence</div>' + reasonCodes(plan.degradedReasons || []);
