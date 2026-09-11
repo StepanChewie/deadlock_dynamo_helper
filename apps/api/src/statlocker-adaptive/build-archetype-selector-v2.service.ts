@@ -1,5 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { BuildArchetypeGroupV2, BuildArchetypeItemV2, BuildArchetypeSnapshotV2, BuildArchetypeV2 } from './build-archetype-v2';
+import {
+  BuildArchetypeFamilyV2,
+  BuildArchetypeGroupV2,
+  BuildArchetypeItemV2,
+  BuildArchetypeSnapshotV2,
+  BuildArchetypeV2,
+} from './build-archetype-v2';
 import { BuildDecisionTraceSinkV2 } from './build-decision-trace-v2';
 import { STATLOCKER_BUILD_V2_CONFIG } from './statlocker-build-v2.config';
 import {
@@ -105,6 +111,97 @@ function scoreArchetype(
   enemyHeroIds: readonly number[],
   rowByKey: ReadonlyMap<string, ReturnType<typeof aggregateStatlockerVsHeroWpaRowsV1>[number]>,
 ): BuildArchetypeSelectionScoreV2 {
+  if (archetype.families && archetype.families.length > 0) {
+    return scoreFamilyArchetype(archetype, enemyHeroIds, rowByKey);
+  }
+  return scoreLegacyItemArchetype(archetype, enemyHeroIds, rowByKey);
+}
+
+function scoreFamilyArchetype(
+  archetype: BuildArchetypeV2,
+  enemyHeroIds: readonly number[],
+  rowByKey: ReadonlyMap<string, ReturnType<typeof aggregateStatlockerVsHeroWpaRowsV1>[number]>,
+): BuildArchetypeSelectionScoreV2 {
+  const families = archetype.families ?? [];
+  const familyById = new Map(families.map((family) => [family.familyId, family]));
+  const itemToFamily = new Map(
+    families.flatMap((family) => family.progressionNodes.map((node) => [node.itemId, family.familyId] as const)),
+  );
+  const choiceGroups = archetype.groups.filter((group) => group.type === 'CHOICE');
+  const choiceFamilyIds = new Set(choiceGroups.flatMap((group) => resolveGroupFamilyIds(group, itemToFamily)));
+  const units: WeightedMatchupUnitV2[] = [];
+
+  for (const family of families) {
+    if (choiceFamilyIds.has(family.familyId)) continue;
+    const terminal = defaultTerminal(family);
+    if (!terminal) continue;
+    units.push({
+      ...scoreItem(terminal.itemId, enemyHeroIds, rowByKey),
+      weight: structuralFamilyWeight(family),
+    });
+  }
+
+  for (const group of choiceGroups) {
+    const groupFamilyIds = resolveGroupFamilyIds(group, itemToFamily);
+    const candidates = groupFamilyIds
+      .map((familyId) => familyById.get(familyId))
+      .filter((family): family is BuildArchetypeFamilyV2 => family !== undefined)
+      .map((family) => {
+        const terminal = defaultTerminal(family);
+        if (!terminal) return undefined;
+        return {
+          family,
+          matchup: scoreItem(terminal.itemId, enemyHeroIds, rowByKey),
+        };
+      })
+      .filter((entry): entry is { family: BuildArchetypeFamilyV2; matchup: ItemMatchupV2 } => entry !== undefined)
+      .sort((left, right) =>
+        right.matchup.score - left.matchup.score ||
+        right.matchup.confidence - left.matchup.confidence ||
+        left.family.familyId - right.family.familyId,
+      );
+    if (candidates.length === 0) continue;
+    const requiredSelections = Math.max(1, Math.min(group.minSelect, candidates.length));
+    const selected = candidates.slice(0, requiredSelections);
+    units.push({
+      score: average(selected.map((entry) => entry.matchup.score)),
+      confidence: average(selected.map((entry) => entry.matchup.confidence)),
+      coverage: average(selected.map((entry) => entry.matchup.coverage)),
+      weight: Math.max(...selected.map((entry) => structuralFamilyWeight(entry.family))) * Math.max(group.confidence, 0.05),
+    });
+  }
+
+  return aggregateUnits(archetype.archetypeId, units);
+}
+
+function resolveGroupFamilyIds(
+  group: BuildArchetypeGroupV2,
+  itemToFamily: ReadonlyMap<number, number>,
+): number[] {
+  if (group.candidateFamilyIds && group.candidateFamilyIds.length > 0) {
+    return [...new Set(group.candidateFamilyIds)].sort((a, b) => a - b);
+  }
+  return [...new Set(
+    group.candidateItemIds
+      .map((itemId) => itemToFamily.get(itemId))
+      .filter((familyId): familyId is number => familyId !== undefined),
+  )].sort((a, b) => a - b);
+}
+
+function defaultTerminal(family: BuildArchetypeFamilyV2): BuildArchetypeFamilyV2['terminalCandidates'][number] | undefined {
+  return family.terminalCandidates.find((candidate) => candidate.kind === 'DEFAULT_TERMINAL');
+}
+
+function structuralFamilyWeight(family: BuildArchetypeFamilyV2): number {
+  const tierWeight = STATLOCKER_BUILD_V2_CONFIG.archetypeSelectionRoleWeights[family.aggregateFrequencyTier];
+  return tierWeight * Math.max(family.structuralPriority, 0.05);
+}
+
+function scoreLegacyItemArchetype(
+  archetype: BuildArchetypeV2,
+  enemyHeroIds: readonly number[],
+  rowByKey: ReadonlyMap<string, ReturnType<typeof aggregateStatlockerVsHeroWpaRowsV1>[number]>,
+): BuildArchetypeSelectionScoreV2 {
   const itemById = new Map(archetype.items.map((item) => [item.itemId, item]));
   const groupedItemIds = new Set(archetype.groups.flatMap((group) => group.candidateItemIds));
   const units: WeightedMatchupUnitV2[] = [];
@@ -118,23 +215,14 @@ function scoreArchetype(
   }
 
   for (const group of archetype.groups) {
-    const unit = scoreGroup(group, itemById, enemyHeroIds, rowByKey);
+    const unit = scoreLegacyGroup(group, itemById, enemyHeroIds, rowByKey);
     if (unit) units.push(unit);
   }
 
-  const weightMass = units.reduce((sum, unit) => sum + unit.weight, 0);
-  if (weightMass <= 0) {
-    return { archetypeId: archetype.archetypeId, score: 0, confidence: 0, coverage: 0 };
-  }
-  return {
-    archetypeId: archetype.archetypeId,
-    score: units.reduce((sum, unit) => sum + unit.score * unit.weight, 0) / weightMass,
-    confidence: units.reduce((sum, unit) => sum + unit.confidence * unit.weight, 0) / weightMass,
-    coverage: units.reduce((sum, unit) => sum + unit.coverage * unit.weight, 0) / weightMass,
-  };
+  return aggregateUnits(archetype.archetypeId, units);
 }
 
-function scoreGroup(
+function scoreLegacyGroup(
   group: BuildArchetypeGroupV2,
   itemById: ReadonlyMap<number, BuildArchetypeItemV2>,
   enemyHeroIds: readonly number[],
@@ -172,6 +260,22 @@ function scoreGroup(
     : average(selected.map((entry) => entry.matchup.coverage));
   const weight = Math.max(...selected.map((entry) => structuralWeight(entry.item))) * Math.max(group.confidence, 0.05);
   return { score, confidence, coverage, weight };
+}
+
+function aggregateUnits(
+  archetypeId: string,
+  units: readonly WeightedMatchupUnitV2[],
+): BuildArchetypeSelectionScoreV2 {
+  const weightMass = units.reduce((sum, unit) => sum + unit.weight, 0);
+  if (weightMass <= 0) {
+    return { archetypeId, score: 0, confidence: 0, coverage: 0 };
+  }
+  return {
+    archetypeId,
+    score: units.reduce((sum, unit) => sum + unit.score * unit.weight, 0) / weightMass,
+    confidence: units.reduce((sum, unit) => sum + unit.confidence * unit.weight, 0) / weightMass,
+    coverage: units.reduce((sum, unit) => sum + unit.coverage * unit.weight, 0) / weightMass,
+  };
 }
 
 function scoreItem(
