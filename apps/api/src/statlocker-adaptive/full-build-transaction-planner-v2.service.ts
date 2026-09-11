@@ -209,7 +209,7 @@ function executableOneSlotRecipe(
   rulesetId: string,
 ) {
   const item = itemGraph.getItem(buyItemId);
-  if (!item?.active || !item.availableRulesetIds.includes(rulesetId)) return undefined;
+  if (!item || !item.availableRulesetIds.includes(rulesetId)) return undefined;
   return itemGraph.getExecutableUpgradeRecipes(buyItemId).find((recipe) =>
     recipe.consumedItemIds.length === 1
       && recipe.consumedItemIds[0] === consumedItemId
@@ -219,7 +219,7 @@ function executableOneSlotRecipe(
 
 function directPurchasable(itemId: number, itemGraph: RecommendationItemGraph, rulesetId: string): boolean {
   const item = itemGraph.getItem(itemId);
-  return Boolean(item?.active && item.availableRulesetIds.includes(rulesetId) && item.directPurchaseCost !== undefined);
+  return Boolean(item && item.availableRulesetIds.includes(rulesetId) && item.directPurchaseCost !== undefined);
 }
 
 function lineageDepth(
