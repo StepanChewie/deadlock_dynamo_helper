@@ -20,6 +20,7 @@ export type BuildArchetypeQualityReasonCodeV2 =
   | 'ITEM_UNAVAILABLE_IN_RULESET'
   | 'DUPLICATE_GROUP_ID'
   | 'GROUP_UNKNOWN_ITEM'
+  | 'GROUP_UNKNOWN_FAMILY'
   | 'CONFLICTING_GROUP_MEMBERSHIP'
   | 'INVALID_GROUP_BOUNDS'
   | 'DUPLICATE_ORDER_EDGE'
@@ -28,6 +29,10 @@ export type BuildArchetypeQualityReasonCodeV2 =
   | 'ORDER_GRAPH_CYCLE'
   | 'RELATIONSHIP_UNKNOWN_ITEM'
   | 'RELATIONSHIP_SELF_EDGE'
+  | 'FAMILY_DEFAULT_TERMINAL_MISSING'
+  | 'FAMILY_TERMINAL_UNKNOWN_ITEM'
+  | 'FAMILY_TERMINAL_NOT_OBSERVED'
+  | 'TERMINAL_CAPACITY_CONFLICT'
   | 'MEANINGLESS_PROGRESSION';
 
 export interface BuildArchetypeQualityCheckV2 {
@@ -162,12 +167,12 @@ function evaluateArchetype(
   }
 
   const itemIds = new Set<number>();
-  const familyIds = new Set<number>();
+  const legacyFamilyIds = new Set<number>();
   for (const item of archetype.items) {
     if (itemIds.has(item.itemId)) reasons.add('DUPLICATE_ITEM_ID');
     itemIds.add(item.itemId);
-    if (familyIds.has(item.familyId)) reasons.add('DUPLICATE_SEMANTIC_FAMILY');
-    familyIds.add(item.familyId);
+    if (legacyFamilyIds.has(item.familyId)) reasons.add('DUPLICATE_SEMANTIC_FAMILY');
+    legacyFamilyIds.add(item.familyId);
 
     if (
       !Number.isInteger(item.itemId) || item.itemId <= 0 ||
@@ -191,13 +196,18 @@ function evaluateArchetype(
     }
   }
 
-  validateGroups(archetype, itemIds, reasons);
+  const familyIds = validateFamilyContracts(archetype, snapshot, graph, sourceProfileIds.size, reasons);
+  validateGroups(archetype, itemIds, familyIds, reasons);
   validateOrderGraph(archetype, itemIds, reasons);
   validateRelationships(archetype, itemIds, reasons);
 
-  const hasStructuralProgression = archetype.items.some((item) => item.role === 'CORE' || item.role === 'FREQUENT') ||
+  const hasFamilyProgression = (archetype.families?.length ?? 0) > 0 &&
+    (archetype.families ?? []).some((family) =>
+      family.requirement === 'REQUIRED' || family.aggregateFrequencyTier === 'FREQUENT',
+    );
+  const hasLegacyProgression = archetype.items.some((item) => item.role === 'CORE' || item.role === 'FREQUENT') ||
     archetype.groups.some((group) => group.minSelect > 0);
-  if (archetype.items.length === 0 || !hasStructuralProgression) {
+  if ((archetype.families?.length ?? archetype.items.length) === 0 || (!hasFamilyProgression && !hasLegacyProgression)) {
     reasons.add('MEANINGLESS_PROGRESSION');
   }
 
@@ -208,7 +218,7 @@ function evaluateArchetype(
     reasonCodes,
     details: {
       sourceProfileCount: sourceProfileIds.size,
-      semanticFamilyCount: familyIds.size,
+      semanticFamilyCount: familyIds.size > 0 ? familyIds.size : legacyFamilyIds.size,
       itemCount: archetype.items.length,
       groupCount: archetype.groups.length,
       orderEdgeCount: archetype.orderEdges.length,
@@ -216,13 +226,98 @@ function evaluateArchetype(
   };
 }
 
+function validateFamilyContracts(
+  archetype: BuildArchetypeV2,
+  snapshot: BuildArchetypeSnapshotV2,
+  graph: RecommendationItemGraph,
+  sourceProfileCount: number,
+  reasons: Set<BuildArchetypeQualityReasonCodeV2>,
+): Set<number> {
+  const families = archetype.families ?? [];
+  const familyIds = new Set<number>();
+  if (families.length === 0) return familyIds;
+
+  for (const family of families) {
+    if (familyIds.has(family.familyId)) reasons.add('DUPLICATE_SEMANTIC_FAMILY');
+    familyIds.add(family.familyId);
+    if (
+      !Number.isInteger(family.familyId) || family.familyId <= 0 ||
+      !Number.isInteger(family.sourceProfileCount) || family.sourceProfileCount <= 0 ||
+      family.sourceProfileCount > sourceProfileCount ||
+      !inUnitRange(family.profileCoverage) ||
+      !inUnitRange(family.purchaseRate) ||
+      !inUnitRange(family.structuralPriority)
+    ) {
+      reasons.add('ITEM_METRICS_INVALID');
+    }
+
+    const observedIds = new Set<number>();
+    for (const node of family.progressionNodes) {
+      if (observedIds.has(node.itemId)) reasons.add('DUPLICATE_ITEM_ID');
+      observedIds.add(node.itemId);
+      if (
+        !Number.isInteger(node.itemId) || node.itemId <= 0 ||
+        !Number.isInteger(node.sourceProfileCount) || node.sourceProfileCount <= 0 ||
+        node.sourceProfileCount > sourceProfileCount ||
+        !inUnitRange(node.profileCoverage) ||
+        !inUnitRange(node.purchaseRate) ||
+        !Number.isFinite(node.timing.medianBuyTimeS) || node.timing.medianBuyTimeS < 0 ||
+        !Number.isFinite(node.timing.spreadS) || node.timing.spreadS < 0
+      ) {
+        reasons.add('ITEM_METRICS_INVALID');
+      }
+    }
+
+    const defaultTerminals = family.terminalCandidates.filter((terminal) => terminal.kind === 'DEFAULT_TERMINAL');
+    if (defaultTerminals.length === 0) reasons.add('FAMILY_DEFAULT_TERMINAL_MISSING');
+    const terminalIds = new Set<number>();
+    for (const terminal of family.terminalCandidates) {
+      if (terminalIds.has(terminal.itemId)) reasons.add('DUPLICATE_ITEM_ID');
+      terminalIds.add(terminal.itemId);
+      if (!observedIds.has(terminal.itemId)) reasons.add('FAMILY_TERMINAL_NOT_OBSERVED');
+      if (
+        !Number.isInteger(terminal.sourceProfileCount) || terminal.sourceProfileCount <= 0 ||
+        terminal.sourceProfileCount > sourceProfileCount ||
+        !inUnitRange(terminal.profileCoverage) ||
+        !inUnitRange(terminal.purchaseRate)
+      ) {
+        reasons.add('ITEM_METRICS_INVALID');
+      }
+      const definition = graph.getItem(terminal.itemId);
+      if (!definition) {
+        reasons.add('FAMILY_TERMINAL_UNKNOWN_ITEM');
+      } else if (!definition.availableRulesetIds.includes(snapshot.rulesetVersion)) {
+        reasons.add('ITEM_UNAVAILABLE_IN_RULESET');
+      }
+    }
+  }
+
+  const requiredFamilyIds = new Set(
+    families.filter((family) => family.requirement === 'REQUIRED').map((family) => family.familyId),
+  );
+  const choiceGroups = archetype.groups.filter((group) =>
+    group.type === 'CHOICE' && (group.candidateFamilyIds?.length ?? 0) > 0,
+  );
+  const choiceFamilyIds = new Set(choiceGroups.flatMap((group) => group.candidateFamilyIds ?? []));
+  const requiredOutsideChoice = [...requiredFamilyIds].filter((familyId) => !choiceFamilyIds.has(familyId)).length;
+  const minimumRequiredOccupancy = requiredOutsideChoice +
+    choiceGroups.reduce((sum, group) => sum + group.minSelect, 0);
+  if (minimumRequiredOccupancy > STATLOCKER_BUILD_V2_CONFIG.archetypePublication.heldItemCapacity) {
+    reasons.add('TERMINAL_CAPACITY_CONFLICT');
+  }
+
+  return familyIds;
+}
+
 function validateGroups(
   archetype: BuildArchetypeV2,
   itemIds: ReadonlySet<number>,
+  familyIds: ReadonlySet<number>,
   reasons: Set<BuildArchetypeQualityReasonCodeV2>,
 ): void {
   const groupIds = new Set<string>();
   const groupByItemId = new Map<number, string>();
+  const groupByFamilyId = new Map<number, string>();
   for (const group of archetype.groups) {
     if (groupIds.has(group.groupId) || group.groupId.trim() === '') reasons.add('DUPLICATE_GROUP_ID');
     groupIds.add(group.groupId);
@@ -245,6 +340,23 @@ function validateGroups(
       const previous = groupByItemId.get(itemId);
       if (previous !== undefined && previous !== group.groupId) reasons.add('CONFLICTING_GROUP_MEMBERSHIP');
       groupByItemId.set(itemId, group.groupId);
+    }
+
+    if (group.candidateFamilyIds !== undefined) {
+      const familyCandidates = new Set(group.candidateFamilyIds);
+      if (
+        familyCandidates.size !== group.candidateFamilyIds.length ||
+        familyCandidates.size === 0 ||
+        group.maxSelect > familyCandidates.size
+      ) {
+        reasons.add('INVALID_GROUP_BOUNDS');
+      }
+      for (const familyId of familyCandidates) {
+        if (!familyIds.has(familyId)) reasons.add('GROUP_UNKNOWN_FAMILY');
+        const previous = groupByFamilyId.get(familyId);
+        if (previous !== undefined && previous !== group.groupId) reasons.add('CONFLICTING_GROUP_MEMBERSHIP');
+        groupByFamilyId.set(familyId, group.groupId);
+      }
     }
   }
 }
