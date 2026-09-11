@@ -288,7 +288,10 @@ function resolveOutsideCompetition(
     family.requirement === 'OPTIONAL' || family.requirement === 'SITUATIONAL',
   );
   const eligibleOutside = dedupeOutsideCandidates(outsideCandidates)
-    .filter((candidate) => candidate.utility.total >= candidate.requiredImprovement);
+    .filter((candidate) =>
+      candidate.candidate.action.type === 'BUY_ITEM' ||
+      candidate.utility.total >= candidate.requiredImprovement,
+    );
   const adaptiveCapacity = Math.max(0, capacity - mandatoryFamilies.length);
   const competitors = [
     ...adaptiveFamilies.map((family) => ({
