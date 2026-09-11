@@ -6,18 +6,18 @@ import {
 } from '../src/statlocker-adaptive/build-archetype-v2';
 import { BuildArchetypeQualityGateV2Service } from '../src/statlocker-adaptive/build-archetype-quality-gate-v2.service';
 
-function family(familyId: number): BuildArchetypeFamilyV2 {
+function family(familyId: number, requirement: BuildArchetypeFamilyV2['requirement'] = 'REQUIRED'): BuildArchetypeFamilyV2 {
   return {
     familyId,
-    requirement: 'REQUIRED',
-    aggregateFrequencyTier: 'CORE',
+    requirement,
+    aggregateFrequencyTier: requirement === 'REQUIRED' ? 'CORE' : 'FREQUENT',
     sourceProfileCount: 2,
     profileCoverage: 1,
     purchaseRate: 0.9,
     structuralPriority: 0.9,
     progressionNodes: [{
       itemId: familyId,
-      rawFrequencyTier: 'CORE',
+      rawFrequencyTier: requirement === 'REQUIRED' ? 'CORE' : 'FREQUENT',
       progressionRole: 'DEFAULT_TERMINAL',
       sourceProfileCount: 2,
       profileCoverage: 1,
@@ -30,7 +30,7 @@ function family(familyId: number): BuildArchetypeFamilyV2 {
       sourceProfileCount: 2,
       profileCoverage: 1,
       purchaseRate: 0.9,
-      rawFrequencyTier: 'CORE',
+      rawFrequencyTier: requirement === 'REQUIRED' ? 'CORE' : 'FREQUENT',
     }],
   };
 }
@@ -47,7 +47,7 @@ function archetype(families: readonly BuildArchetypeFamilyV2[]): BuildArchetypeV
     items: families.map((entry) => ({
       itemId: entry.familyId,
       familyId: entry.familyId,
-      role: 'CORE' as const,
+      role: entry.requirement === 'REQUIRED' ? 'CORE' as const : 'FREQUENT' as const,
       sourceProfileCount: 2,
       profileCoverage: 1,
       purchaseRate: 0.9,
@@ -74,26 +74,87 @@ function snapshot(value: BuildArchetypeV2): BuildArchetypeSnapshotV2 {
   };
 }
 
+function graphForItemIds(itemIds: readonly number[]) {
+  return createRecommendationItemGraph(
+    [...new Set(itemIds)].map((itemId) => ({
+      itemId,
+      name: `item-${itemId}`,
+      slotType: 'weapon' as const,
+      active: true,
+      availableRulesetIds: ['r1'],
+      directPurchaseCost: 500,
+      upgradeRecipes: [],
+    })),
+    [],
+  );
+}
+
 describe('BuildArchetypeQualityGateV2Service family contracts', () => {
+  const gate = new BuildArchetypeQualityGateV2Service();
+
   it('rejects a family contract whose minimum terminal occupancy exceeds 12 slots', () => {
     const families = Array.from({ length: 13 }, (_, index) => family(1000 + index));
-    const graph = createRecommendationItemGraph(
-      families.map((entry) => ({
-        itemId: entry.familyId,
-        name: `item-${entry.familyId}`,
-        slotType: 'weapon' as const,
-        active: true,
-        availableRulesetIds: ['r1'],
-        directPurchaseCost: 500,
-        upgradeRecipes: [],
-      })),
-      [],
-    );
-
-    const result = new BuildArchetypeQualityGateV2Service().evaluate(snapshot(archetype(families)), graph);
+    const result = gate.evaluate(snapshot(archetype(families)), graphForItemIds(families.map((entry) => entry.familyId)));
 
     expect(result.accepted).toBe(false);
     expect(result.reasonCodes).toContain('TERMINAL_CAPACITY_CONFLICT');
+  });
+
+  it('accepts eight required families plus two one-of-two choice groups within capacity', () => {
+    const required = Array.from({ length: 8 }, (_, index) => family(1100 + index));
+    const choices = [family(1200, 'OPTIONAL'), family(1201, 'OPTIONAL'), family(1202, 'OPTIONAL'), family(1203, 'OPTIONAL')];
+    const value = archetype([...required, ...choices]);
+    value.groups = [
+      {
+        groupId: 'choice:a',
+        type: 'CHOICE',
+        candidateFamilyIds: [1200, 1201],
+        candidateItemIds: [1200, 1201],
+        minSelect: 1,
+        maxSelect: 1,
+        source: 'STATLOCKER_EXPLICIT',
+        confidence: 1,
+      },
+      {
+        groupId: 'choice:b',
+        type: 'CHOICE',
+        candidateFamilyIds: [1202, 1203],
+        candidateItemIds: [1202, 1203],
+        minSelect: 1,
+        maxSelect: 1,
+        source: 'STATLOCKER_EXPLICIT',
+        confidence: 1,
+      },
+    ];
+
+    const result = gate.evaluate(snapshot(value), graphForItemIds([...required, ...choices].map((entry) => entry.familyId)));
+
+    expect(result.accepted).toBe(true);
+    expect(result.reasonCodes).not.toContain('TERMINAL_CAPACITY_CONFLICT');
+  });
+
+  it('rejects duplicate family IDs', () => {
+    const duplicate = family(1300);
+    const result = gate.evaluate(snapshot(archetype([duplicate, duplicate])), graphForItemIds([1300]));
+
+    expect(result.accepted).toBe(false);
+    expect(result.reasonCodes).toContain('DUPLICATE_SEMANTIC_FAMILY');
+  });
+
+  it('rejects a family with no default terminal', () => {
+    const invalid: BuildArchetypeFamilyV2 = { ...family(1400), terminalCandidates: [] };
+    const result = gate.evaluate(snapshot(archetype([invalid])), graphForItemIds([1400]));
+
+    expect(result.accepted).toBe(false);
+    expect(result.reasonCodes).toContain('FAMILY_DEFAULT_TERMINAL_MISSING');
+  });
+
+  it('rejects a family whose declared terminal is unknown to the item graph', () => {
+    const invalid = family(1500);
+    const result = gate.evaluate(snapshot(archetype([invalid])), graphForItemIds([1599]));
+
+    expect(result.accepted).toBe(false);
+    expect(result.reasonCodes).toContain('FAMILY_TERMINAL_UNKNOWN_ITEM');
   });
 
   it('rejects a family whose declared terminal was not observed by Statlocker', () => {
@@ -105,30 +166,47 @@ describe('BuildArchetypeQualityGateV2Service family contracts', () => {
         itemId: 2999,
       }],
     };
-    const graph = createRecommendationItemGraph([
-      {
-        itemId: 2000,
-        name: 'observed',
-        slotType: 'weapon',
-        active: true,
-        availableRulesetIds: ['r1'],
-        directPurchaseCost: 500,
-        upgradeRecipes: [],
-      },
-      {
-        itemId: 2999,
-        name: 'catalog-only',
-        slotType: 'weapon',
-        active: true,
-        availableRulesetIds: ['r1'],
-        directPurchaseCost: 1250,
-        upgradeRecipes: [],
-      },
-    ], []);
-
-    const result = new BuildArchetypeQualityGateV2Service().evaluate(snapshot(archetype([invalid])), graph);
+    const result = gate.evaluate(snapshot(archetype([invalid])), graphForItemIds([2000, 2999]));
 
     expect(result.accepted).toBe(false);
     expect(result.reasonCodes).toContain('FAMILY_TERMINAL_NOT_OBSERVED');
+  });
+
+  it('rejects invalid CHOICE bounds', () => {
+    const value = archetype([family(3000, 'OPTIONAL'), family(3001, 'OPTIONAL')]);
+    value.groups = [{
+      groupId: 'choice:invalid',
+      type: 'CHOICE',
+      candidateFamilyIds: [3000, 3001],
+      candidateItemIds: [3000, 3001],
+      minSelect: 2,
+      maxSelect: 1,
+      source: 'STATLOCKER_EXPLICIT',
+      confidence: 1,
+    }];
+
+    const result = gate.evaluate(snapshot(value), graphForItemIds([3000, 3001]));
+
+    expect(result.accepted).toBe(false);
+    expect(result.reasonCodes).toContain('INVALID_GROUP_BOUNDS');
+  });
+
+  it('rejects CHOICE groups that reference an unknown family', () => {
+    const value = archetype([family(3100, 'OPTIONAL')]);
+    value.groups = [{
+      groupId: 'choice:unknown-family',
+      type: 'CHOICE',
+      candidateFamilyIds: [3100, 3199],
+      candidateItemIds: [3100],
+      minSelect: 1,
+      maxSelect: 1,
+      source: 'STATLOCKER_EXPLICIT',
+      confidence: 1,
+    }];
+
+    const result = gate.evaluate(snapshot(value), graphForItemIds([3100]));
+
+    expect(result.accepted).toBe(false);
+    expect(result.reasonCodes).toContain('GROUP_UNKNOWN_FAMILY');
   });
 });
