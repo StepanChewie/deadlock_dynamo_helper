@@ -115,6 +115,13 @@ export class AdaptiveRecommendationV2Service {
       wpaPatchData,
       t4Chains,
     });
+    if (outsideCandidates.length === 0) {
+      trace.record({
+        stage: 'CANDIDATE_DISCOVERY',
+        reasonCodes: ['NO_OUTSIDE_ARCHETYPE_CANDIDATES'],
+        payload: { candidates: [] },
+      });
+    }
     const capacity = decision.slots.totalCapacity;
     if (!Number.isInteger(capacity) || Number(capacity) <= 0) {
       return notReadyRecommendation(decision, ['SLOT_CAPACITY_UNAVAILABLE']);
