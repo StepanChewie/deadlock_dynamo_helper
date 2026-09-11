@@ -138,6 +138,9 @@ jobs:
           fi
           tail -n 20 "$RUNNER_TEMP/api-tests.log"
 
+      - name: Run frozen Billy family-first review gate
+        run: yarn workspace @deadlock-live-probe/api test --runTestsByPath test/statlocker-build-v2-real-data.e2e.spec.ts
+
       - name: Run structured replay release gate
         run: yarn workspace @deadlock-live-probe/api test adaptive-replay-structured-v1.spec.ts
 
