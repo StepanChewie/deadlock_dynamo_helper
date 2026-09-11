@@ -180,7 +180,7 @@ describe('FamilyFirstFullBuildResolverV2Service outside candidates', () => {
     });
 
     expect(result.steps).toHaveLength(0);
-    expect(result.semanticValidation.valid).toBe(true);
+    expect(result.semanticValidation?.valid).toBe(true);
     expect(result.validation.valid).toBe(true);
   });
 });
