@@ -99,10 +99,10 @@ export interface StatlockerBuildV2Config {
 }
 
 export const STATLOCKER_BUILD_V2_CONFIG: Readonly<StatlockerBuildV2Config> = Object.freeze({
-  profileLinkSimilarity: 0.72,
-  minClusterSize: 3,
-  minInternalSimilarity: 0.80,
-  minConsensusSimilarity: 0.72,
+  profileLinkSimilarity: 0.60,
+  minClusterSize: 2,
+  minInternalSimilarity: 0.60,
+  minConsensusSimilarity: 0.52,
   minClusterSeparation: 0.20,
   maxPublishedArchetypes: 3,
   profileSimilarityWeights: Object.freeze({
