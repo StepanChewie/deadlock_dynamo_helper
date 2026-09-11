@@ -124,4 +124,24 @@ describe('FullBuildHysteresisV2Service', () => {
     expect(distant.reasonCodes).not.toContain('NEAR_TERM_PLAN_COMMITMENT_PROTECTED');
     expect(nearTerm.requiredImprovement).toBeGreaterThan(distant.requiredImprovement);
   });
+
+  it('never allows hysteresis scoring to select a semantically invalid candidate', () => {
+    const invalidCandidate: ResolvedFullBuildPlanV2 = {
+      ...candidate,
+      validation: {
+        valid: false,
+        reasonCodes: ['REQUIRED_FAMILY_REGRESSION'],
+      },
+    };
+
+    const result = service.choose(previous, invalidCandidate, {
+      improvement: 10,
+      coreReplacement: false,
+      recentPurchaseProtected: false,
+    });
+
+    expect(result.action).toBe('KEEP_PREVIOUS');
+    expect(result.selected.planRevision).toBe('previous');
+    expect(result.reasonCodes).toContain('SEMANTICALLY_INVALID_CANDIDATE');
+  });
 });
