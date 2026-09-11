@@ -55,6 +55,7 @@ import { ConsensusStrategyFallbackV1Service } from './consensus-strategy-fallbac
 import { DraftMatchupEvidenceV1Service } from './draft-matchup-evidence-v1.service';
 import { EnemyThreatHistoryV1Service } from './enemy-threat-history-v1.service';
 import { EnemyThreatV1Service } from './enemy-threat-v1.service';
+import { FamilyFirstFullBuildResolverV2Service } from './family-first-full-build-resolver-v2.service';
 import { FullBuildResolverV2Service } from './full-build-resolver-v2.service';
 import { HistoricalBuildTrajectorySourceV2Service } from './historical-build-trajectory-source-v2.service';
 import { HistoricalPlannerTrajectoryExtractorV2Service } from './historical-planner-trajectory-extractor-v2.service';
@@ -129,7 +130,11 @@ import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-
     BuildDebugTraceStoreV2Service,
     BuildItemUtilityV2Service,
     MatchupCandidateDiscoveryV2Service,
-    FullBuildResolverV2Service,
+    FamilyFirstFullBuildResolverV2Service,
+    {
+      provide: FullBuildResolverV2Service,
+      useExisting: FamilyFirstFullBuildResolverV2Service,
+    },
     AdaptiveRecommendationV2Service,
     StatlockerRefreshService,
     RecommendationEconomyRulesStoreV1Service,
