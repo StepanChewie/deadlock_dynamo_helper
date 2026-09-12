@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { RecommendationItemGraph } from '@deadlock-live-probe/build-domain';
-import { BuildArchetypeFamilyV2, BuildArchetypeV2 } from './build-archetype-v2';
+import {
+  BuildArchetypeFamilyV2,
+  BuildArchetypeV2,
+  BuildObservedProgressionEdgeV2,
+} from './build-archetype-v2';
 import { DesiredBuildStateV2, DesiredFamilyStateV2 } from './build-desired-state-v2.service';
 import {
   evaluateBuildFamilySatisfactionV2,
@@ -27,8 +31,15 @@ interface PendingFamilyProgressionV2 {
   desiredFamily: DesiredFamilyStateV2;
   family: BuildArchetypeFamilyV2;
   path: readonly number[];
+  timingByItemId: ReadonlyMap<number, number>;
   nextIndex: number;
   blocked: boolean;
+}
+
+interface ConfirmedProgressionPathV2 {
+  heldItemId?: number;
+  path: readonly number[];
+  timingByItemId: ReadonlyMap<number, number>;
 }
 
 @Injectable()
@@ -48,22 +59,55 @@ export class FullBuildTransactionPlannerV2Service {
       }
       if (projectedInventory.includes(desiredFamily.selectedTerminalItemId)) continue;
 
-      const progression = findObservedLineagePath(
+      const hasConfirmedLineage = hasConfirmedProgressionToTarget(
         family,
         desiredFamily.selectedTerminalItemId,
-        projectedInventory,
+      );
+      const confirmed = hasConfirmedLineage
+        ? findConfirmedProgressionPath(
+            family,
+            desiredFamily.selectedTerminalItemId,
+            projectedInventory,
+            input.itemGraph,
+            input.rulesetId,
+          )
+        : undefined;
+
+      if (confirmed) {
+        pending.push({
+          desiredFamily,
+          family,
+          path: confirmed.path,
+          timingByItemId: confirmed.timingByItemId,
+          nextIndex: confirmed.heldItemId === undefined ? 0 : 1,
+          blocked: false,
+        });
+        continue;
+      }
+
+      if (hasConfirmedLineage) {
+        reasonCodes.add('CONFIRMED_PROGRESSION_RECIPE_UNAVAILABLE');
+        continue;
+      }
+
+      if (!verifiedDirectPurchasable(
+        desiredFamily.selectedTerminalItemId,
         input.itemGraph,
         input.rulesetId,
-      );
-      if (!progression) {
+      )) {
         reasonCodes.add('NO_LEGAL_OBSERVED_LINEAGE');
         continue;
       }
+
+      const standaloneTiming = family.progressionNodes.find(
+        (node) => node.itemId === desiredFamily.selectedTerminalItemId,
+      )?.timing.medianBuyTimeS ?? Number.MAX_SAFE_INTEGER;
       pending.push({
         desiredFamily,
         family,
-        path: progression.path,
-        nextIndex: progression.heldItemId === undefined ? 0 : 1,
+        path: [desiredFamily.selectedTerminalItemId],
+        timingByItemId: new Map([[desiredFamily.selectedTerminalItemId, standaloneTiming]]),
+        nextIndex: 0,
         blocked: false,
       });
     }
@@ -114,7 +158,7 @@ export class FullBuildTransactionPlannerV2Service {
           input.rulesetId,
         );
         if (!recipe) {
-          reasonCodes.add('NO_LEGAL_OBSERVED_LINEAGE');
+          reasonCodes.add('CONFIRMED_PROGRESSION_RECIPE_UNAVAILABLE');
           next.blocked = true;
           continue;
         }
@@ -190,8 +234,7 @@ function comparePendingProgressions(
 
 function progressionTime(entry: PendingFamilyProgressionV2): number {
   const itemId = entry.path[entry.nextIndex];
-  return entry.family.progressionNodes.find((node) => node.itemId === itemId)?.timing.medianBuyTimeS
-    ?? Number.MAX_SAFE_INTEGER;
+  return entry.timingByItemId.get(itemId) ?? Number.MAX_SAFE_INTEGER;
 }
 
 function requirementPriority(value: DesiredFamilyStateV2['requirement']): number {
@@ -200,48 +243,111 @@ function requirementPriority(value: DesiredFamilyStateV2['requirement']): number
   return 2;
 }
 
-function findObservedLineagePath(
+function hasConfirmedProgressionToTarget(
+  family: BuildArchetypeFamilyV2,
+  targetItemId: number,
+): boolean {
+  const edges = family.progressionEdges ?? [];
+  if (edges.length === 0) return false;
+  const reverse = new Map<number, number[]>();
+  for (const edge of edges) {
+    const values = reverse.get(edge.toItemId) ?? [];
+    values.push(edge.fromItemId);
+    reverse.set(edge.toItemId, values);
+  }
+  const pending = [targetItemId];
+  const visited = new Set<number>([targetItemId]);
+  while (pending.length > 0) {
+    const current = pending.shift()!;
+    for (const previous of reverse.get(current) ?? []) {
+      if (previous !== targetItemId) return true;
+      if (visited.has(previous)) continue;
+      visited.add(previous);
+      pending.push(previous);
+    }
+  }
+  return false;
+}
+
+function findConfirmedProgressionPath(
   family: BuildArchetypeFamilyV2,
   terminalItemId: number,
   inventoryItemIds: readonly number[],
   itemGraph: RecommendationItemGraph,
   rulesetId: string,
-): { heldItemId?: number; path: number[] } | undefined {
-  const observedIds = new Set(family.progressionNodes.map((node) => node.itemId));
-  if (!observedIds.has(terminalItemId)) return undefined;
+): ConfirmedProgressionPathV2 | undefined {
+  const edges = family.progressionEdges ?? [];
+  if (edges.length === 0) return undefined;
 
-  const heldItemId = family.progressionNodes
+  const heldCandidates = family.progressionNodes
     .map((node) => node.itemId)
-    .filter((itemId) => inventoryItemIds.includes(itemId))
-    .filter((itemId) => itemId === terminalItemId || itemGraph.isComponentAncestor(itemId, terminalItemId))
+    .filter((itemId) => inventoryItemIds.includes(itemId) && itemId !== terminalItemId)
+    .map((itemId) => ({
+      itemId,
+      path: shortestConfirmedExecutablePath(itemId, terminalItemId, edges, itemGraph, rulesetId),
+    }))
+    .filter((entry): entry is { itemId: number; path: number[] } => Boolean(entry.path))
+    .sort((left, right) => left.path.length - right.path.length || left.itemId - right.itemId);
+
+  if (heldCandidates.length > 0) {
+    const selected = heldCandidates[0];
+    return {
+      heldItemId: selected.itemId,
+      path: selected.path,
+      timingByItemId: timingMapForPath(selected.path, edges),
+    };
+  }
+
+  const ancestors = confirmedAncestorsOf(terminalItemId, edges);
+  const roots = [...ancestors]
+    .filter((itemId) => itemId !== terminalItemId)
+    .filter((itemId) => !edges.some((edge) =>
+      edge.toItemId === itemId && ancestors.has(edge.fromItemId),
+    ))
     .sort((left, right) =>
-      lineageDepth(left, terminalItemId, observedIds, itemGraph, rulesetId)
-        - lineageDepth(right, terminalItemId, observedIds, itemGraph, rulesetId),
-    )[0];
+      confirmedStartTiming(left, edges) - confirmedStartTiming(right, edges) || left - right,
+    );
 
-  if (heldItemId === terminalItemId) return { heldItemId, path: [heldItemId] };
-  if (heldItemId !== undefined) {
-    const path = shortestObservedPath(heldItemId, terminalItemId, observedIds, itemGraph, rulesetId);
-    return path ? { heldItemId, path } : undefined;
+  for (const rootItemId of roots) {
+    if (!verifiedDirectPurchasable(rootItemId, itemGraph, rulesetId)) continue;
+    const path = shortestConfirmedExecutablePath(
+      rootItemId,
+      terminalItemId,
+      edges,
+      itemGraph,
+      rulesetId,
+    );
+    if (!path) continue;
+    return {
+      path,
+      timingByItemId: timingMapForPath(path, edges),
+    };
   }
 
-  const entries = family.progressionNodes
-    .filter((node) => node.progressionRole === 'ENTRY' || directPurchasable(node.itemId, itemGraph, rulesetId))
-    .map((node) => node.itemId)
-    .filter((itemId) => directPurchasable(itemId, itemGraph, rulesetId))
-    .sort((a, b) => a - b);
-
-  for (const entryItemId of entries) {
-    const path = shortestObservedPath(entryItemId, terminalItemId, observedIds, itemGraph, rulesetId);
-    if (path) return { path };
-  }
   return undefined;
 }
 
-function shortestObservedPath(
+function confirmedAncestorsOf(
+  targetItemId: number,
+  edges: readonly BuildObservedProgressionEdgeV2[],
+): Set<number> {
+  const result = new Set<number>([targetItemId]);
+  const pending = [targetItemId];
+  while (pending.length > 0) {
+    const current = pending.shift()!;
+    for (const edge of edges) {
+      if (edge.toItemId !== current || result.has(edge.fromItemId)) continue;
+      result.add(edge.fromItemId);
+      pending.push(edge.fromItemId);
+    }
+  }
+  return result;
+}
+
+function shortestConfirmedExecutablePath(
   startItemId: number,
   targetItemId: number,
-  observedIds: ReadonlySet<number>,
+  edges: readonly BuildObservedProgressionEdgeV2[],
   itemGraph: RecommendationItemGraph,
   rulesetId: string,
 ): number[] | undefined {
@@ -251,14 +357,45 @@ function shortestObservedPath(
     const path = queue.shift()!;
     const current = path[path.length - 1];
     if (current === targetItemId) return path;
-    for (const nextItemId of itemGraph.getDirectUpgradeIds(current)) {
-      if (!observedIds.has(nextItemId) || visited.has(nextItemId)) continue;
-      if (!executableOneSlotRecipe(nextItemId, current, [current], itemGraph, rulesetId)) continue;
-      visited.add(nextItemId);
-      queue.push([...path, nextItemId]);
+    const nextEdges = edges
+      .filter((edge) => edge.fromItemId === current)
+      .sort((left, right) => left.toItemId - right.toItemId);
+    for (const edge of nextEdges) {
+      if (visited.has(edge.toItemId)) continue;
+      if (!executableOneSlotRecipe(edge.toItemId, current, [current], itemGraph, rulesetId)) continue;
+      visited.add(edge.toItemId);
+      queue.push([...path, edge.toItemId]);
     }
   }
   return undefined;
+}
+
+function timingMapForPath(
+  path: readonly number[],
+  edges: readonly BuildObservedProgressionEdgeV2[],
+): ReadonlyMap<number, number> {
+  const result = new Map<number, number>();
+  for (let index = 1; index < path.length; index += 1) {
+    const fromItemId = path[index - 1];
+    const toItemId = path[index];
+    const edge = edges.find((candidate) =>
+      candidate.fromItemId === fromItemId && candidate.toItemId === toItemId,
+    );
+    if (!edge) continue;
+    if (index === 1) result.set(fromItemId, edge.timing.fromMedianBuyTimeS);
+    result.set(toItemId, edge.timing.toMedianBuyTimeS);
+  }
+  return result;
+}
+
+function confirmedStartTiming(
+  itemId: number,
+  edges: readonly BuildObservedProgressionEdgeV2[],
+): number {
+  return edges
+    .filter((edge) => edge.fromItemId === itemId)
+    .map((edge) => edge.timing.fromMedianBuyTimeS)
+    .sort((a, b) => a - b)[0] ?? Number.MAX_SAFE_INTEGER;
 }
 
 function executableOneSlotRecipe(
@@ -277,20 +414,17 @@ function executableOneSlotRecipe(
   );
 }
 
-function directPurchasable(itemId: number, itemGraph: RecommendationItemGraph, rulesetId: string): boolean {
-  const item = itemGraph.getItem(itemId);
-  return Boolean(item && item.availableRulesetIds.includes(rulesetId) && item.directPurchaseCost !== undefined);
-}
-
-function lineageDepth(
-  startItemId: number,
-  targetItemId: number,
-  observedIds: ReadonlySet<number>,
+function verifiedDirectPurchasable(
+  itemId: number,
   itemGraph: RecommendationItemGraph,
   rulesetId: string,
-): number {
-  return shortestObservedPath(startItemId, targetItemId, observedIds, itemGraph, rulesetId)?.length
-    ?? Number.MAX_SAFE_INTEGER;
+): boolean {
+  const item = itemGraph.getItem(itemId);
+  return Boolean(
+    item
+      && item.availableRulesetIds.includes(rulesetId)
+      && item.directPurchaseCost !== undefined,
+  );
 }
 
 function simulateOne(
