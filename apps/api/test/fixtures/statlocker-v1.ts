@@ -55,13 +55,16 @@ export const statlockerV1Fixtures = {
       relationships: [{ itemId: 101, strength: 0.7 }],
     }],
   },
+  // WPA_FILTERED_ITEMS raw contract: hero/item names joined against the reference
+  // seeds; values mirror the captured Paradox "Weapon Shielding" lifecycle row.
   filteredItems: {
     hero_id: 10,
     items: [{
-      item_id: 100,
-      mean_wpa: 0.13,
-      sample_size: 900,
-      wpa_confidence: 0.75,
+      item: 'Weapon Shielding',
+      heroName: 'Paradox',
+      wpaValue: 0.04934861681731036,
+      sampleSize: 3651,
+      mean_purchase_time_min: 12.241265406737883,
     }],
   },
 } as const;

@@ -49,7 +49,15 @@ describe('StatlockerNormalizerService', () => {
     expect(pro.payload.items[0].relationships).toEqual([{ itemId: 101, strength: 0.7 }]);
 
     const filtered = service.normalizeWpaFilteredItems(statlockerV1Fixtures.filteredItems, '15-1', 10);
-    expect(filtered.payload.items[0].meanWpa).toBe(0.13);
+    // Lifecycle rows resolve names to reference ids and convert purchase timing
+    // from minutes to seconds via the x60 product.
+    expect(filtered.payload.items[0]).toEqual({
+      heroId: 10,
+      itemId: 805079544,
+      generalWpa: 0.04934861681731036,
+      averagePurchaseTimeS: 12.241265406737883 * 60,
+      sampleSize: 3651,
+    });
     expect(wpa.contentSha256).toMatch(/^[a-f0-9]{64}$/);
     expect(service.normalizeWpaPatchData({ ...statlockerV1Fixtures.patchData }, '15-1').contentSha256)
       .toBe(wpa.contentSha256);
