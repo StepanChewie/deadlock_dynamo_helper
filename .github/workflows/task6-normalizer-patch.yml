@@ -1,0 +1,52 @@
+name: Task 6 Normalizer Patch
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: feat/statlocker-adaptive-progression-replacement
+          persist-credentials: true
+
+      - name: Patch normalizer
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/api/src/statlocker-adaptive/statlocker-normalizer.service.ts')
+          text = path.read_text()
+
+          old_import = "  StatlockerFrequencyTierV1,\n  StatlockerHeroLeaderboardV1,"
+          new_import = "  StatlockerFrequencyTierV1,\n  StatlockerHeroItemLifecycleV1,\n  StatlockerHeroLeaderboardV1,"
+          if old_import not in text:
+              raise SystemExit('normalizer import anchor missing')
+          text = text.replace(old_import, new_import, 1)
+
+          old_method = """  normalizeWpaFilteredItems(\n    raw: unknown,\n    statlockerPatchId: string,\n    heroId: number,\n  ): StatlockerNormalizedDatasetV1<StatlockerWpaFilteredItemsV1> {\n    const root = requireRecord(raw, 'WPA_FILTERED_ITEMS', 'root');\n    const responseHero = optionalPositiveInt(root.hero_id ?? root.heroId, 'WPA_FILTERED_ITEMS', 'hero id') ?? heroId;\n    if (responseHero !== heroId) throw new StatlockerDatasetValidationError('WPA_FILTERED_ITEMS', 'hero mismatch');\n    const items = requireArray(root.items, 'WPA_FILTERED_ITEMS', 'items')\n      .map((row) => parseWpaItem(row, 'WPA_FILTERED_ITEMS', heroId));\n    if (items.length === 0) throw new StatlockerDatasetValidationError('WPA_FILTERED_ITEMS', 'items must not be empty');\n    items.sort((a, b) => a.itemId - b.itemId);\n    return wrap('WPA_FILTERED_ITEMS', `hero:${heroId}`, statlockerPatchId, { heroId, items });\n  }\n"""
+          new_method = """  normalizeWpaFilteredItems(\n    raw: unknown,\n    statlockerPatchId: string,\n    heroId: number,\n  ): StatlockerNormalizedDatasetV1<StatlockerWpaFilteredItemsV1> {\n    const root = requireRecord(raw, 'WPA_FILTERED_ITEMS', 'root');\n    const items = requireArray(root.items, 'WPA_FILTERED_ITEMS', 'items')\n      .map((row) => parseHeroItemLifecycle(row, heroId));\n    if (items.length === 0) throw new StatlockerDatasetValidationError('WPA_FILTERED_ITEMS', 'items must not be empty');\n    items.sort((a, b) => a.itemId - b.itemId);\n    return wrap('WPA_FILTERED_ITEMS', `hero:${heroId}`, statlockerPatchId, { heroId, items });\n  }\n"""
+          if old_method not in text:
+              raise SystemExit('normalizer method anchor missing')
+          text = text.replace(old_method, new_method, 1)
+
+          anchor = "function parseWpaItem(raw: unknown, dataset: string, fallbackHeroId?: number): StatlockerWpaItemV1 {"
+          parser = """function parseHeroItemLifecycle(raw: unknown, heroId: number): StatlockerHeroItemLifecycleV1 {\n  const dataset = 'WPA_FILTERED_ITEMS';\n  const row = requireRecord(raw, dataset, 'item');\n  const heroName = requireString(row.heroName ?? row.hero_name, dataset, 'hero name');\n  const resolvedHeroId = resolveReferenceId(heroName, HERO_ID_BY_NAME);\n  if (resolvedHeroId !== heroId) {\n    throw new StatlockerDatasetValidationError(dataset, `hero mismatch ${heroName}`);\n  }\n  const itemName = requireString(row.item, dataset, 'item name');\n  const itemId = resolveReferenceId(itemName, ITEM_ID_BY_NAME);\n  if (!itemId) {\n    throw new StatlockerDatasetValidationError(dataset, `unknown item ${itemName}`);\n  }\n  const sampleSizeRaw = row.sampleSize ?? row.sample_size;\n  return {\n    heroId,\n    itemId,\n    generalWpa: parseFinite(row.wpaValue, dataset, 'general wpa'),\n    averagePurchaseTimeS: parseNonNegativeFinite(\n      row.mean_purchase_time_min,\n      dataset,\n      'average purchase time minutes',\n    ) * 60,\n    ...(sampleSizeRaw === undefined\n      ? {}\n      : { sampleSize: parseNonNegativeFinite(sampleSizeRaw, dataset, 'sample size') }),\n  };\n}\n\n"""
+          if anchor not in text:
+              raise SystemExit('parser insertion anchor missing')
+          text = text.replace(anchor, parser + anchor, 1)
+          path.write_text(text)
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/api/src/statlocker-adaptive/statlocker-normalizer.service.ts
+          git commit -m "test: verify Statlocker item lifecycle source"
+          git push origin HEAD:feat/statlocker-adaptive-progression-replacement
