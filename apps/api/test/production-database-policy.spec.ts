@@ -22,6 +22,7 @@ const REQUIRED_NEW_TABLES = [
 
 describe('production database policy', () => {
   const srcRoot = path.resolve(__dirname, '../src');
+  const repoRoot = path.resolve(__dirname, '../../..');
   const appModulePath = path.join(srcRoot, 'app.module.ts');
   const dataSourcePath = path.join(srcRoot, 'database', 'data-source.ts');
   const migrationsPath = path.join(srcRoot, 'database', 'migrations');
@@ -54,5 +55,15 @@ describe('production database policy', () => {
     }
 
     expect(migrationSource).not.toMatch(/(?:ALTER|DROP)\s+TABLE\s+["']?item_catalog_/i);
+  });
+
+  it('runs explicit migrations before the production Compose API begins serving', () => {
+    const appModuleSource = fs.readFileSync(appModulePath, 'utf8');
+    const composeSource = fs.readFileSync(path.join(repoRoot, 'docker-compose.yml'), 'utf8');
+    const envExampleSource = fs.readFileSync(path.join(repoRoot, '.env.example'), 'utf8');
+
+    expect(appModuleSource).toContain("migrationsRun: process.env.DB_RUN_MIGRATIONS === 'true'");
+    expect(composeSource).toContain('DB_RUN_MIGRATIONS: ${DB_RUN_MIGRATIONS:-true}');
+    expect(envExampleSource).toContain('DB_RUN_MIGRATIONS=true');
   });
 });
