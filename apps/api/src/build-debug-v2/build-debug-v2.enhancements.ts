@@ -1,7 +1,9 @@
 export const BUILD_DEBUG_V2_ENHANCEMENT_HEAD = `
   <style>
-    .debug-item-icons { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-right: 6px; vertical-align: middle; }
+    .debug-item-icons { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-right: 6px; vertical-align: middle; }
+    .debug-item-ref { display: inline-flex; align-items: center; gap: 5px; border: 1px solid #343d37; background: #0d110e; padding: 2px 5px 2px 2px; }
     .debug-item-icon { --dl-item-icon-size: 34px; display: inline-block; flex: none; vertical-align: middle; }
+    .debug-item-name { color: var(--text); font: 9px ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
     .debug-family-profiles { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; padding-top: 8px; border-top: 1px solid rgba(42, 51, 45, .65); }
     .debug-family-profiles::before { content: 'source players'; width: 100%; color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: .05em; }
     .debug-family-profile { border: 1px solid #343d37; background: #0d110e; color: var(--accent); padding: 3px 5px; font: 9px ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
@@ -12,17 +14,37 @@ export const BUILD_DEBUG_V2_ENHANCEMENT_HEAD = `
 export const BUILD_DEBUG_V2_ENHANCEMENT_CLIENT_JS = String.raw`(() => {
   'use strict';
 
+  const ITEM_ASSETS_URL = 'https://api.deadlock-api.com/v1/assets/items';
+  const itemNames = new Map();
   let latestTrace;
   let scheduled = false;
 
   captureFetchTraces();
   captureEventSourceTraces();
+  loadItemNames();
 
   const observer = new MutationObserver(scheduleEnhancement);
   const traceStages = document.getElementById('traceStages');
   const fullBuildPanel = document.getElementById('fullBuildPanel');
   if (traceStages) observer.observe(traceStages, { childList: true, subtree: true });
   if (fullBuildPanel) observer.observe(fullBuildPanel, { childList: true, subtree: true });
+
+  async function loadItemNames() {
+    try {
+      const response = await window.fetch(ITEM_ASSETS_URL);
+      if (!response.ok) return;
+      const items = await response.json();
+      if (!Array.isArray(items)) return;
+      for (const item of items) {
+        const itemId = Number(item.id ?? item.item_id ?? item.itemId);
+        const name = typeof item.name === 'string' ? item.name.trim() : '';
+        if (Number.isSafeInteger(itemId) && itemId > 0 && name) itemNames.set(itemId, name);
+      }
+      refreshItemNames();
+    } catch (_error) {
+      // Numeric fallback and item-card tooltips remain available when the public API is unreachable.
+    }
+  }
 
   function captureFetchTraces() {
     const nativeFetch = window.fetch.bind(window);
@@ -70,6 +92,7 @@ export const BUILD_DEBUG_V2_ENHANCEMENT_CLIENT_JS = String.raw`(() => {
       scheduled = false;
       enhanceItemReferences();
       enhanceFamilyProfiles();
+      refreshItemNames();
     });
   }
 
@@ -79,26 +102,26 @@ export const BUILD_DEBUG_V2_ENHANCEMENT_CLIENT_JS = String.raw`(() => {
       const value = row.querySelector('dd');
       if (!value) continue;
       if (label === 'item' || label.includes('terminal')) {
-        addItemIcons(value, positiveIntegers(value.textContent || '').slice(0, 1));
+        addItemIcons(value, positiveIntegers(originalText(value)).slice(0, 1));
       } else if (label.includes('items')) {
-        addItemIcons(value, positiveIntegers(value.textContent || ''));
+        addItemIcons(value, positiveIntegers(originalText(value)));
       }
     }
 
     for (const metric of document.querySelectorAll('.metric')) {
       const label = metric.querySelector('span')?.textContent?.trim().toLowerCase();
       const value = metric.querySelector('strong');
-      if (label === 'inventory' && value) addItemIcons(value, positiveIntegers(value.textContent || ''));
+      if (label === 'inventory' && value) addItemIcons(value, positiveIntegers(originalText(value)));
     }
 
     for (const title of document.querySelectorAll('.candidate-title strong, .build-step-head strong, .lock-banner')) {
-      const text = title.textContent || '';
+      const text = originalText(title);
       if (!isItemTitle(text)) continue;
       addItemIcons(title, itemIdsFromTitle(text));
     }
 
     for (const label of document.querySelectorAll('.small-label, .inventory-diff span')) {
-      const text = label.textContent || '';
+      const text = originalText(label);
       if (!/(selected items|consumes:|before \[|after \[)/i.test(text)) continue;
       addItemIcons(label, positiveIntegers(text));
     }
@@ -111,7 +134,7 @@ export const BUILD_DEBUG_V2_ENHANCEMENT_CLIENT_JS = String.raw`(() => {
     const byFamilyId = new Map(families.map((family) => [String(family.familyId), family]));
 
     for (const title of document.querySelectorAll('.candidate-title strong')) {
-      const match = /^Family\s+(\d+)$/.exec((title.textContent || '').trim());
+      const match = /^Family\s+(\d+)$/.exec(originalText(title).trim());
       if (!match) continue;
       const family = byFamilyId.get(match[1]);
       const profiles = family?.sourceProfiles || [];
@@ -131,21 +154,35 @@ export const BUILD_DEBUG_V2_ENHANCEMENT_CLIENT_JS = String.raw`(() => {
   }
 
   function renderItemRef(itemId) {
+    const reference = document.createElement('span');
+    reference.className = 'debug-item-ref';
+    reference.setAttribute('data-debug-item-id', String(itemId));
+
     const card = document.createElement('dl-item-card');
     card.className = 'debug-item-icon';
     card.setAttribute('item-id', String(itemId));
     card.setAttribute('variant', 'icon');
     card.setAttribute('tooltip-trigger', 'hover');
     card.setAttribute('aria-label', 'Item ' + itemId);
-    return card;
+    reference.appendChild(card);
+
+    const name = document.createElement('span');
+    name.className = 'debug-item-name';
+    name.setAttribute('data-debug-item-name-id', String(itemId));
+    name.textContent = itemNames.get(itemId) || 'Item ' + itemId;
+    reference.appendChild(name);
+    return reference;
   }
 
   function addItemIcons(container, itemIds) {
+    if (!container.hasAttribute('data-debug-original-text')) {
+      container.setAttribute('data-debug-original-text', container.textContent || '');
+    }
     const ids = [...new Set(itemIds.filter((itemId) => Number.isSafeInteger(itemId) && itemId > 0))];
     if (ids.length === 0) return;
     const existing = new Set(
-      [...container.querySelectorAll('dl-item-card[data-debug-item-id]')]
-        .map((card) => Number(card.getAttribute('data-debug-item-id'))),
+      [...container.querySelectorAll('.debug-item-ref[data-debug-item-id]')]
+        .map((reference) => Number(reference.getAttribute('data-debug-item-id'))),
     );
     const missing = ids.filter((itemId) => !existing.has(itemId));
     if (missing.length === 0) return;
@@ -155,11 +192,18 @@ export const BUILD_DEBUG_V2_ENHANCEMENT_CLIENT_JS = String.raw`(() => {
       strip.className = 'debug-item-icons';
       container.prepend(strip);
     }
-    for (const itemId of missing) {
-      const card = renderItemRef(itemId);
-      card.setAttribute('data-debug-item-id', String(itemId));
-      strip.appendChild(card);
+    for (const itemId of missing) strip.appendChild(renderItemRef(itemId));
+  }
+
+  function refreshItemNames() {
+    for (const name of document.querySelectorAll('[data-debug-item-name-id]')) {
+      const itemId = Number(name.getAttribute('data-debug-item-name-id'));
+      name.textContent = itemNames.get(itemId) || 'Item ' + itemId;
     }
+  }
+
+  function originalText(element) {
+    return element.getAttribute('data-debug-original-text') ?? element.textContent ?? '';
   }
 
   function positiveIntegers(value) {
