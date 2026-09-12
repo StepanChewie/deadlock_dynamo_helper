@@ -11,6 +11,7 @@ import { BuildDebugTraceStoreV2Service } from '../src/statlocker-adaptive/build-
 import { BuildItemUtilityV2Service } from '../src/statlocker-adaptive/build-item-utility-v2.service';
 import { EnemyThreatV1Service } from '../src/statlocker-adaptive/enemy-threat-v1.service';
 import { FamilyFirstFullBuildResolverV2Service } from '../src/statlocker-adaptive/family-first-full-build-resolver-v2.service';
+import { ResolvedFullBuildPlanV2 } from '../src/statlocker-adaptive/full-build-plan-v2';
 import { MatchupCandidateDiscoveryV2Service } from '../src/statlocker-adaptive/matchup-candidate-discovery-v2.service';
 import { ThreatWeightedMatchupV1Service } from '../src/statlocker-adaptive/threat-weighted-matchup-v1.service';
 
@@ -296,7 +297,7 @@ function evidenceBundle() {
   };
 }
 
-function harness() {
+function harness(resolverOverride?: { resolve(input: unknown): ResolvedFullBuildPlanV2 }) {
   let currentDecision = liveDecision(ENEMY_HERO_IDS.slice(0, 5));
   let currentRows = matchupRows(ARCHETYPE_A);
   let persistedLock: any;
@@ -334,7 +335,7 @@ function harness() {
   const session = new BuildArchetypeSessionV2Service(sessionRepository as any);
   const threat = new EnemyThreatV1Service();
   const discovery = new MatchupCandidateDiscoveryV2Service(utility, matchup);
-  const resolver = new FamilyFirstFullBuildResolverV2Service(utility);
+  const resolver = resolverOverride ?? new FamilyFirstFullBuildResolverV2Service(utility);
   const traceStore = new BuildDebugTraceStoreV2Service();
   const service = new AdaptiveRecommendationV2Service(
     decisionState as any,
@@ -345,7 +346,7 @@ function harness() {
     session,
     threat,
     discovery,
-    resolver,
+    resolver as any,
     traceStore,
   );
   const controller = new AdaptiveRecommendationV2Controller(service);
@@ -406,5 +407,45 @@ describe('Adaptive recommendation V2 endpoint', () => {
     expect(h.traceStore.revisions('match-v2-a')).toHaveLength(2);
     expect(h.traceStore.get('match-v2-a')?.finalPlan?.desiredState).toBeDefined();
     expect(h.traceStore.get('match-v2-a')?.finalPlan?.semanticValidation?.valid).toBe(true);
+  });
+
+  it('holds instead of exposing an action from a plan that failed validation', async () => {
+    const invalidPlan: ResolvedFullBuildPlanV2 = {
+      planRevision: 'invalid-plan',
+      matchId: 'match-v2-a',
+      heroId: HERO_ID,
+      archetypeId: ARCHETYPE_A,
+      stateRevision: 'state-6',
+      steps: [{
+        sequence: 1,
+        action: 'BUY',
+        buyItemId: 1,
+        consumedItemIds: [],
+        inventoryBefore: [],
+        inventoryAfter: [1],
+        reasonCodes: ['INVALID_TEST_STEP'],
+      }],
+      degradedReasons: [],
+      validation: {
+        valid: false,
+        reasonCodes: ['REQUIRED_FAMILY_REGRESSION'],
+      },
+    };
+    const h = harness({ resolve: jest.fn(() => invalidPlan) });
+    h.setFullRoster();
+
+    const result = await h.controller.recommend({
+      matchId: 'match-v2-a',
+      localSteamId: 'steam-local',
+    });
+
+    expect(result.ready).toBe(false);
+    expect(result.blockers).toEqual(['REQUIRED_FAMILY_REGRESSION']);
+    expect(result.nextAction).toEqual({
+      type: 'HOLD',
+      reasonCodes: ['REQUIRED_FAMILY_REGRESSION'],
+    });
+    expect(result.fullBuild?.validation.valid).toBe(false);
+    expect(result.fullBuild?.steps).toHaveLength(1);
   });
 });

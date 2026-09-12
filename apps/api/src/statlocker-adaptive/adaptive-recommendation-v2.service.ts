@@ -430,19 +430,27 @@ function readyRecommendation(input: {
       : { semanticValidation: input.plan.semanticValidation }),
   };
   const selectionScore = input.selection.scores.find((entry) => entry.archetypeId === input.lock.archetypeId);
+  const blockers = plan.validation.valid
+    ? []
+    : plan.validation.reasonCodes.length > 0
+      ? [...plan.validation.reasonCodes]
+      : ['FULL_BUILD_VALIDATION_FAILED'];
   const degradedReasons = unique([
     ...input.evidence.degradedReasons,
     ...input.lock.degradedReasons,
     ...plan.degradedReasons,
+    ...blockers,
   ]);
   return {
-    ready: true,
-    blockers: [],
+    ready: plan.validation.valid,
+    blockers,
     decisionId: input.decision.state.decisionId,
     stateRevision: input.decision.stateRevision,
     heroId: input.decision.state.heroId,
     lock: lockSummary(input.lock, input.selection),
-    nextAction: nextAction(plan),
+    nextAction: plan.validation.valid
+      ? nextAction(plan)
+      : { type: 'HOLD', reasonCodes: blockers },
     fullBuild: plan,
     score: {
       total: selectionScore?.score ?? 0,
