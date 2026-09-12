@@ -204,4 +204,35 @@ describe('BuildDesiredStateV2Service', () => {
     expect(result.families).toHaveLength(12);
     expect(result.reasonCodes).not.toContain('DESIRED_STATE_UNDER_CAPACITY');
   });
+
+  it('keeps more than 12 eligible lifetime goals instead of truncating them to inventory capacity', () => {
+    const required = Array.from({ length: 10 }, (_, index) => family(5000 + index, 6000 + index));
+    const optional = Array.from({ length: 4 }, (_, index) => family(5100 + index, 6100 + index, undefined, 'OPTIONAL'));
+
+    const result = resolve(archetype([...required, ...optional]), [], 12);
+
+    expect(result.families).toHaveLength(14);
+    expect(result.reasonCodes).not.toContain('DESIRED_STATE_CAPACITY_LIMITED');
+  });
+
+  it('excludes a SITUATIONAL goal when configured matchup confidence is insufficient', () => {
+    const situational = family(7000, 7100, undefined, 'SITUATIONAL');
+
+    const result = resolve(archetype([situational]), []);
+
+    expect(result.families).toEqual([]);
+  });
+
+  it('includes a SITUATIONAL goal with sufficient configured matchup evidence', () => {
+    const situational = family(7200, 7300, undefined, 'SITUATIONAL');
+
+    const result = resolve(archetype([situational]), [wpa(7300, 0.1)]);
+
+    expect(result.families).toHaveLength(1);
+    expect(result.families[0]).toMatchObject({
+      familyId: 7200,
+      requirement: 'SITUATIONAL',
+      goalKind: 'SITUATIONAL_MATCHUP_SELECTED',
+    });
+  });
 });
