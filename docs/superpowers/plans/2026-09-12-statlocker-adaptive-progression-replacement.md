@@ -4,9 +4,9 @@
 
 **Goal:** Make Statlocker Adaptive preserve Statlocker-confirmed upgrade progressions, allow full-build timelines longer than 12 transactions while never holding more than 12 items, and perform sell/replacement only at 12/12 capacity using verified Statlocker lifecycle and full-team matchup evidence.
 
-**Architecture:** Keep recommendation evidence, mechanics validation, target replacement gating, sell protection, and sell ranking as separate layers. The archetype compiler emits same-profile observed progression edges. The desired-state resolver emits an ordered goal timeline without using 12 as a lifetime goal cap. The transaction planner executes those goals, invokes replacement only for a new-slot BUY at 12/12, and delegates replacement decisions to focused services. Statlocker Item Meta Model evidence ranks eligible sell candidates, while `VS_HERO_WPA` can hard-protect items against the current enemy team. Missing or unverified mechanics/evidence fails closed instead of inventing a direct purchase or sell policy.
+**Architecture:** Keep build evidence, mechanics validation, incoming-target replacement gating, sell protection, and sell ranking as separate layers. The archetype compiler emits same-profile observed progression edges. The desired-state resolver emits an ordered goal timeline without using 12 as a lifetime goal cap. The transaction planner executes those goals, invokes replacement only for a new-slot BUY at 12/12, and delegates replacement decisions to focused services. Statlocker Item Meta Model evidence ranks eligible sell candidates, while `VS_HERO_WPA` can hard-protect items against the current enemy team. Missing or unverified mechanics/evidence fails closed instead of inventing a direct purchase or sell policy.
 
-**Tech Stack:** TypeScript, NestJS, TypeORM, Jest, Yarn workspaces, `@deadlock-live-probe/build-domain`.
+**Tech Stack:** TypeScript, NestJS, TypeORM, Jest, Yarn 1 workspaces, `@deadlock-live-probe/build-domain`.
 
 **Spec:** `docs/superpowers/specs/2026-09-12-statlocker-adaptive-progression-replacement-design.md`
 
@@ -15,17 +15,33 @@
 - Statlocker aggregate evidence plus verified game mechanics/catalog data are the only allowed policy sources.
 - Do not train or infer sell behavior from our own users, local match history, `MatchPlayer` trajectories, or `historical-build-trajectory-source-v2`.
 - `MAX_HELD_ITEMS = 12` is an inventory invariant, not a build-step or lifetime family-count limit.
-- The replacement algorithm must never run before inventory is full. Its trigger is exactly: `heldItems.length === 12 && nextActionRequiresNewSlot`.
+- The replacement algorithm must never run before inventory is full. Its trigger is exactly `heldItems.length === 12 && nextActionRequiresNewSlot`.
 - `12/12 + UPGRADE` must not invoke sell logic because the component is consumed in place.
 - A Statlocker-confirmed progression must never silently collapse to a direct terminal BUY when mechanics or upgrade pricing are unavailable.
 - Never synthesize a component progression from catalog ancestry alone.
-- Never treat raw item `cost` as proof of direct-shop legality. Use the strict graph contract, where `directPurchaseCost` exists only for verified shopable, enabled items with known cost.
-- Do not use optional `earlyWpa`, `midWpa`, `lateWpa`, `laneWpa`, or `postLaneWpa` fields for this feature; they are not present in the current real snapshots inspected for this project.
+- Never treat raw item `cost` as proof of direct-shop legality. Use the strict graph contract, where graph `directPurchaseCost` exists only for verified shopable, enabled items with known cost.
+- Do not use optional `earlyWpa`, `midWpa`, `lateWpa`, `laneWpa`, or `postLaneWpa` fields for this feature; they are not present in the real snapshots inspected for this project.
 - Do not relabel median purchase time as average purchase time. The Item Meta Model source must expose and verify the actual average-purchase-time coordinate used by the Statlocker graph before lifecycle ranking is enabled.
 - Matchup sell protection stays disabled until absolute WPA and minimum-confidence thresholds are calibrated from real `VS_HERO_WPA` snapshot distributions and committed as versioned configuration.
-- Each task follows red-green-refactor: add the failing test first, run it and confirm the expected failure, make the smallest implementation, rerun the focused test, then run affected tests before committing.
+- Every implementation task follows red-green-refactor: add the failing test first, run it and confirm the expected failure, make the smallest implementation, rerun the focused test, then run affected tests before committing.
 - Do not add `| null` to TypeScript return signatures.
 - Keep code comments in English.
+
+## File Responsibility Map
+
+- `apps/api/src/statlocker-adaptive/build-archetype-v2.ts` - persisted archetype contracts, including explicit observed progression edges.
+- `apps/api/src/statlocker-adaptive/build-archetype-compiler-v2.service.ts` - compiles same-profile Statlocker progression evidence and lineage-specific timing.
+- `apps/api/src/statlocker-adaptive/build-desired-state-v2.service.ts` - selects REQUIRED/CHOICE/OPTIONAL/SITUATIONAL goals; does not enforce lifetime inventory capacity.
+- `apps/api/src/statlocker-adaptive/full-build-transaction-planner-v2.service.ts` - orders and executes BUY/UPGRADE/REPLACE actions while enforcing inventory capacity.
+- `apps/api/src/statlocker-adaptive/full-build-transition-value-v2.service.ts` - reusable whole-inventory value delta used by the replacement gate.
+- `apps/api/src/statlocker-adaptive/full-build-matchup-protection-v1.service.ts` - full-team `VS_HERO_WPA` sell veto.
+- `apps/api/src/statlocker-adaptive/full-build-sell-ranker-v1.service.ts` - pure Pareto + percentile lifecycle ranking.
+- `apps/api/src/statlocker-adaptive/full-build-replacement-v2.service.ts` - 12/12 replacement decision pipeline.
+- `apps/api/src/statlocker-adaptive/statlocker-item-lifecycle-repository-v1.service.ts` - reads verified current-patch hero Item Meta Model evidence.
+- `apps/api/src/statlocker-adaptive/statlocker-refresh.service.ts` - schedules hero lifecycle collection.
+- `apps/api/src/statlocker-adaptive/statlocker-normalizer.service.ts` - parses only verified raw Item Meta Model fields.
+- `apps/api/src/statlocker-adaptive/recommendation-economy-rules-store-v1.service.ts` - preserves verified upgrade-pricing policy through persistence.
+- `packages/deadlock-build-domain/src/recommendation-ruleset-catalog.ts` - strict mechanics catalog and verified direct-purchase/upgrade executability.
 
 ---
 
@@ -34,7 +50,7 @@
 **Files:**
 - Modify: `apps/api/src/statlocker-adaptive/recommendation-economy-rules-store-v1.service.ts`
 - Test: `apps/api/test/recommendation-economy-rules-store-v1.spec.ts`
-- Test or add focused catalog coverage under the existing `packages/deadlock-build-domain` Jest test location for `recommendation-ruleset-catalog.ts`
+- Test: `packages/deadlock-build-domain/test/recommendation-ruleset-catalog.spec.ts`
 - Reference only: `apps/api/src/statlocker-adaptive/adaptive-economy-v1.ts`
 - Reference only: `packages/deadlock-build-domain/src/recommendation-ruleset-catalog.ts`
 
@@ -56,29 +72,29 @@ export interface RecommendationEconomyRulesV1 {
 }
 ```
 
-`normalizeRules()` must preserve and clone `upgradePricingPolicy` and `source` rather than dropping them. Validation must reject malformed supplied policy fields with the same constraints already enforced by the environment parser: known mode, finite ratio in `[0, 1]`, and evidence of `OBSERVED` or `RECONSTRUCTED`.
+`normalizeRules()` must preserve and clone `upgradePricingPolicy` and `source`. `validateRules()` must reject a supplied malformed policy using the same constraints already enforced by `parseUpgradePricingPolicy()` in `adaptive-economy-v1.ts`: mode `TARGET_COST_MINUS_VERIFIED_COMPONENT_CREDIT`, finite `componentCreditRatio` in `[0, 1]`, evidence `OBSERVED | RECONSTRUCTED`, and a non-empty source after normalization.
 
-Do not add a default `componentCreditRatio` to `createCanonicalEconomyRulesV1`. A missing verified source must remain missing.
+Do not add a default `componentCreditRatio` to `createCanonicalEconomyRulesV1`. Missing verified policy remains missing.
 
-The strict recommendation graph must retain the existing direct-purchase contract:
+The strict graph direct-purchase contract remains:
 
 ```text
 item available in ruleset
 AND shopable.value === true
 AND disabled.value === false
-AND directPurchaseCost is known
-=> graph item has directPurchaseCost
+AND directPurchaseCost evidence is known
+=> graph item.directPurchaseCost exists
 ```
 
-No new direct-purchase tri-state is required unless a failing strict-catalog test proves the graph cannot distinguish this case.
+No second direct-purchase tri-state is added unless the focused strict-catalog test disproves this existing contract.
 
-- [ ] Add a store round-trip test that publishes rules with `upgradePricingPolicy` and `source`, reads the persisted payload, resolves it with `resolveExact()`, and asserts `mode`, `componentCreditRatio`, `evidence`, and `source` survive unchanged.
-- [ ] Run `yarn workspace @deadlock-live-probe/api test -- test/recommendation-economy-rules-store-v1.spec.ts` and confirm the new test fails because normalization drops the policy/source.
-- [ ] Extend `validateRules()` and `normalizeRules()` to preserve validated `upgradePricingPolicy` and `source` without inventing missing values.
+- [ ] Add a store round-trip test that publishes rules with `upgradePricingPolicy` and `source`, inspects the persisted payload, resolves it with `resolveExact()`, and asserts `mode`, `componentCreditRatio`, `evidence`, and `source` survive unchanged.
+- [ ] Run `yarn workspace @deadlock-live-probe/api test -- test/recommendation-economy-rules-store-v1.spec.ts` and confirm the new test fails because current normalization drops policy/source.
+- [ ] Extend `validateRules()` and `normalizeRules()` to preserve the validated policy/source without inventing missing values.
 - [ ] Rerun the focused API test and confirm it passes.
-- [ ] Add a strict-catalog test proving a raw item with a cost but `shopable=false` or `disabled=true` does not receive graph `directPurchaseCost`, while a verified shopable/enabled item does.
-- [ ] Run the focused build-domain catalog test and confirm the contract passes without adding a second direct-purchase model.
-- [ ] Run `yarn build:domain` and the economy store test again.
+- [ ] Add strict-catalog coverage proving raw cost plus `shopable=false` or `disabled=true` does not produce graph `directPurchaseCost`, while a verified shopable/enabled item with known cost does.
+- [ ] Run `yarn workspace @deadlock-live-probe/build-domain test -- test/recommendation-ruleset-catalog.spec.ts` and confirm the contract passes without introducing another direct-purchase model.
+- [ ] Run `yarn workspace @deadlock-live-probe/build-domain build` and the focused economy-store test once more.
 - [ ] Commit with message `fix: preserve verified upgrade pricing rules`.
 
 ---
@@ -92,7 +108,7 @@ No new direct-purchase tri-state is required unless a failing strict-catalog tes
 
 **Interfaces:**
 
-Add an explicit edge to the archetype model:
+Add:
 
 ```ts
 export interface BuildObservedProgressionEdgeV2 {
@@ -111,42 +127,44 @@ export interface BuildObservedProgressionEdgeV2 {
 }
 ```
 
-Add to `BuildArchetypeFamilyV2`:
+and on `BuildArchetypeFamilyV2`:
 
 ```ts
 progressionEdges?: readonly BuildObservedProgressionEdgeV2[];
 ```
 
-The field is optional for persisted/replay compatibility, but newly compiled V2 archetypes always emit it.
+The optional field preserves persisted/replay compatibility; newly compiled V2 archetypes always emit it.
 
-For every catalog ancestry pair inside one family, build edge evidence only from profiles containing both exact item IDs. Reuse the existing order timing rule exactly:
+For every catalog ancestry pair where both exact item IDs are already observed inside the same family, inspect only profiles containing both IDs. Reuse the existing directional timing rule:
 
 ```ts
 from.medianBuyTimeS + STATLOCKER_BUILD_V2_CONFIG.orderTimingToleranceS < to.medianBuyTimeS
 ```
 
-Profiles whose two times fall inside the tolerance are non-directional and do not count in the confidence denominator. Match existing order-edge semantics:
+Observations within the 45-second tolerance are non-directional and do not enter the confidence denominator. Define:
 
 ```ts
-orderConfidence = orderedProfileCount / directionalProfileCount
+sourceProfileCount = fromBeforeToCount + toBeforeFromCount;
+orderedProfileCount = fromBeforeToCount;
+orderConfidence = orderedProfileCount / sourceProfileCount;
 ```
 
-The accepted edge must satisfy:
+Accept `from -> to` only when:
 
 ```ts
 sourceProfileCount >= STATLOCKER_BUILD_V2_CONFIG.minOrderSourceProfiles
-orderConfidence >= STATLOCKER_BUILD_V2_CONFIG.softOrderConfidence
+&& orderConfidence >= STATLOCKER_BUILD_V2_CONFIG.softOrderConfidence
 ```
 
-The timing medians/spreads on the accepted edge come only from the same profiles that support `from -> to`; generic per-node timing is not reused for progression execution.
+The timing medians/spreads stored on the accepted edge are calculated only from the profiles counted in `fromBeforeToCount`, not from generic node observations or opposite-direction profiles.
 
-- [ ] Add compiler tests for two or more same profiles containing component and terminal in the correct order; assert one `STATLOCKER_SAME_PROFILE` edge is emitted with confidence and lineage-specific timing.
-- [ ] Add a test where component is present only in profile A and terminal only in profile B; assert no progression edge is emitted.
-- [ ] Add a test with same-profile evidence below `0.65`; assert no edge is emitted.
-- [ ] Add a test where timings are within `45` seconds; assert those observations do not create directional support.
-- [ ] Run `yarn workspace @deadlock-live-probe/api test -- test/build-archetype-compiler-v2.spec.ts` and confirm the new assertions fail because the model has no explicit edges.
-- [ ] Implement edge compilation as a focused helper called by `compileFamily()`. Use the item graph only to validate ancestry candidates; do not add catalog-only items to the family.
-- [ ] Keep `progressionNodes` for family membership/terminal semantics, but stop treating their global timing order as proof of an upgrade edge.
+- [ ] Add a compiler test with at least two same profiles containing component then terminal; assert a `STATLOCKER_SAME_PROFILE` edge, exact counts/confidence, and lineage-specific timing.
+- [ ] Add a cross-profile test where component is only in profile A and terminal only in profile B; assert no edge.
+- [ ] Add a same-profile test below `0.65` directional confidence; assert no edge.
+- [ ] Add a 45-second tolerance test; assert non-directional observations do not create support or inflate the denominator.
+- [ ] Run `yarn workspace @deadlock-live-probe/api test -- test/build-archetype-compiler-v2.spec.ts` and confirm the new assertions fail because explicit edges do not exist yet.
+- [ ] Implement a focused `compileProgressionEdges()` helper called by `compileFamily()`. Use the item graph only to validate ancestry candidates already present in Statlocker evidence; never add catalog-only nodes.
+- [ ] Keep `progressionNodes` for family membership and terminal semantics, but stop treating their global timing order as proof of an upgrade edge.
 - [ ] Rerun the focused compiler tests and confirm they pass.
 - [ ] Commit with message `feat: compile observed progression edges`.
 
@@ -157,15 +175,19 @@ The timing medians/spreads on the accepted edge come only from the same profiles
 **Files:**
 - Modify: `apps/api/src/statlocker-adaptive/full-build-transaction-planner-v2.service.ts`
 - Test: `apps/api/test/full-build-transaction-planner-v2.spec.ts`
-- Modify if needed for reason typing only: `apps/api/src/statlocker-adaptive/full-build-plan-v2.ts`
+- Modify only if reason-code typing requires it: `apps/api/src/statlocker-adaptive/full-build-plan-v2.ts`
 
 **Interfaces:**
 
-Replace graph-inferred observed paths with paths composed from `family.progressionEdges` plus strict mechanics validation.
-
-Introduce focused helpers with these responsibilities:
+Replace graph-inferred "observed" paths with paths composed from `family.progressionEdges` and validated against strict mechanics.
 
 ```ts
+interface ConfirmedProgressionPathV2 {
+  heldItemId?: number;
+  path: readonly number[];
+  timingByItemId: ReadonlyMap<number, number>;
+}
+
 function findConfirmedProgressionPath(
   family: BuildArchetypeFamilyV2,
   terminalItemId: number,
@@ -175,33 +197,23 @@ function findConfirmedProgressionPath(
 ): ConfirmedProgressionPathV2 | undefined
 ```
 
-```ts
-interface ConfirmedProgressionPathV2 {
-  heldItemId?: number;
-  path: readonly number[];
-  timingByItemId: ReadonlyMap<number, number>;
-}
-```
-
-A progression transition is executable only when both are true:
+A transition in a confirmed path is executable only when:
 
 ```text
-accepted Statlocker edge exists
-AND executableOneSlotRecipe(target, component, inventory, graph, rulesetId) exists
+accepted same-profile edge exists
+AND executableOneSlotRecipe(target, component, current inventory, graph, rulesetId) exists
 ```
 
-For a weak/unconfirmed lineage, the terminal may be a standalone entry only when `verifiedDirectPurchasable()` sees strict-graph `directPurchaseCost` for the terminal. Rename the current helper for clarity; do not infer legality from raw catalog fields inside the planner.
+For weak/unconfirmed lineage, a terminal may be a standalone family entry only when a renamed `verifiedDirectPurchasable()` helper sees strict-graph `directPurchaseCost`. The planner must not inspect raw catalog `cost`/shop flags itself.
 
-For a confirmed edge whose recipe is unavailable, block the chain and emit a specific reason. Do not search for a direct-terminal fallback.
+A confirmed edge with no executable strict recipe blocks that progression. Emit `CONFIRMED_PROGRESSION_RECIPE_UNAVAILABLE`. Add a more specific pricing reason only when the caller/catalog already provides enough evidence to distinguish pricing absence; do not infer a cause from an empty executable-recipe list.
 
-Use edge-specific timing for `comparePendingProgressions()` when scheduling component and upgrade steps.
-
-- [ ] Add a planner test where progression nodes imply ancestry but `progressionEdges` is empty; assert the component is not invented.
-- [ ] Add a planner test where the terminal is strictly direct-purchasable and no accepted edge exists; assert standalone `BUY terminal` remains legal.
-- [ ] Add a planner test where a confirmed edge exists but executable recipe/pricing is unavailable; assert no `BUY terminal` action is emitted and the reason includes `CONFIRMED_PROGRESSION_RECIPE_UNAVAILABLE` or `UPGRADE_PRICING_UNVERIFIED` according to the failure.
-- [ ] Extend the existing interleaving test so edge timing, not global node timing, yields `BUY component`, another family BUY, then `UPGRADE terminal`.
-- [ ] Run `yarn workspace @deadlock-live-probe/api test -- test/full-build-transaction-planner-v2.spec.ts` and confirm the new tests fail on the current graph-inferred path logic.
-- [ ] Implement edge-driven path finding and edge-specific timing.
+- [ ] Add a test where `progressionNodes` imply ancestry but `progressionEdges` is empty; assert the component is not invented.
+- [ ] Add a test where no edge is confirmed but terminal strict direct purchase is legal; assert standalone `BUY terminal`.
+- [ ] Add a test with a confirmed edge but no executable recipe; assert no direct terminal BUY and reason `CONFIRMED_PROGRESSION_RECIPE_UNAVAILABLE`.
+- [ ] Convert the existing interleaving test to explicit edge timing and assert `BUY component`, another family BUY, then `UPGRADE terminal`.
+- [ ] Run `yarn workspace @deadlock-live-probe/api test -- test/full-build-transaction-planner-v2.spec.ts` and confirm the new tests fail on current graph-inferred path logic.
+- [ ] Implement edge-driven path finding and make `comparePendingProgressions()` use `timingByItemId` from accepted edges for chain steps.
 - [ ] Preserve the existing one-slot UPGRADE behavior at 12/12.
 - [ ] Rerun the planner test file and confirm all old and new cases pass.
 - [ ] Commit with message `fix: fail closed on unverified build progression`.
@@ -213,11 +225,9 @@ Use edge-specific timing for `comparePendingProgressions()` when scheduling comp
 **Files:**
 - Modify: `apps/api/src/statlocker-adaptive/build-desired-state-v2.service.ts`
 - Test: `apps/api/test/build-desired-state-v2.spec.ts`
-- Modify callers: `apps/api/src/statlocker-adaptive/family-first-full-build-resolver-v2.service.ts`
+- Modify caller: `apps/api/src/statlocker-adaptive/family-first-full-build-resolver-v2.service.ts`
 
 **Interfaces:**
-
-Extend each desired family state with explicit goal semantics:
 
 ```ts
 export type DesiredFamilyGoalKindV2 =
@@ -240,31 +250,29 @@ export interface DesiredFamilyStateV2 {
 }
 ```
 
-Remove `totalCapacity` from `ResolveDesiredBuildStateV2Input`; inventory capacity belongs to transaction planning, not lifetime goal selection.
+Remove `totalCapacity` from `ResolveDesiredBuildStateV2Input`; capacity belongs to transaction execution, not lifetime goal selection.
 
-Goal-selection policy:
+Selection rules:
 
-- `REQUIRED`: always include.
-- `CHOICE`: include only the existing `minSelect` winners for each CHOICE group; non-selected alternatives never reappear later.
-- `OPTIONAL`: include as an eligible timeline goal; it may later be skipped at 12/12 if replacement value is insufficient.
-- `SITUATIONAL`: include only when current matchup support is real. Reuse existing configured evidence gates instead of introducing new numbers:
-  - `confidence >= STATLOCKER_BUILD_V2_CONFIG.outsideMatchupDiscovery.minConfidence`;
-  - `score >= STATLOCKER_BUILD_V2_CONFIG.outsideMatchupDiscovery.minNormalizedSupport + STATLOCKER_BUILD_V2_CONFIG.outsideMatchupDiscovery.buyMinImprovement`.
+- REQUIRED: always include.
+- CHOICE: include only existing `minSelect` winners for each CHOICE group; non-selected alternatives never reappear later.
+- OPTIONAL: include as eligible timeline goals.
+- SITUATIONAL: include only when `confidence >= outsideMatchupDiscovery.minConfidence` and `score >= outsideMatchupDiscovery.minNormalizedSupport`. Do not add another guessed SITUATIONAL threshold; the later replacement gate handles whether a full inventory should churn for it.
 
-Keep output deterministic in archetype family order so the transaction planner can then interleave actual steps by progression timing.
+Keep returned goals deterministic in archetype family order; actual transaction interleaving still happens from progression timing in the planner.
 
-- [ ] Add a desired-state test with more than 12 eligible REQUIRED/OPTIONAL goals and assert the resolver returns more than 12 instead of truncating at `totalCapacity`.
-- [ ] Add a CHOICE test proving only `minSelect` winners become goals even though capacity no longer truncates the list.
-- [ ] Add SITUATIONAL tests for insufficient confidence/support (excluded) and sufficient confidence/support (included with `SITUATIONAL_MATCHUP_SELECTED`).
-- [ ] Run `yarn workspace @deadlock-live-probe/api test -- test/build-desired-state-v2.spec.ts` and confirm the >12 test fails on the current capacity slice.
-- [ ] Remove the capacity throw/slice from desired-state resolution and add `goalKind`.
-- [ ] Update `FamilyFirstFullBuildResolverV2Service` call sites to stop passing `totalCapacity` into desired-state resolution.
-- [ ] Rerun focused desired-state tests and family-first resolver tests that compile against the changed input.
+- [ ] Add a desired-state test with more than 12 eligible REQUIRED/OPTIONAL families and assert more than 12 goals are returned.
+- [ ] Add a CHOICE test proving only `minSelect` winners become goals even without a capacity slice.
+- [ ] Add SITUATIONAL tests for insufficient evidence (excluded) and sufficient configured confidence/support (included as `SITUATIONAL_MATCHUP_SELECTED`).
+- [ ] Run `yarn workspace @deadlock-live-probe/api test -- test/build-desired-state-v2.spec.ts` and confirm the >12 case fails on current capacity truncation.
+- [ ] Remove the mandatory-capacity throw and optional capacity slice, remove `totalCapacity` from the input, and add `goalKind`.
+- [ ] Update `FamilyFirstFullBuildResolverV2Service` to stop passing `totalCapacity` to desired-state resolution.
+- [ ] Rerun `test/build-desired-state-v2.spec.ts` and the TypeScript build to catch all input callers.
 - [ ] Commit with message `refactor: model full build as ordered goals`.
 
 ---
 
-## Task 5: Extract reusable transition-value evaluation for the replacement gate
+## Task 5: Extract reusable whole-inventory transition value for the replacement gate
 
 **Files:**
 - Add: `apps/api/src/statlocker-adaptive/full-build-transition-value-v2.service.ts`
@@ -275,65 +283,74 @@ Keep output deterministic in archetype family order so the transaction planner c
 
 **Interfaces:**
 
-Create a focused service so family-first replacement can reuse the same whole-inventory improvement semantics as the generic resolver instead of duplicating numbers:
+Extract the current `scoreInventory()` semantics instead of creating a second utility model.
 
 ```ts
 export interface FullBuildTransitionValueV2Input {
   heroId: number;
   archetype: BuildArchetypeV2;
   itemGraph: RecommendationItemGraph;
+  gameTimeSec: number;
   currentInventoryItemIds: readonly number[];
   resultingInventoryItemIds: readonly number[];
-  currentGameTimeS: number;
+  targetItemId: number;
   enemyHeroIds: readonly number[];
-  enemyThreats: readonly EnemyThreatWeightV1[];
+  enemyThreats: readonly EnemyThreatScoreV1[];
   vsHeroRows: readonly StatlockerVsHeroWpaAggregateSourceV1[];
+  wpaPatchData?: StatlockerWpaPatchDataV1;
+  t4Chains?: StatlockerT4ChainsV1;
+  transition?: Partial<BuildTransitionCostV2>;
 }
 
 export interface FullBuildTransitionValueV2Result {
-  improvement: number;
+  currentState: FullBuildInventoryUtilityV2;
+  resultingState: FullBuildInventoryUtilityV2;
+  marginalGain: number;
   confidence: number;
-  currentNormalized: number;
-  resultingNormalized: number;
 }
 ```
 
-The implementation must reuse `BuildItemUtilityV2Service` and the same inventory aggregation behavior currently embedded in `FullBuildResolverV2Service.evaluateTransitions()`. Move the calculation, not the policy threshold, into the service.
-
-Add a second pure policy helper or method:
+`marginalGain` must use the exact existing meaning:
 
 ```ts
-passesReplacementImprovement(
-  result: FullBuildTransitionValueV2Result,
-  replacingCoreItem: boolean,
-): boolean
+resultingState.total - currentState.total
 ```
 
-It uses existing `fullBuildResolver.replacementMinImprovement` / `coreReplacementMinImprovement` and existing minimum-confidence rules. REQUIRED incoming goals can bypass the improvement threshold later, but they never bypass mechanics or protection constraints.
+Do not rename this to "normalized improvement"; the existing resolver thresholds are applied to this whole-inventory utility delta.
 
-- [ ] Add focused tests that reproduce current generic-resolver inventory improvement and replacement threshold outcomes for normal and core replacement.
-- [ ] Run the focused new test and confirm it fails before the service exists.
-- [ ] Extract the inventory value computation from `FullBuildResolverV2Service` into `FullBuildTransitionValueV2Service` without changing generic resolver outcomes.
-- [ ] Register the new service in `StatlockerAdaptiveModule` and inject it into `FullBuildResolverV2Service`.
-- [ ] Rerun the new test plus existing full-build resolver tests and confirm no behavior drift.
+Also expose one policy helper used by both generic and family-first replacement:
+
+```ts
+function replacementImprovementThreshold(
+  soldRole: BuildArchetypeRoleV2 | undefined,
+): number
+```
+
+It returns `coreReplacementMinImprovement` for CORE, otherwise `replacementMinImprovement`. Keep the existing role lookup semantics based on archetype item/component/upgrade relationships.
+
+- [ ] Add a focused test that reproduces current `FullBuildResolverV2Service` current/resulting inventory totals, marginal gain, and confidence for a known REPLACE case.
+- [ ] Add threshold tests for CORE and non-CORE sold items.
+- [ ] Run `yarn workspace @deadlock-live-probe/api test -- test/full-build-transition-value-v2.spec.ts` and confirm failure before the service exists.
+- [ ] Move the current inventory-scoring loop from `FullBuildResolverV2Service` into `FullBuildTransitionValueV2Service` using `BuildItemUtilityV2Service.scoreItem()` with the same `gameTimeSec`, enemy, `vsHeroRows`, `wpaPatchData`, `t4Chains`, and transition-cost inputs.
+- [ ] Refactor `FullBuildResolverV2Service.evaluateCandidate()` to consume the extracted service without changing accepted/rejected outcomes.
+- [ ] Register the service in `StatlockerAdaptiveModule`.
+- [ ] Run the new focused test plus the existing full-build resolver tests and confirm no behavior drift.
 - [ ] Commit with message `refactor: extract full build transition value`.
 
 ---
 
-## Task 6: Prove the Statlocker Item Meta Model data source before enabling lifecycle ranking
+## Task 6: Prove the Statlocker Item Meta Model source before enabling lifecycle ranking
 
 **Files:**
-- Add captured raw fixture: `apps/api/test/fixtures/statlocker-item-meta-model/billy.raw.json`
-- Add expected manually verified fixture: `apps/api/test/fixtures/statlocker-item-meta-model/billy.expected.json`
+- Add fixture: `apps/api/test/fixtures/statlocker-item-meta-model/billy.raw.json`
+- Add fixture: `apps/api/test/fixtures/statlocker-item-meta-model/billy.expected.json`
 - Modify: `apps/api/src/statlocker-adaptive/statlocker-adaptive.types.ts`
 - Modify: `apps/api/src/statlocker-adaptive/statlocker-normalizer.service.ts`
-- Add or extend focused normalizer test under `apps/api/test/` for `WPA_FILTERED_ITEMS`
+- Add test: `apps/api/test/statlocker-item-meta-model-normalizer.spec.ts`
 
-**Hard gate:** Do not proceed to Tasks 7-12 until this task proves that the collector payload used for `WPA_FILTERED_ITEMS` corresponds to the Statlocker hero Item Meta Model values required by the spec. The proof must compare at least several item IDs against the Statlocker table/graph for the same hero and patch. If the endpoint does not expose the graph's average purchase time and general WPA, stop execution and revise the ingestion source; do not substitute median purchase time, our own history, or synthetic values.
+**Hard gate:** Do not start Tasks 7-12 until this task proves that the aggregate payload used for lifecycle ingestion corresponds to the Statlocker hero Item Meta Model values required by the spec. The proof compares several item IDs against the same hero and patch shown in the Statlocker Item Meta Model table/graph. If `/api/info/wpa-filtered-items?hero_id=6` does not expose both the graph's general WPA and actual average purchase time, stop at this gate and identify the correct Statlocker aggregate endpoint. Do not substitute median purchase time, our own history, or synthetic values.
 
-**Interfaces:**
-
-Add lifecycle-specific normalized fields only after the fixture proves their raw keys:
+**Interface after the raw keys are verified:**
 
 ```ts
 export interface StatlockerHeroItemLifecycleV1 {
@@ -345,15 +362,15 @@ export interface StatlockerHeroItemLifecycleV1 {
 }
 ```
 
-Keep this distinct from the older optional phase-WPA parser fields. If `WPA_FILTERED_ITEMS` remains the verified source, `normalizeWpaFilteredItems()` should emit or expose these explicit lifecycle facts rather than making callers interpret `StatlockerWpaItemV1.purchaseTiming.medianPurchaseSec` as average time.
+This interface is distinct from existing optional phase-WPA parser fields.
 
-- [ ] Capture the raw `/api/info/wpa-filtered-items?hero_id=6` response for the same Billy/patch view used for manual verification and commit the fixture with no credentials or user-specific data.
-- [ ] Record several matching `itemId`, general WPA, and average purchase-time values from the Statlocker Item Meta Model table/page into `billy.expected.json`.
-- [ ] Add a normalization contract test comparing those exact values to the raw fixture.
-- [ ] Run the focused test. If the raw endpoint cannot produce the expected average purchase time and WPA, stop this implementation plan at the hard gate and identify the correct Statlocker aggregate endpoint before editing downstream ranking code.
-- [ ] Once equivalence is proven, add `StatlockerHeroItemLifecycleV1` and parse the exact verified raw fields.
-- [ ] Assert no feature code reads `earlyWpa`, `midWpa`, `lateWpa`, `laneWpa`, or `postLaneWpa` for replacement.
-- [ ] Run the focused normalizer test and confirm the fixture contract passes.
+- [ ] Capture the raw `/api/info/wpa-filtered-items?hero_id=6` response for the exact Billy/patch view being manually verified and save it with no credentials/user data.
+- [ ] Record at least five matching `itemId`, general WPA, and average purchase-time values from the Statlocker Item Meta Model table/page in `billy.expected.json`.
+- [ ] Add `statlocker-item-meta-model-normalizer.spec.ts` asserting those exact expected values can be obtained from the raw fixture.
+- [ ] Run `yarn workspace @deadlock-live-probe/api test -- test/statlocker-item-meta-model-normalizer.spec.ts`. If the payload cannot produce actual average purchase time and general WPA, stop the implementation at this hard gate.
+- [ ] After equivalence is proven, add `StatlockerHeroItemLifecycleV1` and parse the exact verified raw keys in `StatlockerNormalizerService`.
+- [ ] Add a regression assertion that lifecycle normalization does not read `earlyWpa`, `midWpa`, `lateWpa`, `laneWpa`, or `postLaneWpa`.
+- [ ] Rerun the focused normalizer test and confirm the captured contract passes.
 - [ ] Commit with message `test: verify Statlocker item lifecycle source`.
 
 ---
@@ -362,11 +379,12 @@ Keep this distinct from the older optional phase-WPA parser fields. If `WPA_FILT
 
 **Files:**
 - Modify: `apps/api/src/statlocker-adaptive/statlocker-refresh.service.ts`
-- Modify as required by the verified Task 6 payload: `apps/api/src/statlocker-adaptive/statlocker-browser-collector.service.ts`
+- Modify if Task 6 proves the current collector endpoint: `apps/api/src/statlocker-adaptive/statlocker-browser-collector.service.ts`
 - Modify: `apps/api/src/statlocker-adaptive/statlocker-normalizer.service.ts`
 - Add: `apps/api/src/statlocker-adaptive/statlocker-item-lifecycle-repository-v1.service.ts`
 - Modify: `apps/api/src/statlocker-adaptive/statlocker-adaptive.module.ts`
-- Test: add focused refresh/repository tests under `apps/api/test/`
+- Add test: `apps/api/test/statlocker-item-lifecycle-refresh.spec.ts`
+- Add test: `apps/api/test/statlocker-item-lifecycle-repository-v1.spec.ts`
 - Reference: `apps/api/src/statlocker-adaptive/statlocker-snapshot-store.service.ts`
 
 **Interfaces:**
@@ -382,21 +400,21 @@ export interface StatlockerItemLifecycleEvidenceV1 {
 
 @Injectable()
 export class StatlockerItemLifecycleRepositoryV1Service {
-  async loadCurrentPatchForHero(heroId: number): Promise<readonly StatlockerItemLifecycleEvidenceV1[]>;
+  async loadCurrentPatchForHero(
+    heroId: number,
+  ): Promise<readonly StatlockerItemLifecycleEvidenceV1[]>;
 }
 ```
 
-Schedule the verified lifecycle dataset per hero alongside hero-scoped refresh work. Use a deterministic scope such as `hero:${heroId}` and the same current-patch snapshot identity rules used by the other Statlocker datasets.
+Schedule the verified lifecycle dataset once per due hero with deterministic hero scope, using the same current-patch snapshot identity/backoff patterns as existing Statlocker datasets. Do not derive these values from `PRO_BUILD_ANALYSIS`.
 
-Do not derive lifecycle values from `PRO_BUILD_ANALYSIS`; this repository represents the separate hero Item Meta Model layer.
-
-- [ ] Add a refresh test proving each due hero receives a lifecycle dataset target in addition to the existing leaderboard/profile work.
-- [ ] Run the focused refresh test and confirm it fails because `WPA_FILTERED_ITEMS` is not currently scheduled.
-- [ ] Add the per-hero target and preserve current refresh rate-limits/backoff behavior.
-- [ ] Add repository tests that read a persisted normalized lifecycle snapshot and return deterministic item evidence for one hero/current patch.
-- [ ] Implement the repository using `StatlockerSnapshotStoreService` or the existing snapshot persistence pattern; do not create a parallel persistence mechanism.
+- [ ] Add `statlocker-item-lifecycle-refresh.spec.ts` proving a due hero receives one lifecycle collection target and that existing global/profile targets are unchanged.
+- [ ] Run that focused test and confirm it fails because `WPA_FILTERED_ITEMS` is not currently scheduled per hero.
+- [ ] Add the hero-scoped target using the endpoint/dataset proven in Task 6 and preserve current refresh rate limiting/backoff.
+- [ ] Add repository tests that persist a normalized lifecycle snapshot and read deterministic current-patch evidence for one hero.
+- [ ] Implement the repository on top of `StatlockerSnapshotStoreService`; do not create parallel storage.
 - [ ] Register the repository in `StatlockerAdaptiveModule`.
-- [ ] Rerun refresh, normalizer, and repository tests.
+- [ ] Run both new test files plus the Task 6 normalizer test.
 - [ ] Commit with message `feat: ingest Statlocker item lifecycle evidence`.
 
 ---
@@ -408,11 +426,8 @@ Do not derive lifecycle values from `PRO_BUILD_ANALYSIS`; this repository repres
 - Add: `apps/api/test/full-build-matchup-protection-v1.spec.ts`
 - Modify: `apps/api/src/statlocker-adaptive/statlocker-build-v2.config.ts`
 - Reference: `apps/api/src/statlocker-adaptive/statlocker-vs-hero-wpa-repository-v1.service.ts`
-- Reference: `apps/api/src/statlocker-adaptive/threat-weighted-matchup-v1.service.ts`
 
 **Interfaces:**
-
-Use a discriminated config so production cannot accidentally enable guessed thresholds:
 
 ```ts
 export type SellMatchupProtectionV1Config =
@@ -428,7 +443,7 @@ export type SellMatchupProtectionV1Config =
     };
 ```
 
-Initial checked-in state for this task:
+Initial checked-in state:
 
 ```ts
 sellMatchupProtection: {
@@ -437,9 +452,7 @@ sellMatchupProtection: {
 }
 ```
 
-`500` reuses the existing exact-enemy sample prior; it is not a new WPA threshold.
-
-Service API:
+`500` reuses the existing exact-enemy sample prior; it is not a guessed protection threshold.
 
 ```ts
 export interface FullBuildMatchupProtectionV1Input {
@@ -458,23 +471,27 @@ export interface FullBuildMatchupProtectionV1Result {
 }
 ```
 
-For each available enemy matchup row:
+Use unique enemy IDs, maximum five. For each available row:
 
 ```ts
-weight = count / (count + shrinkK)
-teamWpaPct = sum(wpaPct * weight) / sum(weight)
+rowWeight = count / (count + shrinkK);
+teamWpaPct = sum(wpaPct * rowWeight) / sum(rowWeight);
+coverage = coveredEnemyHeroIds.length / requestedEnemyHeroIds.length;
+meanEvidenceStrength = sum(rowWeight) / coveredEnemyHeroIds.length;
+confidence = coverage * meanEvidenceStrength;
 ```
 
-Aggregate confidence must be bounded in `[0, 1]` and reflect full-team evidence coverage plus the bounded row confidences. Use all unique supplied enemy IDs up to five; do not apply the ordinary scorer's three-matchup cap. A single strong enemy row cannot protect the item unless the configured team aggregate threshold is satisfied after aggregation.
+If there are no requested enemies or no covered rows, return zero confidence and no protection. This confidence is bounded `[0, 1]`; raw sample counts never become unbounded weights.
 
-With `enabled=false`, calculate diagnostics but always return `protected=false` plus `MATCHUP_PROTECTION_UNCALIBRATED`.
+With `enabled=false`, calculate diagnostics but always return `protected=false` and `MATCHUP_PROTECTION_UNCALIBRATED`.
 
-- [ ] Add tests proving all five enemy rows participate in aggregation.
-- [ ] Add a test where one enemy has huge positive WPA but the other four make the team aggregate low; assert no protection.
-- [ ] Add a test proving raw `count` cannot dominate without bound because weights asymptote to `1`.
-- [ ] Add a disabled-config test proving diagnostics are returned but no item is protected before calibration.
-- [ ] Run the focused test and confirm it fails before the service exists.
-- [ ] Implement the pure aggregation/protection service and config union.
+- [ ] Add a test proving all five available enemy rows participate; no three-matchup cap applies.
+- [ ] Add a test where one enemy has huge positive WPA but four others pull the weighted team aggregate below threshold; assert no protection when using an enabled test config.
+- [ ] Add a test proving counts 10,000 and 1,000,000 have weights that both remain below/equal to 1 and cannot differ by raw-count scale.
+- [ ] Add a missing-coverage test for the exact confidence formula above.
+- [ ] Add a disabled-config test proving diagnostics are returned but `protected=false` before calibration.
+- [ ] Run `yarn workspace @deadlock-live-probe/api test -- test/full-build-matchup-protection-v1.spec.ts` and confirm failure before the service exists.
+- [ ] Implement the pure aggregation/protection service and discriminated config.
 - [ ] Rerun the focused test.
 - [ ] Commit with message `feat: add team matchup sell protection`.
 
@@ -511,7 +528,7 @@ export class FullBuildSellRankerV1Service {
 }
 ```
 
-Dominance rule:
+Dominance:
 
 ```text
 A.averagePurchaseTimeS <= B.averagePurchaseTimeS
@@ -519,28 +536,30 @@ AND A.generalWpa <= B.generalWpa
 AND at least one comparison is strict
 ```
 
-Produce a deterministic total order by iterative Pareto-front peeling:
+Build a deterministic total order by iterative Pareto-front peeling. Front `0` contains the non-dominated most-sellable candidates. Remove it, compute front `1`, and continue. Lower front number always ranks first.
 
-1. Front `0` contains non-dominated most-sellable candidates.
-2. Remove it and compute front `1`, then continue.
-3. Inside each front, sort by `tieBreakScore DESC`, then `itemId ASC`.
-
-Percentiles use the full verified hero Item Meta Model distribution, not only the currently held 12 items:
+Percentiles use the full verified hero distribution, not only held candidates. For either coordinate, lower raw values are more sellable. Sort the full coordinate vector ascending. For candidate value `v`, compute the tie-aware zero-based midrank of all equal values. Then:
 
 ```ts
-timeSellPercentile = percentileRankDescendingSellability(averagePurchaseTimeS, earlierIsHigher)
-wpaSellPercentile = percentileRankDescendingSellability(generalWpa, lowerIsHigher)
-tieBreakScore = 0.5 * timeSellPercentile + 0.5 * wpaSellPercentile
+sellPercentile = values.length <= 1
+  ? 0.5
+  : 1 - midrank / (values.length - 1);
 ```
 
-Equal empirical values must receive equal percentile values; item ID is only the final deterministic tie-break.
+Thus the earliest/lowest-WPA observation is 1, the latest/highest-WPA is 0, and equal raw values receive equal percentiles.
 
-- [ ] Add a Pareto test where an earlier/lower-WPA item ranks ahead of a later/higher-WPA item regardless of percentile tie-break.
-- [ ] Add a trade-off test where candidates are Pareto-incomparable and 50/50 percentiles determine their order.
-- [ ] Add equality/determinism tests for duplicate coordinate values and item-ID final tie-break.
-- [ ] Add a test proving percentiles are computed from the hero distribution rather than only held candidates.
-- [ ] Run the focused test and confirm it fails before the ranker exists.
-- [ ] Implement the pure ranker with no dependency on inventory capacity or matchup data.
+```ts
+tieBreakScore = 0.5 * timeSellPercentile + 0.5 * wpaSellPercentile;
+```
+
+Inside one Pareto front, sort `tieBreakScore DESC`, then `itemId ASC`.
+
+- [ ] Add a dominance test where an earlier/lower-WPA item ranks ahead of a later/higher-WPA item regardless of tie-break.
+- [ ] Add a trade-off test where two candidates are Pareto-incomparable and 50/50 percentiles decide order.
+- [ ] Add duplicate-value tests proving equal raw coordinates receive equal percentiles and item ID is the final deterministic tie-break.
+- [ ] Add a test proving percentiles use the full hero distribution rather than the held subset.
+- [ ] Run `yarn workspace @deadlock-live-probe/api test -- test/full-build-sell-ranker-v1.spec.ts` and confirm failure before the ranker exists.
+- [ ] Implement the pure ranker with no inventory-capacity, matchup, or repository dependency.
 - [ ] Rerun the focused test.
 - [ ] Commit with message `feat: add Pareto lifecycle sell ranking`.
 
@@ -561,10 +580,12 @@ Equal empirical values must receive equal percentile values; item ID is only the
 ```ts
 export interface FullBuildReplacementContextV2 {
   heroId: number;
-  currentGameTimeS: number;
+  gameTimeSec: number;
   enemyHeroIds: readonly number[];
-  enemyThreats: readonly EnemyThreatWeightV1[];
+  enemyThreats: readonly EnemyThreatScoreV1[];
   vsHeroRows: readonly StatlockerVsHeroWpaAggregateSourceV1[];
+  wpaPatchData?: StatlockerWpaPatchDataV1;
+  t4Chains?: StatlockerT4ChainsV1;
   lifecycleEvidence: readonly StatlockerItemLifecycleEvidenceV1[];
 }
 
@@ -591,32 +612,32 @@ export type FullBuildReplacementV2Result =
     };
 ```
 
-This service is called only at 12/12 for a BUY that requires a new slot; it does not decide when to run.
+This service is called only for a new-slot BUY after the planner has established 12/12. It never decides when replacement begins.
 
 Decision order:
 
 1. Start from held items.
-2. Remove items in `activeProgressionProtectedItemIds`.
-3. Remove target-family dependencies and mechanics-defined unsellable items if applicable.
-4. Evaluate team matchup protection; remove only items with `protected=true`. Missing matchup rows do not protect and add diagnostics.
-5. Require verified lifecycle evidence for each remaining candidate. If no candidate has verified lifecycle evidence, return `BLOCKED` with `ITEM_META_EVIDENCE_MISSING`.
-6. Simulate each candidate's exact `REPLACE` inventory and evaluate `FullBuildTransitionValueV2Service`.
-7. Incoming `REQUIRED` / selected CHOICE mandatory goals bypass the improvement threshold but not safety/protection.
-8. Incoming `OPTIONAL` / `SITUATIONAL_MATCHUP_SELECTED` goals retain only sell pairs passing the existing replacement-improvement and confidence policy.
-9. Pareto-rank the remaining sell candidates and return the first one.
+2. Remove `activeProgressionProtectedItemIds`.
+3. Remove held items that are dependencies of the target progression currently being executed.
+4. Apply mechanics sellability only if a verified catalog sellability fact exists. The current catalog has no separate sellability fact, so do not invent one and do not add a filter until such evidence exists.
+5. Evaluate team matchup protection. Remove only candidates with `protected=true`. Missing rows do not protect; retain diagnostics.
+6. Join remaining candidates to verified lifecycle evidence. If no candidate has lifecycle evidence, return `BLOCKED` with `ITEM_META_EVIDENCE_MISSING`.
+7. For every surviving sell item, simulate the exact REPLACE result and call `FullBuildTransitionValueV2Service`.
+8. REQUIRED and selected CHOICE mandatory incoming goals bypass the marginal-gain threshold, but never bypass active-progression or matchup protection.
+9. OPTIONAL/SITUATIONAL incoming goals retain only candidate pairs whose marginal gain is at least `replacementImprovementThreshold(soldRole)`. Require resulting transition confidence at least `outsideMatchupDiscovery.replacementMinConfidence`.
+10. Pareto-rank the surviving sell candidates using the full hero lifecycle distribution and return the first.
 
-Historical `REQUIRED` status of the item being sold is not permanent protection. Only active plan dependencies/protections matter.
+Historical REQUIRED status of the held item is not permanent protection.
 
-- [ ] Add a test that calling the service with an early weak item and a later stronger item ranks the early weak item for sale when both are eligible.
-- [ ] Add a test where the otherwise-best sell candidate is `MATCHUP_PROTECTED`; assert another candidate is selected.
-- [ ] Add a test where a held component is required for a pending confirmed upgrade; assert it cannot be sold.
-- [ ] Add OPTIONAL/SITUATIONAL tests where the incoming target fails replacement improvement and returns `BLOCKED` rather than forcing churn.
-- [ ] Add a REQUIRED test proving it may replace a safe historical REQUIRED item even when the value threshold is not met.
-- [ ] Add a no-lifecycle-evidence test that returns `ITEM_META_EVIDENCE_MISSING` rather than guessing.
-- [ ] Run the focused test and confirm it fails before the service exists.
-- [ ] Implement the decision pipeline in the exact order above.
-- [ ] Register the service in `StatlockerAdaptiveModule`.
-- [ ] Rerun the focused replacement, sell-ranker, matchup-protection, and transition-value tests.
+- [ ] Add a test where two eligible held items exist and lifecycle ranking chooses the earlier/lower-WPA one.
+- [ ] Add a test where that candidate is `MATCHUP_PROTECTED`; assert the next safe candidate is selected.
+- [ ] Add a test where a held component is needed by another pending confirmed upgrade; assert it cannot be sold.
+- [ ] Add OPTIONAL and SITUATIONAL tests where no candidate pair clears replacement gain/confidence; assert `BLOCKED` instead of forced churn.
+- [ ] Add a REQUIRED test proving a safe historical REQUIRED held item may be sold even when its pair does not clear the optional gain threshold.
+- [ ] Add a no-lifecycle-evidence test returning `ITEM_META_EVIDENCE_MISSING`.
+- [ ] Run `yarn workspace @deadlock-live-probe/api test -- test/full-build-replacement-v2.spec.ts` and confirm failure before the service exists.
+- [ ] Implement the decision pipeline in the exact order above and register the service in `StatlockerAdaptiveModule`.
+- [ ] Run replacement, transition-value, matchup-protection, and sell-ranker focused tests.
 - [ ] Commit with message `feat: add capacity driven full build replacement`.
 
 ---
@@ -628,11 +649,11 @@ Historical `REQUIRED` status of the item being sold is not permanent protection.
 - Modify: `apps/api/src/statlocker-adaptive/family-first-full-build-resolver-v2.service.ts`
 - Modify: `apps/api/src/statlocker-adaptive/statlocker-adaptive.module.ts`
 - Test: `apps/api/test/full-build-transaction-planner-v2.spec.ts`
-- Add or extend family-first resolver integration tests under `apps/api/test/`
+- Add integration test: `apps/api/test/family-first-full-build-resolver-v2.spec.ts`
 
 **Interfaces:**
 
-Extend planner input with replacement context:
+Extend planner input:
 
 ```ts
 export interface FullBuildTransactionPlannerV2Input {
@@ -648,96 +669,88 @@ export interface FullBuildTransactionPlannerV2Input {
 
 Inject `FullBuildReplacementV2Service` into `FullBuildTransactionPlannerV2Service`.
 
-`FamilyFirstFullBuildResolverV2Service` loads:
+`FamilyFirstFullBuildResolverV2Service` loads current-patch `VS_HERO_WPA` as today plus verified current-patch lifecycle evidence from `StatlockerItemLifecycleRepositoryV1Service`, then passes all facts to the planner. The planner must not query repositories.
 
-- current patch `VS_HERO_WPA` rows, as it already does;
-- verified current-patch hero lifecycle evidence from `StatlockerItemLifecycleRepositoryV1Service`;
-- current game time and enemy lineup from the existing resolver input.
-
-It passes these facts to the transaction planner without letting the planner query repositories directly.
-
-Planner trigger must stay exact:
+Exact trigger:
 
 ```ts
-if (next.nextIndex === 0 && projectedInventory.length === input.capacity) {
-  // new-slot family entry at full capacity: replacement may run
+if (
+  next.nextIndex === 0
+  && projectedInventory.length === input.capacity
+) {
+  // New family-entry BUY at full capacity: replacement may run.
 }
 ```
 
-Do not call replacement for:
+Never invoke replacement when `projectedInventory.length < capacity` or for an UPGRADE of an already-held component.
 
-```text
-projectedInventory.length < capacity
-UPGRADE of an already-held progression component
-```
+Before a replacement call, derive `activeProgressionProtectedItemIds` from every non-blocked pending path whose currently held node is required for a future accepted edge/UPGRADE.
 
-Before each replacement decision, compute `activeProgressionProtectedItemIds` from all non-blocked pending confirmed paths whose held component is still needed for a future UPGRADE.
+Blocked policy:
 
-Blocked behavior:
+- REQUIRED/CHOICE_SELECTED incoming goal: leave it unexecuted, add degraded/HOLD reason such as `CAPACITY_BLOCKED_NO_SAFE_REPLACEMENT`, and continue only where later actions are independent.
+- OPTIONAL/SITUATIONAL_MATCHUP_SELECTED: skip/block that goal and continue later independent goals.
 
-- REQUIRED / CHOICE mandatory goal: mark degraded/HOLD with explicit reason and keep it observable.
-- OPTIONAL / SITUATIONAL goal: skip/block that goal and continue processing later eligible goals.
-
-- [ ] Add an interaction test with `11/12 + BUY`; spy/mock replacement service and assert it is never called.
-- [ ] Add an interaction test with `12/12 + UPGRADE`; assert replacement service is never called and inventory stays 12.
-- [ ] Add an interaction test with `12/12 + new family BUY`; assert replacement is invoked exactly once.
-- [ ] Add a test with 12 initial/accumulated held items plus a 13th eligible goal; assert the action list exceeds 12 transactions while the simulator never exceeds 12 held items.
-- [ ] Add a test where a component is bought by replacement at 12/12, other actions interleave, and the component later upgrades in place.
-- [ ] Run the planner and family-first resolver tests and confirm the trigger tests fail on current `findSafeReplacement()` behavior.
-- [ ] Replace `findSafeReplacement()` with the new replacement service only in the 12/12 new-slot branch.
-- [ ] Wire lifecycle evidence into `FamilyFirstFullBuildResolverV2Service`.
-- [ ] Keep the inventory simulator as the authoritative post-action invariant check.
-- [ ] Rerun focused tests and verify every projected action keeps `heldItems.length <= 12`.
+- [ ] Add a planner interaction test for `11/12 + BUY`; spy/mock replacement and assert zero calls.
+- [ ] Add a planner interaction test for `12/12 + UPGRADE`; assert zero replacement calls and inventory remains 12.
+- [ ] Add a planner interaction test for `12/12 + new family BUY`; assert exactly one replacement call.
+- [ ] Add a planner test with a 13th eligible goal; assert transaction count can exceed 12 and simulate every prefix to prove held count never exceeds 12.
+- [ ] Add a planner test where at 12/12 a component is introduced via REPLACE, unrelated transactions interleave, then that component upgrades in place without another sell.
+- [ ] Add `family-first-full-build-resolver-v2.spec.ts` proving resolver lifecycle evidence is passed into the planner and repository access remains outside the planner.
+- [ ] Run both focused test files and confirm current `findSafeReplacement()` behavior fails the trigger/delegation assertions.
+- [ ] Replace `findSafeReplacement()` with the new replacement service only in the exact full-capacity family-entry branch.
+- [ ] Wire lifecycle evidence through `FamilyFirstFullBuildResolverV2Service`.
+- [ ] Rerun both focused test files and verify inventory prefix invariants.
 - [ ] Commit with message `feat: support long capacity aware build timelines`.
 
 ---
 
-## Task 12: Calibrate protection, add captured end-to-end regression, and run full verification
+## Task 12: Calibrate protection, add captured end-to-end regressions, and run full verification
 
 **Files:**
-- Add calibration test/report fixture under `apps/api/test/fixtures/statlocker-vs-hero-wpa/` using current real Statlocker snapshot data
+- Add fixture: `apps/api/test/fixtures/statlocker-vs-hero-wpa/sell-protection-calibration.json`
+- Add test: `apps/api/test/full-build-matchup-protection-calibration.spec.ts`
 - Modify after calibration only: `apps/api/src/statlocker-adaptive/statlocker-build-v2.config.ts`
 - Test: `apps/api/test/statlocker-build-v2-real-data.e2e.spec.ts`
-- Modify/add captured build fixture under `apps/api/test/fixtures/statlocker-build-v2/`
-- Modify corresponding expected golden under `apps/api/test/fixtures/statlocker-build-v2/`
-- Modify any directly affected snapshots only after reviewing the semantic diff
+- Modify/add captured fixture: `apps/api/test/fixtures/statlocker-build-v2/billy-real.fixture.json` only if it genuinely contains the required evidence; otherwise add a new real captured fixture under the same directory with an explicit hero/profile name.
+- Modify/add matching expected golden under `apps/api/test/fixtures/statlocker-build-v2/`.
 
-**Calibration gate:** Production `MATCHUP_PROTECTED` remains disabled until real current-patch `VS_HERO_WPA` rows are summarized and an absolute team-WPA threshold plus minimum confidence are selected from that distribution. The commit enabling protection must include the calibration fixture/test so the numbers are reviewable. Do not invent defaults to make a test pass.
+**Calibration gate:** Production `MATCHUP_PROTECTED` remains disabled until current-patch captured `VS_HERO_WPA` rows produce a reviewable distribution and an absolute `minTeamWpaPct` plus `minConfidence` are selected from that distribution. The commit enabling protection must contain the calibration fixture and assertions. Do not invent defaults to make tests pass.
 
-**Real-data gate:** The real-data upgrade golden must use captured Statlocker same-profile progression evidence and verified mechanics/economy pricing. Do not inject a made-up `componentCreditRatio` into the Billy fixture. If the existing Billy capture cannot prove an executable upgrade, capture a different real Statlocker profile/hero fixture that can. Until such a fixture exists, keep production upgrade execution fail-closed and do not claim the end-to-end upgrade path is verified.
+**Real-data gate:** A real-data upgrade golden must use captured same-profile component-before-terminal Statlocker evidence plus verified executable mechanics/economy pricing. Do not inject a made-up `componentCreditRatio` into Billy or another fixture. If no current capture proves both sides, keep production progression fail-closed and do not claim end-to-end upgrade verification complete.
 
-- [ ] Build a deterministic calibration helper/test over captured `VS_HERO_WPA` rows that outputs reviewable team-WPA/confidence distributions for representative held items and enemy teams.
-- [ ] Select and encode `minTeamWpaPct` and `minConfidence` from that captured distribution, switch `sellMatchupProtection.enabled` to `true`, and document the fixture-derived values in the test name/assertions.
-- [ ] Run `yarn workspace @deadlock-live-probe/api test -- test/full-build-matchup-protection-v1.spec.ts` and the calibration test.
-- [ ] Capture or identify a real Statlocker build fixture with same-profile component-before-terminal evidence that passes the accepted edge rule and has verified executable mechanics/economy pricing.
-- [ ] Update the real-data e2e expected output to contain at least one `BUY component ... UPGRADE terminal` sequence rather than a direct terminal BUY.
-- [ ] Add a real/captured long-timeline case whose transaction count is greater than 12 while the inventory simulator's maximum held count is exactly 12.
-- [ ] Add a captured 12/12 replacement case where lifecycle evidence selects an early/low-general-WPA item, and assert a high full-team matchup score protects an otherwise sellable item when the calibrated threshold is satisfied.
-- [ ] Run the real-data e2e test and review every golden change for source-backed behavior rather than snapshot churn.
-- [ ] Run all focused tests touched by Tasks 1-11.
+- [ ] Add `sell-protection-calibration.json` from current real Statlocker aggregate rows with no user-specific data.
+- [ ] Add `full-build-matchup-protection-calibration.spec.ts` that computes deterministic team WPA/confidence distributions for representative items/lineups and asserts the selected absolute threshold/min-confidence against the captured distribution.
+- [ ] After reviewing that distribution, encode `minTeamWpaPct` and `minConfidence`, set `sellMatchupProtection.enabled=true`, and run both matchup-protection test files.
+- [ ] Identify/capture a real Statlocker build fixture with same-profile component-before-terminal support meeting `>=2` profiles and `>=0.65` confidence plus verified executable upgrade pricing.
+- [ ] Update/add the real-data expected output to contain at least one `BUY component ... UPGRADE terminal` sequence and explicitly assert there is no direct terminal BUY fallback.
+- [ ] Add a captured long-timeline case with more than 12 transactions and assert the inventory simulator maximum held count is exactly 12.
+- [ ] Add a captured 12/12 replacement case where lifecycle evidence selects an early/low-WPA item while a high calibrated full-team matchup score protects another otherwise-sellable item.
+- [ ] Run every focused test introduced or modified by Tasks 1-11.
 - [ ] Run `yarn workspace @deadlock-live-probe/api test`.
 - [ ] Run `yarn workspace @deadlock-live-probe/api build`.
-- [ ] Run the repository-level lint/typecheck command if configured by the root package scripts.
-- [ ] Inspect the final diff and confirm there is no dependency on our own player histories, no use of absent phase-WPA fields, no direct-buy fallback for confirmed broken upgrades, and no transaction-count cap at 12.
+- [ ] Run `yarn workspace @deadlock-live-probe/build-domain test`.
+- [ ] Run `yarn lint` from the repository root.
+- [ ] Inspect the final diff and confirm there is no own-player-history dependency, no use of absent phase-WPA fields, no confirmed-upgrade direct-BUY fallback, no proactive sell below 12/12, and no transaction-count cap at 12.
 - [ ] Commit with message `test: verify Statlocker adaptive progression and replacement`.
 
 ---
 
 ## Final Acceptance Checklist
 
-- [ ] Same-profile Statlocker evidence with at least 2 source profiles and at least 0.65 directional confidence creates progression; cross-profile synthesis does not.
+- [ ] Same-profile Statlocker evidence with at least 2 directional source profiles and at least 0.65 confidence creates progression; cross-profile synthesis does not.
 - [ ] Lineage-specific timing can interleave other purchases between component BUY and terminal UPGRADE.
 - [ ] Confirmed progression plus unavailable mechanics/pricing fails closed and never emits direct terminal BUY.
 - [ ] Verified standalone direct purchase depends on the strict graph's shopable/enabled/cost contract.
-- [ ] `upgradePricingPolicy` survives store normalization, hashing, persistence, and `resolveExact()`.
-- [ ] Desired goals are not truncated to 12; CHOICE alternatives do not leak into later purchases; SITUATIONAL goals require matchup evidence.
+- [ ] `upgradePricingPolicy` survives validation, normalization, hashing, persistence, and `resolveExact()`.
+- [ ] Desired goals are not truncated to 12; CHOICE alternatives do not leak into later purchases; SITUATIONAL goals require configured matchup evidence.
 - [ ] Full-build transaction lists may exceed 12 rows while inventory never exceeds 12 held items.
-- [ ] Sell/replacement is never invoked below 12 held items and is never invoked for an in-place UPGRADE at 12/12.
-- [ ] OPTIONAL/SITUATIONAL replacement has a separate value-improvement gate before sell ranking; REQUIRED goals still respect hard safety/protection constraints.
-- [ ] The Item Meta Model source is proven against captured Statlocker values and uses actual average purchase time, not median relabeling.
-- [ ] Full-team matchup protection uses all available enemy heroes, bounded sample weights, an absolute calibrated threshold, and a minimum confidence.
+- [ ] Sell/replacement is never invoked below 12 held items and never invoked for an in-place UPGRADE at 12/12.
+- [ ] OPTIONAL/SITUATIONAL replacement has a separate whole-inventory marginal-gain/confidence gate before sell ranking; REQUIRED/CHOICE mandatory goals still respect hard protections.
+- [ ] The lifecycle source is proven against captured Statlocker values and uses actual average purchase time, not median relabeling.
+- [ ] Full-team matchup protection uses all available enemy heroes up to five, bounded sample weights, an absolute calibrated threshold, and minimum confidence.
 - [ ] A single strong enemy matchup cannot independently veto a sell when the team aggregate is low.
-- [ ] Sell ranking is Pareto-first; 50/50 empirical percentile scoring is only the deterministic tie-break within a Pareto front.
+- [ ] Sell ranking is Pareto-first; 50/50 empirical percentile scoring is only the deterministic tie-break inside one Pareto front.
 - [ ] Missing lifecycle evidence never falls back to our own player history or synthetic lifecycle heuristics.
-- [ ] Historical `REQUIRED` status is not permanent hold protection; active progression/build constraints are.
-- [ ] Real captured end-to-end coverage proves at least one actual upgrade and one >12-step / max-12-held timeline before production completion is claimed.
+- [ ] Historical REQUIRED status is not permanent hold protection; active progression/build constraints are.
+- [ ] Real captured end-to-end coverage proves at least one actual upgrade and one >12-step/max-12-held timeline before production completion is claimed.
