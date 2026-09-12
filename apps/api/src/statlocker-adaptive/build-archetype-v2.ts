@@ -58,6 +58,21 @@ export interface BuildProgressionNodeV2 {
   };
 }
 
+export interface BuildObservedProgressionEdgeV2 {
+  fromItemId: number;
+  toItemId: number;
+  sourceProfileCount: number;
+  orderedProfileCount: number;
+  orderConfidence: number;
+  timing: {
+    fromMedianBuyTimeS: number;
+    toMedianBuyTimeS: number;
+    fromSpreadS: number;
+    toSpreadS: number;
+  };
+  evidence: 'STATLOCKER_SAME_PROFILE';
+}
+
 export interface BuildTerminalCandidateV2 {
   itemId: number;
   kind: 'DEFAULT_TERMINAL' | 'OPTIONAL_TERMINAL';
@@ -78,6 +93,8 @@ export interface BuildArchetypeFamilyV2 {
   /** Exact Statlocker profiles that contributed evidence to this family. */
   sourceProfileAccountIds?: readonly string[];
   progressionNodes: readonly BuildProgressionNodeV2[];
+  /** Explicit same-profile Statlocker evidence for observed upgrade progression. */
+  progressionEdges?: readonly BuildObservedProgressionEdgeV2[];
   terminalCandidates: readonly BuildTerminalCandidateV2[];
 }
 
