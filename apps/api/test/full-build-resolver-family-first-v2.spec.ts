@@ -143,4 +143,28 @@ describe('FamilyFirstFullBuildResolverV2Service lifetime mode', () => {
     expect(switched.planRevision).not.toBe(previous.planRevision);
     expect(switched.desiredState?.families[0].selectedTerminalItemId).toBe(D);
   });
+
+  it('refuses flat-item lifetime fallback when family semantics are missing', () => {
+    const matchup = new ThreatWeightedMatchupV1Service();
+    const resolver = new FamilyFirstFullBuildResolverV2Service(new BuildItemUtilityV2Service(matchup));
+    const flatArchetype: BuildArchetypeV2 = {
+      ...archetype(),
+      families: [],
+      items: [{
+        itemId: A,
+        familyId: A,
+        role: 'CORE',
+        sourceProfileCount: 2,
+        profileCoverage: 1,
+        purchaseRate: 1,
+        timing: { medianBuyTimeS: 300, spreadS: 30, phase: 'EARLY' },
+        structuralPriority: 1,
+      }],
+    };
+
+    expect(() => resolver.resolve({
+      ...input(),
+      archetype: flatArchetype,
+    })).toThrow('Family-first full build resolver v2 requires family semantics');
+  });
 });
