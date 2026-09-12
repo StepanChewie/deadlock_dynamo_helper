@@ -28,6 +28,15 @@ jobs:
           docker run --rm -i --entrypoint node deadlock-statlocker-probe:ci - <<'NODE' > "$RUNNER_TEMP/statlocker-lifecycle-probe.json"
           const puppeteer = require('puppeteer-core');
 
+          const TARGET_NAMES = [
+            'Crippling Headshot',
+            'Weapon Shielding',
+            'Bullet Resist Shredder',
+            'Long Range',
+            'Lucky Shot',
+            'Witchmail',
+          ];
+
           (async () => {
             const browser = await puppeteer.launch({
               executablePath: process.env.CHROMIUM_PATH,
@@ -42,46 +51,88 @@ jobs:
 
             try {
               const page = await browser.newPage();
-              const network = [];
-              page.on('response', async (response) => {
-                const url = response.url();
-                if (!url.includes('/api/info/')) return;
-                let body = '';
-                try {
-                  body = await response.text();
-                } catch (error) {
-                  body = `BODY_READ_FAILED:${String(error)}`;
-                }
-                network.push({ url, status: response.status(), body: body.slice(0, 500000) });
-              });
-
               const requestedUrl = 'https://statlocker.gg/items/meta-model?hero=Billy&heroId=6&min=500&mode=items-heroes&patch=patch_676255623445218601';
               await page.goto(requestedUrl, { waitUntil: 'networkidle2', timeout: 90000 });
-              await new Promise((resolve) => setTimeout(resolve, 5000));
+              await new Promise((resolve) => setTimeout(resolve, 3000));
 
-              const direct = await page.evaluate(async () => {
+              const proof = await page.evaluate(async (targetNames) => {
                 async function fetchJson(path) {
                   const response = await fetch(path, { credentials: 'same-origin' });
                   const text = await response.text();
-                  let data = text;
-                  try { data = JSON.parse(text); } catch {}
-                  return { path, status: response.status, data };
+                  if (!response.ok) throw new Error(`${path} -> ${response.status}: ${text.slice(0, 500)}`);
+                  return JSON.parse(text);
                 }
-                return {
-                  patches: await fetchJson('/api/info/wpa-patches'),
-                  filteredItems: await fetchJson('/api/info/wpa-filtered-items?hero_id=6'),
-                };
-              });
 
-              const bodyText = await page.evaluate(() => document.body.innerText);
-              const html = await page.content();
+                function flatten(value, output = []) {
+                  if (Array.isArray(value)) {
+                    for (const item of value) flatten(item, output);
+                    return output;
+                  }
+                  if (value && typeof value === 'object') {
+                    output.push(value);
+                    for (const nested of Object.values(value)) flatten(nested, output);
+                  }
+                  return output;
+                }
+
+                function pickName(row) {
+                  return row?.name ?? row?.item_name ?? row?.itemName ?? row?.display_name ?? row?.displayName;
+                }
+
+                function pickId(row) {
+                  const value = row?.id ?? row?.item_id ?? row?.itemId ?? row?.game_id ?? row?.gameId;
+                  const numeric = Number(value);
+                  return Number.isInteger(numeric) && numeric > 0 ? numeric : undefined;
+                }
+
+                const lifecyclePath = '/api/info/wpa-filtered-items?hero=Billy&tier=all&rank=ranked&category=all&gameState=all&purchaseTime=all&teamComp=Average+Comp&buildType=all&patch=patch_676255623445218601&minSampleSize=500&searchTerm=&sortBy=wpa';
+                const [lifecycleRaw, itemsFullRaw, itemsRaw] = await Promise.all([
+                  fetchJson(lifecyclePath),
+                  fetchJson('/api/info/items-full?v=08-22-2026'),
+                  fetchJson('/api/info/items'),
+                ]);
+
+                const metadataRows = [...flatten(itemsFullRaw), ...flatten(itemsRaw)];
+                const metadataByName = new Map();
+                for (const row of metadataRows) {
+                  const name = pickName(row);
+                  const id = pickId(row);
+                  if (typeof name === 'string' && id !== undefined && !metadataByName.has(name)) {
+                    metadataByName.set(name, { itemId: id, sourceRow: row });
+                  }
+                }
+
+                const lifecycleRows = flatten(lifecycleRaw).filter((row) =>
+                  typeof row?.wpaValue === 'number' &&
+                  typeof row?.mean_purchase_time_min === 'number' &&
+                  typeof pickName(row) === 'string'
+                );
+
+                const matches = targetNames.map((name) => {
+                  const lifecycle = lifecycleRows.find((row) => pickName(row) === name);
+                  const metadata = metadataByName.get(name);
+                  return {
+                    name,
+                    itemId: metadata?.itemId,
+                    wpaValue: lifecycle?.wpaValue,
+                    sampleSize: lifecycle?.sampleSize,
+                    mean_purchase_time_min: lifecycle?.mean_purchase_time_min,
+                    lifecycleRow: lifecycle,
+                    metadataRow: metadata?.sourceRow,
+                  };
+                });
+
+                return {
+                  lifecyclePath,
+                  lifecycleRaw,
+                  matches,
+                };
+              }, TARGET_NAMES);
+
               process.stdout.write(JSON.stringify({
                 requestedUrl,
                 finalUrl: page.url(),
-                direct,
-                network,
-                bodyText: bodyText.slice(0, 250000),
-                html: html.slice(0, 1000000),
+                ...proof,
               }, null, 2));
             } finally {
               await browser.close();
