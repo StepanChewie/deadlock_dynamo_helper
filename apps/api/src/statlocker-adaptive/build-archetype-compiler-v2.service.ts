@@ -6,6 +6,7 @@ import {
   BuildArchetypeItemV2,
   BuildArchetypeRelationshipV2,
   BuildArchetypeV2,
+  BuildObservedProgressionEdgeV2,
   BuildOrderEdgeV2,
   BuildPhaseV2,
   BuildProgressionNodeV2,
@@ -211,6 +212,7 @@ function compileFamily(
           ? 'ENTRY'
           : 'INTERMEDIATE',
   }));
+  const progressionEdges = compileProgressionEdges(family, progressionNodes, itemGraph);
   const defaultTerminal = progressionNodes[defaultTerminalIndex];
   const optionalTerminals = progressionNodes.filter((node) => node.progressionRole === 'OPTIONAL_TERMINAL');
 
@@ -236,11 +238,69 @@ function compileFamily(
       TIER_SCORE[aggregateFrequencyTier] * 0.20,
     ),
     progressionNodes,
+    progressionEdges,
     terminalCandidates: [
       terminalCandidate(defaultTerminal, 'DEFAULT_TERMINAL'),
       ...optionalTerminals.map((node) => terminalCandidate(node, 'OPTIONAL_TERMINAL')),
     ],
   };
+}
+
+function compileProgressionEdges(
+  family: FamilyEvidenceV2,
+  nodes: readonly BuildProgressionNodeV2[],
+  itemGraph?: RecommendationItemGraph,
+): BuildObservedProgressionEdgeV2[] {
+  if (!itemGraph || nodes.length < 2) return [];
+  const itemIds = nodes.map((node) => node.itemId).sort((a, b) => a - b);
+  const edges: BuildObservedProgressionEdgeV2[] = [];
+
+  for (const fromItemId of itemIds) {
+    for (const toItemId of itemIds) {
+      if (fromItemId === toItemId || !itemGraph.isComponentAncestor(fromItemId, toItemId)) continue;
+      const supporting: Array<{ from: number; to: number }> = [];
+      let reverseCount = 0;
+
+      for (const values of family.profiles.values()) {
+        const from = values.find((item) => item.itemId === fromItemId);
+        const to = values.find((item) => item.itemId === toItemId);
+        if (!from || !to) continue;
+        if (from.medianBuyTimeS + STATLOCKER_BUILD_V2_CONFIG.orderTimingToleranceS < to.medianBuyTimeS) {
+          supporting.push({ from: from.medianBuyTimeS, to: to.medianBuyTimeS });
+        } else if (to.medianBuyTimeS + STATLOCKER_BUILD_V2_CONFIG.orderTimingToleranceS < from.medianBuyTimeS) {
+          reverseCount += 1;
+        }
+      }
+
+      const sourceProfileCount = supporting.length + reverseCount;
+      if (sourceProfileCount < STATLOCKER_BUILD_V2_CONFIG.minOrderSourceProfiles) continue;
+      const orderConfidence = supporting.length / sourceProfileCount;
+      if (orderConfidence < STATLOCKER_BUILD_V2_CONFIG.softOrderConfidence) continue;
+
+      const fromTimes = supporting.map((entry) => entry.from);
+      const toTimes = supporting.map((entry) => entry.to);
+      const fromMedianBuyTimeS = median(fromTimes);
+      const toMedianBuyTimeS = median(toTimes);
+      edges.push({
+        fromItemId,
+        toItemId,
+        sourceProfileCount,
+        orderedProfileCount: supporting.length,
+        orderConfidence,
+        timing: {
+          fromMedianBuyTimeS,
+          toMedianBuyTimeS,
+          fromSpreadS: median(fromTimes.map((value) => Math.abs(value - fromMedianBuyTimeS))),
+          toSpreadS: median(toTimes.map((value) => Math.abs(value - toMedianBuyTimeS))),
+        },
+        evidence: 'STATLOCKER_SAME_PROFILE',
+      });
+    }
+  }
+
+  return edges.sort((left, right) =>
+    left.fromItemId - right.fromItemId || left.toItemId - right.toItemId,
+  );
 }
 
 function compileProgressionNode(
