@@ -71,6 +71,6 @@ describe('production database policy', () => {
     expect(serveIndex).toBeGreaterThanOrEqual(0);
     expect(migrationIndex).toBeLessThan(serveIndex);
     expect(deploySource).toContain("DB_RUN_MIGRATIONS='false'");
-    expect(fs.existsSync(path.join(repoRoot, 'run-migrations.js'))).toBe(true);
+    expect(fs.existsSync(path.join(repoRoot, 'apps', 'api', 'run-migrations.js'))).toBe(true);
   });
 });
