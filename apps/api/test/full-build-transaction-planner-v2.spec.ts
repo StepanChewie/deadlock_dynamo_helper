@@ -107,6 +107,7 @@ function desired(terminalItemId: number, terminalKind: 'DEFAULT_TERMINAL' | 'OPT
     families: [{
       familyId: A,
       requirement: 'REQUIRED',
+      goalKind: 'REQUIRED',
       selectedTerminalItemId: terminalItemId,
       selectedTerminalKind: terminalKind,
       score: 0.2,
@@ -270,8 +271,8 @@ describe('FullBuildTransactionPlannerV2Service', () => {
     const value = archetype([misleadingNodeTimingFamily, otherFamily]);
     const target: DesiredBuildStateV2 = {
       families: [
-        { familyId: A, requirement: 'REQUIRED', selectedTerminalItemId: C, selectedTerminalKind: 'DEFAULT_TERMINAL', score: 0.9, confidence: 1, reasonCodes: [] },
-        { familyId: otherItemId, requirement: 'REQUIRED', selectedTerminalItemId: otherItemId, selectedTerminalKind: 'DEFAULT_TERMINAL', score: 0.1, confidence: 1, reasonCodes: [] },
+        { familyId: A, requirement: 'REQUIRED', goalKind: 'REQUIRED', selectedTerminalItemId: C, selectedTerminalKind: 'DEFAULT_TERMINAL', score: 0.9, confidence: 1, reasonCodes: [] },
+        { familyId: otherItemId, requirement: 'REQUIRED', goalKind: 'REQUIRED', selectedTerminalItemId: otherItemId, selectedTerminalKind: 'DEFAULT_TERMINAL', score: 0.1, confidence: 1, reasonCodes: [] },
       ],
       selectedChoiceFamilyIdsByGroup: {},
       reasonCodes: [],
@@ -336,8 +337,8 @@ describe('FullBuildTransactionPlannerV2Service', () => {
     const value = archetype([requiredX, optionalFamily]);
     const target: DesiredBuildStateV2 = {
       families: [
-        { familyId: A, requirement: 'REQUIRED', selectedTerminalItemId: C, selectedTerminalKind: 'DEFAULT_TERMINAL', score: 0.2, confidence: 1, reasonCodes: [] },
-        { familyId: optionalItemId, requirement: 'OPTIONAL', selectedTerminalItemId: optionalItemId, selectedTerminalKind: 'DEFAULT_TERMINAL', score: 1, confidence: 1, reasonCodes: [] },
+        { familyId: A, requirement: 'REQUIRED', goalKind: 'REQUIRED', selectedTerminalItemId: C, selectedTerminalKind: 'DEFAULT_TERMINAL', score: 0.2, confidence: 1, reasonCodes: [] },
+        { familyId: optionalItemId, requirement: 'OPTIONAL', goalKind: 'OPTIONAL', selectedTerminalItemId: optionalItemId, selectedTerminalKind: 'DEFAULT_TERMINAL', score: 1, confidence: 1, reasonCodes: [] },
       ],
       selectedChoiceFamilyIdsByGroup: {},
       reasonCodes: [],
@@ -389,8 +390,8 @@ describe('FullBuildTransactionPlannerV2Service', () => {
     const value = archetype([family(), missingRequiredFamily]);
     const target: DesiredBuildStateV2 = {
       families: [
-        { familyId: A, requirement: 'REQUIRED', selectedTerminalItemId: C, selectedTerminalKind: 'DEFAULT_TERMINAL', score: 1, confidence: 1, reasonCodes: [] },
-        { familyId: missingRequiredItemId, requirement: 'REQUIRED', selectedTerminalItemId: missingRequiredItemId, selectedTerminalKind: 'DEFAULT_TERMINAL', score: 1, confidence: 1, reasonCodes: [] },
+        { familyId: A, requirement: 'REQUIRED', goalKind: 'REQUIRED', selectedTerminalItemId: C, selectedTerminalKind: 'DEFAULT_TERMINAL', score: 1, confidence: 1, reasonCodes: [] },
+        { familyId: missingRequiredItemId, requirement: 'REQUIRED', goalKind: 'REQUIRED', selectedTerminalItemId: missingRequiredItemId, selectedTerminalKind: 'DEFAULT_TERMINAL', score: 1, confidence: 1, reasonCodes: [] },
       ],
       selectedChoiceFamilyIdsByGroup: {},
       reasonCodes: [],
