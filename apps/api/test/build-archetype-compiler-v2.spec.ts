@@ -81,6 +81,39 @@ function progressionGraph(): RecommendationItemGraph {
   ], [{ parentItemId: A_UPGRADE, componentItemId: A }]);
 }
 
+function multiStepProgressionGraph(): RecommendationItemGraph {
+  return createRecommendationItemGraph([
+    {
+      itemId: A,
+      name: 'Entry',
+      slotType: 'weapon',
+      active: false,
+      availableRulesetIds: ['r1'],
+      directPurchaseCost: 1_600,
+      upgradeRecipes: [],
+    },
+    {
+      itemId: B,
+      name: 'Intermediate',
+      slotType: 'weapon',
+      active: false,
+      availableRulesetIds: ['r1'],
+      upgradeRecipes: [],
+    },
+    {
+      itemId: C,
+      name: 'Terminal',
+      slotType: 'weapon',
+      active: false,
+      availableRulesetIds: ['r1'],
+      upgradeRecipes: [],
+    },
+  ], [
+    { parentItemId: B, componentItemId: A },
+    { parentItemId: C, componentItemId: B },
+  ]);
+}
+
 function progressionEdgesOf(
   archetype: ReturnType<BuildArchetypeCompilerV2Service['compile']>,
 ): readonly unknown[] | undefined {
@@ -195,6 +228,29 @@ describe('BuildArchetypeCompilerV2Service', () => {
         evidence: 'STATLOCKER_SAME_PROFILE',
       },
     ]);
+  });
+
+  it('compiles only direct catalog upgrade relations as executable progression edges', () => {
+    const archetype = compile([
+      profile('p1', [
+        itemAt(A, 300, { familyId: A }),
+        itemAt(B, 700, { familyId: A }),
+        itemAt(C, 1_100, { familyId: A }),
+      ]),
+      profile('p2', [
+        itemAt(A, 320, { familyId: A }),
+        itemAt(B, 720, { familyId: A }),
+        itemAt(C, 1_120, { familyId: A }),
+      ]),
+    ], multiStepProgressionGraph());
+
+    expect(progressionEdgesOf(archetype)).toEqual([
+      expect.objectContaining({ fromItemId: A, toItemId: B }),
+      expect.objectContaining({ fromItemId: B, toItemId: C }),
+    ]);
+    expect(progressionEdgesOf(archetype)).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ fromItemId: A, toItemId: C }),
+    ]));
   });
 
   it('does not synthesize progression from items observed only in different profiles', () => {
