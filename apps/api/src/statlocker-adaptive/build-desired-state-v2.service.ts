@@ -13,6 +13,11 @@ import {
   ThreatWeightedMatchupV1Service,
 } from './threat-weighted-matchup-v1.service';
 
+export interface DesiredFamilySourceProfileV2 {
+  accountId: string;
+  playerName?: string;
+}
+
 export interface DesiredFamilyStateV2 {
   familyId: number;
   requirement: BuildFamilyRequirementV2 | 'CHOICE';
@@ -22,6 +27,7 @@ export interface DesiredFamilyStateV2 {
   score: number;
   confidence: number;
   reasonCodes: readonly string[];
+  sourceProfiles?: readonly DesiredFamilySourceProfileV2[];
 }
 
 export interface DesiredBuildStateV2 {
@@ -144,6 +150,7 @@ export class BuildDesiredStateV2Service {
       throw new Error(`Build desired state v2: family ${family.familyId} has no default terminal`);
     }
 
+    const sourceProfiles = resolveFamilySourceProfiles(input.archetype, family);
     const defaultScore = this.scoreTerminal(input, defaultTerminal.itemId);
     const optionalCandidates = family.terminalCandidates
       .filter((candidate) => candidate.kind === 'OPTIONAL_TERMINAL')
@@ -176,6 +183,7 @@ export class BuildDesiredStateV2Service {
         score: promoted.matchup.normalized,
         confidence: promoted.matchup.confidence,
         reasonCodes: ['OPTIONAL_TERMINAL_WPA_SELECTED'],
+        ...(sourceProfiles.length === 0 ? {} : { sourceProfiles }),
       };
     }
 
@@ -191,6 +199,7 @@ export class BuildDesiredStateV2Service {
       score: defaultScore.normalized,
       confidence: defaultScore.confidence,
       reasonCodes,
+      ...(sourceProfiles.length === 0 ? {} : { sourceProfiles }),
     };
   }
 
@@ -206,6 +215,22 @@ export class BuildDesiredStateV2Service {
       enemyThreats: input.enemyThreats,
     });
   }
+}
+
+function resolveFamilySourceProfiles(
+  archetype: BuildArchetypeV2,
+  family: BuildArchetypeFamilyV2,
+): DesiredFamilySourceProfileV2[] {
+  const accountIds = [...(family.sourceProfileAccountIds ?? [])].sort();
+  if (accountIds.length === 0) return [];
+  const byAccountId = new Map((archetype.sourceProfiles ?? []).map((profile) => [profile.accountId, profile]));
+  return accountIds.map((accountId) => {
+    const profile = byAccountId.get(accountId);
+    return {
+      accountId,
+      ...(profile?.playerName ? { playerName: profile.playerName } : {}),
+    };
+  });
 }
 
 function resolveGroupFamilyIds(

@@ -18,6 +18,10 @@ import { BuildDebugTraceStoreV2Service } from '../statlocker-adaptive/build-debu
 import { BuildDebugAuthV2Guard } from './build-debug-auth-v2.guard';
 import { BuildDebugAuthV2Service } from './build-debug-auth-v2.service';
 import { BUILD_DEBUG_V2_CLIENT_JS } from './build-debug-v2.client';
+import {
+  BUILD_DEBUG_V2_ENHANCEMENT_CLIENT_JS,
+  BUILD_DEBUG_V2_ENHANCEMENT_HEAD,
+} from './build-debug-v2.enhancements';
 import { BUILD_DEBUG_V2_HTML } from './build-debug-v2.ui';
 
 interface HeaderResponseV2 {
@@ -39,14 +43,14 @@ export class BuildDebugV2Controller {
   @Header('Content-Type', 'text/html; charset=utf-8')
   @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
   ui(): string {
-    return BUILD_DEBUG_V2_HTML;
+    return BUILD_DEBUG_V2_HTML.replace('</head>', `${BUILD_DEBUG_V2_ENHANCEMENT_HEAD}</head>`);
   }
 
   @Get('client.js')
   @Header('Content-Type', 'application/javascript; charset=utf-8')
   @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
   client(): string {
-    return BUILD_DEBUG_V2_CLIENT_JS;
+    return `${BUILD_DEBUG_V2_CLIENT_JS}\n${BUILD_DEBUG_V2_ENHANCEMENT_CLIENT_JS}`;
   }
 
   @Post('login')

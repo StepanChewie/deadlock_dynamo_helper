@@ -12,6 +12,7 @@ import { RecommendationItemCatalogRecipeV1 } from '../deadlock-live/entities/rec
 import { RecommendationItemCatalogVersionV1 } from '../deadlock-live/entities/recommendation-item-catalog-version-v1.entity';
 import {
   BuildArchetypeSnapshotV2,
+  BuildArchetypeV2,
   StatlockerBuildProfileV2,
 } from './build-archetype-v2';
 import { BuildArchetypeCompilerV2Service } from './build-archetype-compiler-v2.service';
@@ -46,6 +47,7 @@ export interface BuildArchetypeRefreshIdentityV2 {
 export interface BuildArchetypeRefreshSourceProfileV2 {
   accountId: string;
   rank: number;
+  playerName?: string;
 }
 
 export interface BuildArchetypeRefreshResultV2 {
@@ -118,7 +120,7 @@ export class BuildArchetypeRefreshV2Service {
       if (!profileRow) continue;
 
       const analysis = parseProBuild(profileRow.payload, heroId, source.accountId);
-      profiles.push(toStatlockerBuildProfileV2(analysis, catalogGraph, source.rank));
+      profiles.push(toStatlockerBuildProfileV2(analysis, catalogGraph, source.rank, source.playerName));
       availableSources.push(source);
     }
 
@@ -131,14 +133,14 @@ export class BuildArchetypeRefreshV2Service {
       return rejected('ARCHETYPE_MINING_EMPTY', availableSources);
     }
 
-    const archetypes = mining.accepted.map((cluster) => this.compiler.compile({
+    const archetypes = mining.accepted.map((cluster) => withSourceProfileProvenance(this.compiler.compile({
       cluster,
       profiles,
       rulesetVersion: normalizedIdentity.rulesetVersion,
       statlockerPatchId: normalizedIdentity.statlockerPatchId,
       catalogSha256: normalizedIdentity.catalogSha256,
       itemGraph: catalogGraph,
-    }));
+    }), profiles));
 
     const snapshot: BuildArchetypeSnapshotV2 = {
       snapshotId: buildSnapshotId(heroId, normalizedIdentity, availableSources, archetypes.map((entry) => entry.archetypeId)),
@@ -202,6 +204,33 @@ export class BuildArchetypeRefreshV2Service {
   }
 }
 
+export function withSourceProfileProvenance(
+  archetype: BuildArchetypeV2,
+  profiles: readonly StatlockerBuildProfileV2[],
+): BuildArchetypeV2 {
+  const memberIds = new Set(archetype.sourceProfileAccountIds);
+  const members = profiles
+    .filter((profile) => memberIds.has(profile.accountId))
+    .sort((left, right) => left.accountId.localeCompare(right.accountId));
+  const sourceProfiles = members.map((profile) => ({
+    accountId: profile.accountId,
+    ...(profile.playerName ? { playerName: profile.playerName } : {}),
+    ...(profile.leaderboardRank === undefined ? {} : { leaderboardRank: profile.leaderboardRank }),
+  }));
+  const families = archetype.families?.map((family) => ({
+    ...family,
+    sourceProfileAccountIds: members
+      .filter((profile) => profile.items.some((item) => item.familyId === family.familyId))
+      .map((profile) => profile.accountId)
+      .sort(),
+  }));
+  return {
+    ...archetype,
+    sourceProfiles,
+    ...(families === undefined ? {} : { families }),
+  };
+}
+
 function rejected(
   reason: BuildArchetypeRefreshReasonCodeV2,
   sourceProfiles: readonly BuildArchetypeRefreshSourceProfileV2[],
@@ -241,7 +270,14 @@ function selectTopTen(
       typeof profile.accountId === 'string' &&
       profile.accountId.trim() !== '',
     )
-    .map((profile) => ({ accountId: profile.accountId, rank: profile.rank }))
+    .map((profile) => {
+      const playerName = typeof profile.playerName === 'string' ? profile.playerName.trim() : '';
+      return {
+        accountId: profile.accountId,
+        rank: profile.rank,
+        ...(playerName ? { playerName } : {}),
+      };
+    })
     .sort((left, right) => left.rank - right.rank || left.accountId.localeCompare(right.accountId));
 
   const selected: BuildArchetypeRefreshSourceProfileV2[] = [];
@@ -307,7 +343,7 @@ function finiteNonNegative(value: number | undefined): boolean {
   return value !== undefined && Number.isFinite(Number(value)) && Number(value) >= 0;
 }
 
-function buildSnapshotId(
+export function buildSnapshotId(
   heroId: number,
   identity: BuildArchetypeRefreshIdentityV2,
   sourceProfiles: readonly BuildArchetypeRefreshSourceProfileV2[],
@@ -319,7 +355,7 @@ function buildSnapshotId(
       rulesetVersion: identity.rulesetVersion,
       catalogSha256: identity.catalogSha256.toLowerCase(),
       statlockerPatchId: identity.statlockerPatchId,
-      sourceProfiles,
+      sourceProfiles: sourceProfiles.map(({ accountId, rank }) => ({ accountId, rank })),
       archetypeIds: [...archetypeIds].sort(),
     }))
     .digest('hex')

@@ -34,7 +34,14 @@ export interface StatlockerBuildProfileV2 {
   accountId: string;
   heroId: number;
   leaderboardRank?: number;
+  playerName?: string;
   items: readonly StatlockerBuildProfileItemV2[];
+}
+
+export interface BuildArchetypeSourceProfileV2 {
+  accountId: string;
+  playerName?: string;
+  leaderboardRank?: number;
 }
 
 export interface BuildProgressionNodeV2 {
@@ -68,6 +75,8 @@ export interface BuildArchetypeFamilyV2 {
   profileCoverage: number;
   purchaseRate: number;
   structuralPriority: number;
+  /** Exact Statlocker profiles that contributed evidence to this family. */
+  sourceProfileAccountIds?: readonly string[];
   progressionNodes: readonly BuildProgressionNodeV2[];
   terminalCandidates: readonly BuildTerminalCandidateV2[];
 }
@@ -133,6 +142,8 @@ export interface BuildArchetypeV2 {
   catalogSha256: string;
   statlockerPatchId: string;
   sourceProfileAccountIds: readonly string[];
+  /** Debug-only profile metadata. It must not participate in archetype identity or scoring. */
+  sourceProfiles?: readonly BuildArchetypeSourceProfileV2[];
   /**
    * Family-first strategic semantics. Kept optional during the staged V2 migration so
    * existing stored snapshots and not-yet-migrated consumers remain readable.
