@@ -8,6 +8,7 @@ import {
   ConsensusBuildGroupTypeV1,
   ConsensusBuildPhaseV1,
   StatlockerFrequencyTierV1,
+  StatlockerHeroItemLifecycleV1,
   StatlockerHeroLeaderboardV1,
   StatlockerNormalizedDatasetV1,
   StatlockerPatchControlV1,
@@ -198,10 +199,8 @@ export class StatlockerNormalizerService {
     heroId: number,
   ): StatlockerNormalizedDatasetV1<StatlockerWpaFilteredItemsV1> {
     const root = requireRecord(raw, 'WPA_FILTERED_ITEMS', 'root');
-    const responseHero = optionalPositiveInt(root.hero_id ?? root.heroId, 'WPA_FILTERED_ITEMS', 'hero id') ?? heroId;
-    if (responseHero !== heroId) throw new StatlockerDatasetValidationError('WPA_FILTERED_ITEMS', 'hero mismatch');
     const items = requireArray(root.items, 'WPA_FILTERED_ITEMS', 'items')
-      .map((row) => parseWpaItem(row, 'WPA_FILTERED_ITEMS', heroId));
+      .map((row) => parseHeroItemLifecycle(row, heroId));
     if (items.length === 0) throw new StatlockerDatasetValidationError('WPA_FILTERED_ITEMS', 'items must not be empty');
     items.sort((a, b) => a.itemId - b.itemId);
     return wrap('WPA_FILTERED_ITEMS', `hero:${heroId}`, statlockerPatchId, { heroId, items });
@@ -372,6 +371,35 @@ function normalizeReferenceName(value: string): string {
     .replace(/&/g, ' and ')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
+}
+
+function parseHeroItemLifecycle(raw: unknown, heroId: number): StatlockerHeroItemLifecycleV1 {
+  const dataset = 'WPA_FILTERED_ITEMS';
+  const row = requireRecord(raw, dataset, 'item');
+  const heroName = requireString(row.heroName ?? row.hero_name, dataset, 'hero name');
+  const resolvedHeroId = resolveReferenceId(heroName, HERO_ID_BY_NAME);
+  if (resolvedHeroId !== heroId) {
+    throw new StatlockerDatasetValidationError(dataset, `hero mismatch ${heroName}`);
+  }
+  const itemName = requireString(row.item, dataset, 'item name');
+  const itemId = resolveReferenceId(itemName, ITEM_ID_BY_NAME);
+  if (!itemId) {
+    throw new StatlockerDatasetValidationError(dataset, `unknown item ${itemName}`);
+  }
+  const sampleSizeRaw = row.sampleSize ?? row.sample_size;
+  return {
+    heroId,
+    itemId,
+    generalWpa: parseFinite(row.wpaValue, dataset, 'general wpa'),
+    averagePurchaseTimeS: parseNonNegativeFinite(
+      row.mean_purchase_time_min,
+      dataset,
+      'average purchase time minutes',
+    ) * 60,
+    ...(sampleSizeRaw === undefined
+      ? {}
+      : { sampleSize: parseNonNegativeFinite(sampleSizeRaw, dataset, 'sample size') }),
+  };
 }
 
 function parseWpaItem(raw: unknown, dataset: string, fallbackHeroId?: number): StatlockerWpaItemV1 {
