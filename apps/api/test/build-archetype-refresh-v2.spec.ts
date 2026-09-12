@@ -73,7 +73,7 @@ function sourceStore(profileCount = 12) {
   } as any;
 }
 
-function catalogRepositories() {
+function catalogRepositories(extraItems: readonly any[] = []) {
   const versionRepo = {
     findOne: jest.fn(async () => ({
       catalogVersionId: 'catalog-v1',
@@ -86,14 +86,15 @@ function catalogRepositories() {
     find: jest.fn(async () => [
       { catalogVersionId: 'catalog-v1', itemId: 1, name: 'Core', slotType: 'weapon', cost: 800, active: true, rawPayload: {} },
       { catalogVersionId: 'catalog-v1', itemId: 2, name: 'Followup', slotType: 'vitality', cost: 1600, active: true, rawPayload: {} },
+      ...extraItems,
     ]),
   } as any;
   const recipeRepo = { find: jest.fn(async () => []) } as any;
   return { versionRepo, itemRepo, recipeRepo };
 }
 
-function service(source = sourceStore()) {
-  const catalog = catalogRepositories();
+function service(source = sourceStore(), extraCatalogItems: readonly any[] = []) {
+  const catalog = catalogRepositories(extraCatalogItems);
   const published = {
     publishValidated: jest.fn(async (snapshot: any) => ({ snapshotId: snapshot.snapshotId })),
   } as any;
@@ -175,5 +176,27 @@ describe('BuildArchetypeRefreshV2Service', () => {
     expect(result.reasonCodes).toContain('INSUFFICIENT_TOP_TEN_PROFILES');
     expect(result.sourceProfiles.map((entry) => entry.accountId)).not.toContain('p11');
     expect(fixture.published.publishValidated).not.toHaveBeenCalled();
+  });
+
+  it('ignores catalog metadata rows without an inventory slot type', async () => {
+    const fixture = service(sourceStore(), [
+      {
+        catalogVersionId: 'catalog-v1',
+        itemId: 999,
+        name: 'Ability metadata',
+        slotType: null,
+        active: false,
+        rawPayload: { type: 'ability' },
+      },
+    ]);
+
+    const result = await fixture.service.refreshHero(HERO_ID, {
+      rulesetVersion: RULESET,
+      catalogSha256: CATALOG_SHA,
+      statlockerPatchId: PATCH,
+    });
+
+    expect(result.published).toBe(true);
+    expect(fixture.published.publishValidated).toHaveBeenCalledTimes(1);
   });
 });

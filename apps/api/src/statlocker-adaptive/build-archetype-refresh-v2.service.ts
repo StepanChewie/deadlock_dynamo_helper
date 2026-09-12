@@ -190,9 +190,10 @@ export class BuildArchetypeRefreshV2Service {
         order: { parentItemId: 'ASC', componentOrder: 'ASC', componentItemId: 'ASC' },
       }),
     ]);
-    if (itemRows.length === 0) return undefined;
+    const buildItemRows = itemRows.filter((row) => hasInventorySlotType(row.slotType));
+    if (buildItemRows.length === 0) return undefined;
 
-    const definitions = itemRows.map((row) => toItemDefinition(row, identity.rulesetVersion));
+    const definitions = buildItemRows.map((row) => toItemDefinition(row, identity.rulesetVersion));
     const lineageEdges = recipeRows.map((row) => ({
       parentItemId: positiveInteger(row.parentItemId, 'catalog recipe parentItemId'),
       componentItemId: positiveInteger(row.componentItemId, 'catalog recipe componentItemId'),
@@ -288,6 +289,10 @@ function normalizeSlotType(value: string | undefined): RecommendationItemDefinit
   const normalized = value?.trim().toLowerCase();
   if (normalized === 'weapon' || normalized === 'vitality' || normalized === 'spirit') return normalized;
   throw new Error(`Build archetype v2 refresh: unsupported catalog slot type ${String(value)}`);
+}
+
+function hasInventorySlotType(value: string | undefined): boolean {
+  return typeof value === 'string' && value.trim().length > 0;
 }
 
 function positiveInteger(value: number, field: string): number {
