@@ -9,6 +9,7 @@ import {
   StatlockerCollectionTargetV1,
 } from './statlocker-browser-collector.service';
 import { BuildArchetypeRefreshV2Service } from './build-archetype-refresh-v2.service';
+import { BuildArchetypeSnapshotStoreV2Service } from './build-archetype-snapshot-store-v2.service';
 import { BuildSkeletonService } from './build-skeleton.service';
 import { STATLOCKER_HERO_IDS_V1 } from './statlocker-hero-pool';
 import { StatlockerNormalizerService } from './statlocker-normalizer.service';
@@ -78,6 +79,7 @@ export class StatlockerRefreshService {
     @Optional() private readonly vsHeroWpaPublisher?: StatlockerVsHeroWpaPublisherV1Service,
     @Optional() private readonly observability?: AdaptiveRecommendationObservabilityV1Service,
     @Optional() private readonly archetypeRefreshV2?: BuildArchetypeRefreshV2Service,
+    @Optional() private readonly archetypeSnapshotStoreV2?: BuildArchetypeSnapshotStoreV2Service,
   ) {}
 
   observeGameIdentity(identity: StatlockerGameIdentityV1, _nowMs = Date.now()): void {
@@ -195,7 +197,7 @@ export class StatlockerRefreshService {
     if (!Number.isInteger(heroId) || heroId <= 0) return;
     const identity = this.requireIdentity();
     const key = this.heroRefreshKey(identity, heroId);
-    if (!force && !this.isHeroDue(identity, heroId, nowMs)) return;
+    if (!force && !(await this.isHeroDue(identity, heroId, nowMs))) return;
     return this.singleFlight(key, async () => {
       this.markAttempt(nowMs);
       try {
@@ -267,7 +269,7 @@ export class StatlockerRefreshService {
       this.lastError = describeError(error);
     });
 
-    const heroId = this.takeNextDuePoolHero(this.identity, nowMs);
+    const heroId = await this.takeNextDuePoolHero(this.identity, nowMs);
     if (heroId === undefined) return;
     await this.refreshHeroNow(heroId, false, nowMs).catch((error) => {
       this.lastError = describeError(error);
@@ -298,23 +300,19 @@ export class StatlockerRefreshService {
     });
   }
 
-  private takeNextDuePoolHero(identity: StatlockerGameIdentityV1, nowMs: number): number | undefined {
+  private async takeNextDuePoolHero(identity: StatlockerGameIdentityV1, nowMs: number): Promise<number | undefined> {
     if (STATLOCKER_HERO_IDS_V1.length === 0) return undefined;
     for (let offset = 0; offset < STATLOCKER_HERO_IDS_V1.length; offset += 1) {
       const index = (this.poolCursor + offset) % STATLOCKER_HERO_IDS_V1.length;
       const heroId = STATLOCKER_HERO_IDS_V1[index];
-      if (!this.isHeroDue(identity, heroId, nowMs)) continue;
+      if (!(await this.isHeroDue(identity, heroId, nowMs))) continue;
       this.poolCursor = (index + 1) % STATLOCKER_HERO_IDS_V1.length;
       return heroId;
     }
     return undefined;
   }
 
-  private isHeroDue(identity: StatlockerGameIdentityV1, heroId: number, nowMs: number): boolean {
-    const key = this.heroRefreshKey(identity, heroId);
-    const inMemorySuccess = this.lastSuccessByKey.get(key);
-    if (inMemorySuccess !== undefined) return nowMs - inMemorySuccess >= HERO_REFRESH_TTL_MS;
-
+  private async isHeroDue(identity: StatlockerGameIdentityV1, heroId: number, nowMs: number): Promise<boolean> {
     const rows = this.store.listActive().filter((row) =>
       row.rulesetVersion === identity.rulesetVersion &&
       row.catalogSha256.toLowerCase() === identity.catalogSha256.toLowerCase(),
@@ -329,6 +327,22 @@ export class StatlockerRefreshService {
         (!currentPatchId || row.statlockerPatchId === currentPatchId),
       )
       .sort((a, b) => b.fetchedAt.getTime() - a.fetchedAt.getTime())[0];
+
+    const currentV2PatchId = currentPatchId || latestHeroSnapshot?.statlockerPatchId;
+    if (this.archetypeRefreshV2 && this.archetypeSnapshotStoreV2) {
+      if (!currentV2PatchId) return true;
+      const hasActiveV2 = await this.archetypeSnapshotStoreV2.hasActive({
+        heroId,
+        rulesetVersion: identity.rulesetVersion,
+        statlockerPatchId: currentV2PatchId,
+        catalogSha256: identity.catalogSha256,
+      });
+      if (!hasActiveV2) return true;
+    }
+
+    const key = this.heroRefreshKey(identity, heroId);
+    const inMemorySuccess = this.lastSuccessByKey.get(key);
+    if (inMemorySuccess !== undefined) return nowMs - inMemorySuccess >= HERO_REFRESH_TTL_MS;
 
     const latestConsensusSnapshot = rows
       .filter((row) =>

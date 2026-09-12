@@ -139,6 +139,28 @@ describe('BuildArchetypeSnapshotStoreV2Service', () => {
     })).resolves.toEqual(value);
   });
 
+  it('reports only an exact active snapshot scope as available', async () => {
+    const db = persistence();
+    const store = new BuildArchetypeSnapshotStoreV2Service(db.dataSource);
+    const identity = {
+      heroId: 72,
+      rulesetVersion: 'r1',
+      statlockerPatchId: 'patch-1',
+      catalogSha256: CATALOG_SHA,
+    };
+
+    await expect(store.hasActive(identity)).resolves.toBe(false);
+
+    const value = snapshot('snapshot-1');
+    await store.publishValidated(value, gate.evaluate(value, graph));
+
+    await expect(store.hasActive(identity)).resolves.toBe(true);
+    await expect(store.hasActive({ ...identity, heroId: 73 })).resolves.toBe(false);
+
+    db.rows[0].isActive = false;
+    await expect(store.hasActive(identity)).resolves.toBe(false);
+  });
+
   it('keeps the previous active snapshot when a rejected replacement is offered', async () => {
     const db = persistence();
     const store = new BuildArchetypeSnapshotStoreV2Service(db.dataSource);

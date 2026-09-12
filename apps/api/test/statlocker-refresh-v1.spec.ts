@@ -11,7 +11,11 @@ const EXPECTED_STATLOCKER_HERO_POOL = [
   25, 27, 31, 35, 50, 52, 58, 60, 63, 64, 65, 66, 67, 69, 72, 76, 77, 79, 80, 81,
 ] as const;
 
-function createHarness(options: { observeIdentity?: boolean } = {}) {
+function createHarness(options: {
+  observeIdentity?: boolean;
+  archetypeRefreshV2?: any;
+  archetypeSnapshotStoreV2?: any;
+} = {}) {
   let releaseCollector: (() => void) | undefined;
   let publishSequence = 0;
   const block = { enabled: false };
@@ -120,6 +124,9 @@ function createHarness(options: { observeIdentity?: boolean } = {}) {
     rawVsHeroWpaStore,
     vsHeroWpaRowNormalizer,
     vsHeroWpaPublisher,
+    undefined,
+    options.archetypeRefreshV2,
+    options.archetypeSnapshotStoreV2,
   ) as StatlockerRefreshService;
   if (options.observeIdentity !== false) service.observeGameIdentity(identity, 1_000);
 
@@ -223,6 +230,87 @@ describe('StatlockerRefreshService', () => {
 
     await h.service.refreshHeroNow(6, false, startMs + (37 * 60 * 60_000));
     expect(h.collector.collectBatch).toHaveBeenCalled();
+  });
+
+  it('refreshes a hero when its legacy evidence is fresh but the V2 snapshot is missing', async () => {
+    const v2SnapshotStore = {
+      hasActive: jest.fn().mockResolvedValue(false),
+    };
+    const archetypeRefreshV2 = {
+      refreshHero: jest.fn().mockResolvedValue({ published: true }),
+    };
+    const h = createHarness({ archetypeRefreshV2, archetypeSnapshotStoreV2: v2SnapshotStore });
+    const startMs = Date.parse('2026-09-01T00:00:00.000Z');
+
+    await h.service.refreshGlobalNow(true, startMs);
+    await h.service.refreshHeroNow(6, true, startMs);
+    h.collector.collectBatch.mockClear();
+
+    await h.service.refreshHeroNow(6, false, startMs + 60 * 60_000);
+
+    expect(v2SnapshotStore.hasActive).toHaveBeenCalledWith({
+      heroId: 6,
+      rulesetVersion: identity.rulesetVersion,
+      statlockerPatchId: '15-1',
+      catalogSha256: identity.catalogSha256,
+    });
+    expect(h.collector.collectBatch).toHaveBeenCalledWith([
+      { dataset: 'HERO_LEADERBOARD', scopeKey: 'hero:6', heroId: 6 },
+    ]);
+  });
+
+  it('walks every hero for V2 backfill even when all legacy evidence is fresh', async () => {
+    const publishedHeroes = new Set<number>();
+    const v2SnapshotStore = {
+      hasActive: jest.fn(async ({ heroId }: { heroId: number }) => publishedHeroes.has(heroId)),
+    };
+    const archetypeRefreshV2 = {
+      refreshHero: jest.fn(async (heroId: number) => {
+        publishedHeroes.add(heroId);
+        return { published: true };
+      }),
+    };
+    const h = createHarness({ archetypeRefreshV2, archetypeSnapshotStoreV2: v2SnapshotStore });
+    const startMs = Date.parse('2026-09-01T00:00:00.000Z');
+
+    await h.service.refreshGlobalNow(true, startMs);
+    for (const heroId of EXPECTED_STATLOCKER_HERO_POOL) {
+      const common = {
+        rulesetVersion: identity.rulesetVersion,
+        catalogSha256: identity.catalogSha256,
+        statlockerPatchId: '15-1',
+        fetchedAt: new Date(startMs),
+      };
+      h.active.set([
+        'HERO_LEADERBOARD',
+        identity.rulesetVersion,
+        identity.catalogSha256,
+        '15-1',
+        `hero:${heroId}`,
+      ].join('|'), {
+        ...common,
+        dataset: 'HERO_LEADERBOARD',
+        scopeKey: `hero:${heroId}`,
+      });
+      h.active.set([
+        'CONSENSUS_SKELETON',
+        identity.rulesetVersion,
+        identity.catalogSha256,
+        '15-1',
+        `hero:${heroId}:consensus`,
+      ].join('|'), {
+        ...common,
+        dataset: 'CONSENSUS_SKELETON',
+        scopeKey: `hero:${heroId}:consensus`,
+      });
+    }
+
+    for (let index = 0; index < EXPECTED_STATLOCKER_HERO_POOL.length; index += 1) {
+      await h.service.scheduledTick(startMs + index * 60_000);
+    }
+
+    expect([...publishedHeroes].sort((left, right) => left - right)).toEqual(EXPECTED_STATLOCKER_HERO_POOL);
+    expect(archetypeRefreshV2.refreshHero.mock.calls.map(([heroId]) => heroId)).toEqual(EXPECTED_STATLOCKER_HERO_POOL);
   });
 
   it('bootstraps collection identity from the latest serving catalog when no recommendation was served', async () => {

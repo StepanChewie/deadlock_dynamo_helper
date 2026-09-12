@@ -76,6 +76,21 @@ export class BuildArchetypeSnapshotStoreV2Service {
     return parsePayload(row);
   }
 
+  async hasActive(identity: BuildArchetypeSnapshotIdentityV2): Promise<boolean> {
+    const normalized = normalizeIdentity(identity);
+    const repository = this.dataSource.getRepository(BuildArchetypeSnapshotV2Entity);
+    const row = await repository.findOne({
+      where: {
+        heroId: normalized.heroId,
+        rulesetVersion: normalized.rulesetVersion,
+        statlockerPatchId: normalized.statlockerPatchId,
+        catalogSha256: normalized.catalogSha256,
+        isActive: true,
+      },
+    });
+    return row !== null && row !== undefined;
+  }
+
   async getById(snapshotId: string): Promise<BuildArchetypeSnapshotV2> {
     validateSnapshotId(snapshotId);
     const repository = this.dataSource.getRepository(BuildArchetypeSnapshotV2Entity);
