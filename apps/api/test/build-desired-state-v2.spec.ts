@@ -11,6 +11,7 @@ function family(
   defaultItemId: number,
   optionalItemId?: number,
   requirement: BuildArchetypeFamilyV2['requirement'] = 'REQUIRED',
+  medianBuyTimeS = 900,
 ): BuildArchetypeFamilyV2 {
   return {
     familyId,
@@ -28,7 +29,7 @@ function family(
         sourceProfileCount: 10,
         profileCoverage: requirement === 'REQUIRED' ? 1 : 0.7,
         purchaseRate: requirement === 'REQUIRED' ? 0.95 : 0.65,
-        timing: { medianBuyTimeS: 900, spreadS: 60, phase: 'MID' },
+        timing: { medianBuyTimeS, spreadS: 60, phase: 'MID' },
       },
       ...(optionalItemId === undefined ? [] : [{
         itemId: optionalItemId,
@@ -97,6 +98,7 @@ function wpa(itemId: number, deltaWpa: number, count = 10_000): StatlockerVsHero
 function resolve(
   value: BuildArchetypeV2,
   rows: readonly StatlockerVsHeroWpaAggregateSourceV1[],
+  flexGoalCapacity?: number,
 ) {
   return new BuildDesiredStateV2Service(new ThreatWeightedMatchupV1Service()).resolve({
     heroId: 72,
@@ -104,6 +106,7 @@ function resolve(
     enemyHeroIds: [6],
     enemyThreats: [],
     vsHeroRows: rows,
+    ...(flexGoalCapacity === undefined ? {} : { flexGoalCapacity }),
   });
 }
 
@@ -238,5 +241,67 @@ describe('BuildDesiredStateV2Service', () => {
       requirement: 'SITUATIONAL',
       goalKind: 'SITUATIONAL_MATCHUP_SELECTED',
     });
+  });
+
+  it('appends provisional flex goals up to the requested visible capacity without displacing primary goals', () => {
+    const required = family(6000, 6001);
+    const passing = family(6100, 6101, undefined, 'SITUATIONAL');
+    const weakEvidence = family(6200, 6201, undefined, 'SITUATIONAL', 2_200);
+    const negativeWpa = family(6300, 6301, undefined, 'SITUATIONAL', 1_500);
+    const value = archetype([required, passing, weakEvidence, negativeWpa]);
+
+    // weakEvidence has no rows (confidence 0); negativeWpa has confident rows
+    // but negative matchup WPA, so both fail the SITUATIONAL gate yet remain
+    // real captured families eligible for the provisional flex fill. Flex
+    // order follows purchase time: 6300 (1500s) before 6200 (2200s).
+    const result = resolve(
+      value,
+      [wpa(6101, 0.1), wpa(6301, -0.05)],
+      4,
+    );
+
+    expect(result.families).toHaveLength(4);
+    expect(result.families.slice(0, 2).map((entry) => entry.goalKind)).toEqual([
+      'REQUIRED',
+      'SITUATIONAL_MATCHUP_SELECTED',
+    ]);
+    const flex = result.families.slice(2);
+    expect(flex.map((entry) => entry.familyId)).toEqual([6300, 6200]);
+    expect(flex.map((entry) => entry.goalKind)).toEqual(['FLEX_PROVISIONAL', 'FLEX_PROVISIONAL']);
+    expect(flex.map((entry) => entry.selectedTerminalKind)).toEqual(['DEFAULT_TERMINAL', 'DEFAULT_TERMINAL']);
+    for (const entry of flex) {
+      expect(entry.reasonCodes).toContain('FLEX_PROVISIONAL_FILL');
+    }
+  });
+
+  it('never appends flex goals when primary goals already cover the visible capacity', () => {
+    const required = [1, 2, 3].map((index) => family(6500 + index, 6600 + index));
+    const value = archetype(required);
+
+    const result = resolve(value, [], 2);
+
+    expect(result.families).toHaveLength(3);
+    expect(result.families.every((entry) => entry.goalKind === 'REQUIRED')).toBe(true);
+  });
+
+  it('treats the flex capacity as a floor target only and never truncates primary goals', () => {
+    const required = [1, 2, 3, 4, 5].map((index) => family(6700 + index, 6800 + index));
+    const value = archetype(required);
+
+    const result = resolve(value, [], 3);
+
+    expect(result.families).toHaveLength(5);
+    expect(result.families.every((entry) => entry.goalKind === 'REQUIRED')).toBe(true);
+  });
+
+  it('appends no flex goals when no flex capacity is requested', () => {
+    const required = family(6900, 6901);
+    const weakEvidence = family(7000, 7001, undefined, 'SITUATIONAL');
+    const value = archetype([required, weakEvidence]);
+
+    const result = resolve(value, []);
+
+    expect(result.families).toHaveLength(1);
+    expect(result.families[0].goalKind).toBe('REQUIRED');
   });
 });

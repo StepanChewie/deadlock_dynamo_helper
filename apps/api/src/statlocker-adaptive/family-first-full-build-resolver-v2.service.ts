@@ -99,6 +99,7 @@ export class FamilyFirstFullBuildResolverV2Service extends FullBuildResolverV2Se
         threatMultiplier: enemy.threatMultiplier,
       })),
       vsHeroRows: input.vsHeroRows,
+      flexGoalCapacity: input.capacity,
     });
     const outsideCompetition = resolveOutsideCompetition(
       baseDesiredState,

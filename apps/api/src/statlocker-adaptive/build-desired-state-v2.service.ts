@@ -22,7 +22,8 @@ export type DesiredFamilyGoalKindV2 =
   | 'REQUIRED'
   | 'CHOICE_SELECTED'
   | 'OPTIONAL'
-  | 'SITUATIONAL_MATCHUP_SELECTED';
+  | 'SITUATIONAL_MATCHUP_SELECTED'
+  | 'FLEX_PROVISIONAL';
 
 export interface DesiredFamilyStateV2 {
   familyId: number;
@@ -49,6 +50,14 @@ export interface ResolveDesiredBuildStateV2Input {
   enemyHeroIds: readonly number[];
   enemyThreats: readonly EnemyThreatWeightV1[];
   vsHeroRows: readonly StatlockerVsHeroWpaAggregateSourceV1[];
+  /**
+   * Minimum number of visible goals the full build should present. When the
+   * evidence-backed primary goals fall short, unselected SITUATIONAL families
+   * (real captured evidence, no matchup advantage on this roster) are appended
+   * as FLEX_PROVISIONAL goals in archetype purchase-time order. Never a cap:
+   * primary goals are never truncated.
+   */
+  flexGoalCapacity?: number;
 }
 
 interface FamilyEvaluationV2 {
@@ -134,10 +143,42 @@ export class BuildDesiredStateV2Service {
       selected.push({ state: evaluation, familyOrder: index });
     }
 
+    const flexStates: DesiredFamilyStateV2[] = [];
+    const flexGoalCapacity = input.flexGoalCapacity;
+    if (flexGoalCapacity !== undefined && selected.length < flexGoalCapacity) {
+      const primaryFamilyIds = new Set(selected.map((entry) => entry.state.familyId));
+      const flexPool = families
+        .map((family, index) => ({ family, index }))
+        .filter(({ family }) =>
+          !primaryFamilyIds.has(family.familyId) &&
+          !choiceFamilyIds.has(family.familyId) &&
+          family.requirement === 'SITUATIONAL',
+        )
+        .sort((left, right) =>
+          firstFamilyTiming(left.family) - firstFamilyTiming(right.family) ||
+          left.family.familyId - right.family.familyId,
+        );
+      for (const { family, index } of flexPool) {
+        if (selected.length + flexStates.length >= flexGoalCapacity) break;
+        const evaluation = this.evaluateFamily(input, family, 'SITUATIONAL', 'FLEX_PROVISIONAL');
+        flexStates.push({
+          ...evaluation,
+          selectedTerminalItemId: evaluation.selectedTerminalKind === 'DEFAULT_TERMINAL'
+            ? evaluation.selectedTerminalItemId
+            : family.terminalCandidates.find((candidate) => candidate.kind === 'DEFAULT_TERMINAL')!.itemId,
+          selectedTerminalKind: 'DEFAULT_TERMINAL',
+          reasonCodes: ['FLEX_PROVISIONAL_FILL'],
+        });
+      }
+    }
+
     return {
-      families: selected
-        .sort((left, right) => left.familyOrder - right.familyOrder || left.state.familyId - right.state.familyId)
-        .map((entry) => entry.state),
+      families: [
+        ...selected
+          .sort((left, right) => left.familyOrder - right.familyOrder || left.state.familyId - right.state.familyId)
+          .map((entry) => entry.state),
+        ...flexStates,
+      ],
       selectedChoiceFamilyIdsByGroup,
       reasonCodes: [],
     };
@@ -261,6 +302,10 @@ function compareFamilyEvaluation(left: FamilyEvaluationV2, right: FamilyEvaluati
   return right.state.score - left.state.score ||
     right.state.confidence - left.state.confidence ||
     left.state.familyId - right.state.familyId;
+}
+
+function firstFamilyTiming(family: BuildArchetypeFamilyV2): number {
+  return family.progressionNodes[0]?.timing.medianBuyTimeS ?? 0;
 }
 
 function validateInput(input: ResolveDesiredBuildStateV2Input): void {
