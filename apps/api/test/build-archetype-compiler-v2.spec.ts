@@ -81,6 +81,13 @@ function progressionGraph(): RecommendationItemGraph {
   ], [{ parentItemId: A_UPGRADE, componentItemId: A }]);
 }
 
+function progressionEdgesOf(
+  archetype: ReturnType<BuildArchetypeCompilerV2Service['compile']>,
+): readonly unknown[] | undefined {
+  const family = archetype.families?.[0] as unknown as { progressionEdges?: readonly unknown[] } | undefined;
+  return family?.progressionEdges;
+}
+
 function hasHardEdge(
   archetype: ReturnType<BuildArchetypeCompilerV2Service['compile']>,
   beforeItemId: number,
@@ -172,7 +179,7 @@ describe('BuildArchetypeCompilerV2Service', () => {
       ]),
     ], progressionGraph());
 
-    expect(archetype.families?.[0].progressionEdges).toEqual([
+    expect(progressionEdgesOf(archetype)).toEqual([
       {
         fromItemId: A,
         toItemId: A_UPGRADE,
@@ -198,7 +205,7 @@ describe('BuildArchetypeCompilerV2Service', () => {
       profile('p4', [itemAt(A_UPGRADE, 920, { familyId: A })]),
     ], progressionGraph());
 
-    expect(archetype.families?.[0].progressionEdges).toEqual([]);
+    expect(progressionEdgesOf(archetype)).toEqual([]);
   });
 
   it('rejects same-profile progression below soft order confidence', () => {
@@ -213,7 +220,7 @@ describe('BuildArchetypeCompilerV2Service', () => {
       ]),
     ], progressionGraph());
 
-    expect(archetype.families?.[0].progressionEdges).toEqual([]);
+    expect(progressionEdgesOf(archetype)).toEqual([]);
   });
 
   it('ignores same-profile observations inside the order timing tolerance', () => {
@@ -228,7 +235,7 @@ describe('BuildArchetypeCompilerV2Service', () => {
       ]),
     ], progressionGraph());
 
-    expect(archetype.families?.[0].progressionEdges).toEqual([]);
+    expect(progressionEdgesOf(archetype)).toEqual([]);
   });
 
   it('preserves a consistent Statlocker explicit CHOICE as one semantic group', () => {
