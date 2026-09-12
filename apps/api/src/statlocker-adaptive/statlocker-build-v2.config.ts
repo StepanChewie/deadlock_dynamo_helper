@@ -83,6 +83,18 @@ export interface OptionalTerminalV2Config {
   minConfidence: number;
 }
 
+export type SellMatchupProtectionV1Config =
+  | {
+      enabled: false;
+      shrinkK: number;
+    }
+  | {
+      enabled: true;
+      shrinkK: number;
+      minTeamWpaPct: number;
+      minConfidence: number;
+    };
+
 export interface StatlockerBuildV2Config {
   profileLinkSimilarity: number;
   minClusterSize: number;
@@ -106,6 +118,7 @@ export interface StatlockerBuildV2Config {
   optionalTerminal: OptionalTerminalV2Config;
   itemUtility: BuildItemUtilityV2Config;
   outsideMatchupDiscovery: OutsideMatchupDiscoveryV2Config;
+  sellMatchupProtection: SellMatchupProtectionV1Config;
   fullBuildResolver: FullBuildResolverV2Config;
 }
 
@@ -199,6 +212,10 @@ export const STATLOCKER_BUILD_V2_CONFIG: Readonly<StatlockerBuildV2Config> = Obj
     buyMinImprovement: 0.08,
     replacementMinImprovement: 0.30,
     coreReplacementMinImprovement: 0.45,
+  }),
+  sellMatchupProtection: Object.freeze<SellMatchupProtectionV1Config>({
+    enabled: false,
+    shrinkK: 500,
   }),
   fullBuildResolver: Object.freeze({
     buyMinImprovement: 0.08,
