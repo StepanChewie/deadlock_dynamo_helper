@@ -596,10 +596,10 @@ describe('Statlocker Build V2 real Billy fixture', () => {
     expect(result.lock?.selectionMode).toBe('VS_HERO_WPA');
     expect(result.fullBuild?.validation.valid).toBe(false);
     expect(result.fullBuild?.degradedReasons).toContain('CONFIRMED_PROGRESSION_RECIPE_UNAVAILABLE');
-    expect(result.blockers).toContain('CONFIRMED_PROGRESSION_RECIPE_UNAVAILABLE');
+    expect(result.blockers).toContain('REQUIRED_FAMILY_UNSATISFIED');
     expect(result.nextAction).toEqual({
       type: 'HOLD',
-      reasonCodes: expect.arrayContaining(['CONFIRMED_PROGRESSION_RECIPE_UNAVAILABLE']),
+      reasonCodes: expect.arrayContaining(['REQUIRED_FAMILY_UNSATISFIED']),
     });
     expect(result.fullBuild?.steps.every((step) => step.inventoryAfter.length <= fixture.request.totalCapacity)).toBe(true);
 
