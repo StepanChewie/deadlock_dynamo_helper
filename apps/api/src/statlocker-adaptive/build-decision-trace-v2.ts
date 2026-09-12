@@ -125,6 +125,10 @@ export interface BuildDesiredStateTracePayloadV2 {
     score: number;
     confidence: number;
     reasonCodes: readonly string[];
+    sourceProfiles?: readonly {
+      accountId: string;
+      playerName?: string;
+    }[];
   }[];
   selectedChoiceFamilyIdsByGroup: Readonly<Record<string, readonly number[]>>;
   reasonCodes: readonly string[];
