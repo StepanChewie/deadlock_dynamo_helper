@@ -253,11 +253,12 @@ function compileProgressionEdges(
 ): BuildObservedProgressionEdgeV2[] {
   if (!itemGraph || nodes.length < 2) return [];
   const itemIds = nodes.map((node) => node.itemId).sort((a, b) => a - b);
+  const observedIds = new Set(itemIds);
   const edges: BuildObservedProgressionEdgeV2[] = [];
 
   for (const fromItemId of itemIds) {
-    for (const toItemId of itemIds) {
-      if (fromItemId === toItemId || !itemGraph.isComponentAncestor(fromItemId, toItemId)) continue;
+    for (const toItemId of itemGraph.getDirectUpgradeIds(fromItemId)) {
+      if (!observedIds.has(toItemId)) continue;
       const supporting: Array<{ from: number; to: number }> = [];
       let reverseCount = 0;
 
