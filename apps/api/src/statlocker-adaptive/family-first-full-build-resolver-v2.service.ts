@@ -50,8 +50,9 @@ export class FamilyFirstFullBuildResolverV2Service extends FullBuildResolverV2Se
   override resolve(
     input: FamilyFirstFullBuildLifetimeResolverV2Input | FullBuildResolverV2Input,
   ): ResolvedFullBuildPlanV2 | FullBuildResolutionV2 {
-    if (!isLifetimeInput(input) || (input.archetype.families ?? []).length === 0) {
-      return super.resolve(input as FullBuildResolverV2Input);
+    if (!isLifetimeInput(input)) return super.resolve(input);
+    if ((input.archetype.families ?? []).length === 0) {
+      throw new Error('Family-first full build resolver v2 requires family semantics');
     }
     return this.resolveFamilyFirstLifetime(input);
   }
