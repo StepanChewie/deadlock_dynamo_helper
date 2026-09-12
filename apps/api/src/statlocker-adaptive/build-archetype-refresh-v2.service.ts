@@ -12,6 +12,7 @@ import { RecommendationItemCatalogRecipeV1 } from '../deadlock-live/entities/rec
 import { RecommendationItemCatalogVersionV1 } from '../deadlock-live/entities/recommendation-item-catalog-version-v1.entity';
 import {
   BuildArchetypeSnapshotV2,
+  BuildArchetypeV2,
   StatlockerBuildProfileV2,
 } from './build-archetype-v2';
 import { BuildArchetypeCompilerV2Service } from './build-archetype-compiler-v2.service';
@@ -132,14 +133,14 @@ export class BuildArchetypeRefreshV2Service {
       return rejected('ARCHETYPE_MINING_EMPTY', availableSources);
     }
 
-    const archetypes = mining.accepted.map((cluster) => this.compiler.compile({
+    const archetypes = mining.accepted.map((cluster) => withSourceProfileProvenance(this.compiler.compile({
       cluster,
       profiles,
       rulesetVersion: normalizedIdentity.rulesetVersion,
       statlockerPatchId: normalizedIdentity.statlockerPatchId,
       catalogSha256: normalizedIdentity.catalogSha256,
       itemGraph: catalogGraph,
-    }));
+    }), profiles));
 
     const snapshot: BuildArchetypeSnapshotV2 = {
       snapshotId: buildSnapshotId(heroId, normalizedIdentity, availableSources, archetypes.map((entry) => entry.archetypeId)),
@@ -201,6 +202,33 @@ export class BuildArchetypeRefreshV2Service {
     }));
     return createRecommendationItemGraph(definitions, lineageEdges);
   }
+}
+
+export function withSourceProfileProvenance(
+  archetype: BuildArchetypeV2,
+  profiles: readonly StatlockerBuildProfileV2[],
+): BuildArchetypeV2 {
+  const memberIds = new Set(archetype.sourceProfileAccountIds);
+  const members = profiles
+    .filter((profile) => memberIds.has(profile.accountId))
+    .sort((left, right) => left.accountId.localeCompare(right.accountId));
+  const sourceProfiles = members.map((profile) => ({
+    accountId: profile.accountId,
+    ...(profile.playerName ? { playerName: profile.playerName } : {}),
+    ...(profile.leaderboardRank === undefined ? {} : { leaderboardRank: profile.leaderboardRank }),
+  }));
+  const families = archetype.families?.map((family) => ({
+    ...family,
+    sourceProfileAccountIds: members
+      .filter((profile) => profile.items.some((item) => item.familyId === family.familyId))
+      .map((profile) => profile.accountId)
+      .sort(),
+  }));
+  return {
+    ...archetype,
+    sourceProfiles,
+    ...(families === undefined ? {} : { families }),
+  };
 }
 
 function rejected(
