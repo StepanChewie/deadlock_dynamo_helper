@@ -56,6 +56,7 @@ import { EnemyThreatHistoryV1Service } from './enemy-threat-history-v1.service';
 import { EnemyThreatV1Service } from './enemy-threat-v1.service';
 import { FamilyFirstFullBuildResolverV2Service } from './family-first-full-build-resolver-v2.service';
 import { FullBuildResolverV2Service } from './full-build-resolver-v2.service';
+import { FullBuildTransitionValueV2Service } from './full-build-transition-value-v2.service';
 import { HistoricalBuildTrajectorySourceV2Service } from './historical-build-trajectory-source-v2.service';
 import { HistoricalPlannerTrajectoryExtractorV2Service } from './historical-planner-trajectory-extractor-v2.service';
 import { MatchupCandidateDiscoveryV2Service } from './matchup-candidate-discovery-v2.service';
@@ -128,6 +129,7 @@ import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-
     BuildArchetypeSessionV2Service,
     BuildDebugTraceStoreV2Service,
     BuildItemUtilityV2Service,
+    FullBuildTransitionValueV2Service,
     MatchupCandidateDiscoveryV2Service,
     FamilyFirstFullBuildResolverV2Service,
     {
