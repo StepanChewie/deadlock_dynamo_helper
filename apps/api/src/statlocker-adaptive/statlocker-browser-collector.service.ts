@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { HERO_REFERENCE_SEED } from '../deadlock-live/reference-data.seed';
 import { StatlockerDatasetV1 } from './statlocker-adaptive.types';
 
 export const STATLOCKER_BROWSER_LAUNCHER_V1 = Symbol('STATLOCKER_BROWSER_LAUNCHER_V1');
@@ -219,7 +220,23 @@ function buildDatasetPath(target: StatlockerCollectionTargetV1, statlockerPatchI
   }
   if (target.dataset === 'WPA_FILTERED_ITEMS') {
     const heroId = requirePositiveInteger(target.heroId, target.dataset, 'heroId');
-    return `/api/info/wpa-filtered-items?hero_id=${heroId}`;
+    const heroName = HERO_NAME_BY_ID.get(heroId);
+    if (!heroName) throw new StatlockerCollectionError(`Unknown Statlocker hero id ${heroId}`);
+    return [
+      '/api/info/wpa-filtered-items',
+      `?hero=${encodeURIComponent(heroName)}`,
+      '&tier=all',
+      '&rank=ranked',
+      '&category=all',
+      '&gameState=all',
+      '&purchaseTime=all',
+      '&teamComp=Average+Comp',
+      '&buildType=all',
+      `&patch=patch_${encodeURIComponent(statlockerPatchId)}`,
+      '&minSampleSize=500',
+      '&searchTerm=',
+      '&sortBy=wpa',
+    ].join('');
   }
   throw new StatlockerCollectionError(`Unsupported Statlocker dataset: ${String(target.dataset)}`);
 }
@@ -257,8 +274,11 @@ function cleanPatchId(value: unknown): string | undefined {
   return value.trim().replace(/^patch_/i, '');
 }
 
-function looksLikeAccessWall(value: unknown): boolean {
-  const text = typeof value === 'string' ? value : safeStringify(value);
+const HERO_NAME_BY_ID = new Map<number, string>(
+  HERO_REFERENCE_SEED.map((hero) => [hero.hero_id, hero.name] as const),
+);
+
+function looksLikeAccessWall(value: unknown): boolean {  const text = typeof value === 'string' ? value : safeStringify(value);
   return /captcha|login wall|sign in|access denied|authentication required/i.test(text);
 }
 

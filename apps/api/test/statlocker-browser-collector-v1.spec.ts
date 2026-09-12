@@ -132,6 +132,20 @@ describe('StatlockerBrowserCollectorService', () => {
       .toMatchObject({ statlockerPatchId: '15-1' });
   });
 
+  it('uses the verified hero-scoped Item Meta Model query for lifecycle collection', async () => {
+    const harness = createHarness();
+
+    const result = await harness.service.collectBatch([
+      { dataset: 'WPA_FILTERED_ITEMS', scopeKey: 'hero:72', heroId: 72 },
+    ]);
+
+    expect(result.datasets[0]?.path).toBe(
+      '/api/info/wpa-filtered-items?hero=Billy&tier=all&rank=ranked&category=all&gameState=all'
+      + '&purchaseTime=all&teamComp=Average+Comp&buildType=all&patch=patch_15-1'
+      + '&minSampleSize=500&searchTerm=&sortBy=wpa',
+    );
+  });
+
   it('returns only the current patch from the live multi-patch VS response', async () => {
     const close = jest.fn().mockResolvedValue(undefined);
     const fetchMock = jest.spyOn(global, 'fetch').mockImplementation(async (input) => {

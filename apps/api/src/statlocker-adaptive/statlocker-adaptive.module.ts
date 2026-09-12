@@ -67,6 +67,7 @@ import {
   StatlockerBrowserCollectorService,
 } from './statlocker-browser-collector.service';
 import { StatlockerEvidenceService } from './statlocker-evidence.service';
+import { StatlockerItemLifecycleRepositoryV1Service } from './statlocker-item-lifecycle-repository-v1.service';
 import { StatlockerNormalizerService } from './statlocker-normalizer.service';
 import { StatlockerRefreshService } from './statlocker-refresh.service';
 import { StatlockerSnapshotStoreService } from './statlocker-snapshot-store.service';
@@ -119,6 +120,7 @@ import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-
     StatlockerVsHeroWpaRepositoryV1Service,
     StatlockerVsHeroWpaRowNormalizerV1Service,
     StatlockerEvidenceService,
+    StatlockerItemLifecycleRepositoryV1Service,
     BuildSkeletonService,
     BuildArchetypeMinerV2Service,
     BuildArchetypeCompilerV2Service,
