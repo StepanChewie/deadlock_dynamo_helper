@@ -6,6 +6,7 @@ export function toStatlockerBuildProfileV2(
   analysis: StatlockerProBuildAnalysisV1,
   graph: RecommendationItemGraph,
   leaderboardRank?: number,
+  playerName?: string,
 ): StatlockerBuildProfileV2 {
   if (analysis.items.length === 0) {
     throw new Error('Statlocker build profile v2: items must not be empty');
@@ -25,10 +26,12 @@ export function toStatlockerBuildProfileV2(
   }
 
   const items = [...byItemId.values()].sort((a, b) => a.itemId - b.itemId);
+  const normalizedPlayerName = typeof playerName === 'string' ? playerName.trim() : '';
   return {
     accountId: analysis.accountId,
     heroId: analysis.heroId,
     ...(leaderboardRank === undefined ? {} : { leaderboardRank }),
+    ...(normalizedPlayerName ? { playerName: normalizedPlayerName } : {}),
     items,
   };
 }
