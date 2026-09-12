@@ -59,6 +59,7 @@ import { FullBuildMatchupProtectionV1Service } from './full-build-matchup-protec
 import { FullBuildReplacementV2Service } from './full-build-replacement-v2.service';
 import { FullBuildResolverV2Service } from './full-build-resolver-v2.service';
 import { FullBuildSellRankerV1Service } from './full-build-sell-ranker-v1.service';
+import { FullBuildTransactionPlannerV2Service } from './full-build-transaction-planner-v2.service';
 import { FullBuildTransitionValueV2Service } from './full-build-transition-value-v2.service';
 import { HistoricalBuildTrajectorySourceV2Service } from './historical-build-trajectory-source-v2.service';
 import { HistoricalPlannerTrajectoryExtractorV2Service } from './historical-planner-trajectory-extractor-v2.service';
@@ -137,6 +138,7 @@ import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-
     FullBuildMatchupProtectionV1Service,
     FullBuildSellRankerV1Service,
     FullBuildReplacementV2Service,
+    FullBuildTransactionPlannerV2Service,
     FullBuildTransitionValueV2Service,
     MatchupCandidateDiscoveryV2Service,
     FamilyFirstFullBuildResolverV2Service,

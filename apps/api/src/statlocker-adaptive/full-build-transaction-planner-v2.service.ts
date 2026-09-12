@@ -12,6 +12,10 @@ import {
 } from './build-family-satisfaction-v2';
 import { FullBuildTransitionIntentV2 } from './full-build-plan-v2';
 import { simulateFullBuildInventoryV2 } from './full-build-inventory-simulator-v2';
+import {
+  FullBuildReplacementContextV2,
+  FullBuildReplacementV2Service,
+} from './full-build-replacement-v2.service';
 
 export interface FullBuildTransactionPlannerV2Input {
   archetype: BuildArchetypeV2;
@@ -20,6 +24,8 @@ export interface FullBuildTransactionPlannerV2Input {
   rulesetId: string;
   capacity: number;
   currentInventoryItemIds: readonly number[];
+  /** Matchup and lifecycle facts for the replacement service; the planner itself never queries repositories. */
+  replacementContext?: FullBuildReplacementContextV2;
 }
 
 export interface FullBuildTransactionPlannerV2Result {
@@ -44,6 +50,8 @@ interface ConfirmedProgressionPathV2 {
 
 @Injectable()
 export class FullBuildTransactionPlannerV2Service {
+  constructor(private readonly replacement?: FullBuildReplacementV2Service) {}
+
   plan(input: FullBuildTransactionPlannerV2Input): FullBuildTransactionPlannerV2Result {
     const actions: FullBuildTransitionIntentV2[] = [];
     const reasonCodes = new Set<string>();
@@ -122,25 +130,17 @@ export class FullBuildTransactionPlannerV2Service {
       let action: FullBuildTransitionIntentV2 | undefined;
 
       if (next.nextIndex === 0) {
-        if (projectedInventory.length >= input.capacity) {
-          const replacement = this.findSafeReplacement(
+        if (projectedInventory.length === input.capacity) {
+          // New family-entry BUY at full capacity: replacement may run.
+          action = this.replaceAtCapacity(
             input,
-            families,
+            pending,
             projectedInventory,
-            next.desiredFamily,
+            next,
             buyItemId,
+            reasonCodes,
           );
-          if (!replacement) {
-            reasonCodes.add('REQUIRED_FAMILY_REGRESSION');
-            next.blocked = true;
-            continue;
-          }
-          action = {
-            action: 'REPLACE',
-            sellItemId: replacement.sellItemId,
-            buyItemId,
-            reasonCodes: ['FAMILY_ENTRY_REPLACEMENT'],
-          };
+          if (!action) continue;
         } else {
           action = {
             action: 'BUY',
@@ -176,6 +176,66 @@ export class FullBuildTransactionPlannerV2Service {
     }
 
     return { actions, reasonCodes: [...reasonCodes].sort() };
+  }
+
+  /**
+   * New family-entry BUY at exactly full capacity. The sell decision is
+   * delegated to FullBuildReplacementV2Service; the planner only derives the
+   * active-progression protection set and applies the blocked policy. When the
+   * planner is constructed without the replacement service (legacy direct
+   * construction), the previous conservative local guard is preserved.
+   */
+  private replaceAtCapacity(
+    input: FullBuildTransactionPlannerV2Input,
+    pending: readonly PendingFamilyProgressionV2[],
+    projectedInventory: readonly number[],
+    next: PendingFamilyProgressionV2,
+    buyItemId: number,
+    reasonCodes: Set<string>,
+  ): FullBuildTransitionIntentV2 | undefined {
+    if (!this.replacement) {
+      const legacy = this.findSafeReplacement(
+        input,
+        input.archetype.families ?? [],
+        projectedInventory,
+        next.desiredFamily,
+        buyItemId,
+      );
+      if (!legacy) {
+        reasonCodes.add('REQUIRED_FAMILY_REGRESSION');
+        next.blocked = true;
+        return undefined;
+      }
+      return {
+        action: 'REPLACE',
+        sellItemId: legacy.sellItemId,
+        buyItemId,
+        reasonCodes: ['FAMILY_ENTRY_REPLACEMENT'],
+      };
+    }
+
+    const decision = this.replacement.decide({
+      archetype: input.archetype,
+      desiredFamily: next.desiredFamily,
+      buyItemId,
+      projectedInventoryItemIds: projectedInventory,
+      activeProgressionProtectedItemIds: activeProgressionProtectedItemIds(pending, projectedInventory),
+      itemGraph: input.itemGraph,
+      rulesetId: input.rulesetId,
+      context: input.replacementContext ?? emptyReplacementContext(),
+    });
+    if (decision.kind === 'BLOCKED') {
+      reasonCodes.add('CAPACITY_BLOCKED_NO_SAFE_REPLACEMENT');
+      for (const reasonCode of decision.reasonCodes) reasonCodes.add(reasonCode);
+      next.blocked = true;
+      return undefined;
+    }
+    return {
+      action: 'REPLACE',
+      sellItemId: decision.sellItemId,
+      buyItemId,
+      reasonCodes: [...new Set(['FAMILY_ENTRY_REPLACEMENT', ...decision.reasonCodes])],
+    };
   }
 
   private findSafeReplacement(
@@ -230,6 +290,49 @@ function comparePendingProgressions(
     || requirementPriority(left.desiredFamily.requirement) - requirementPriority(right.desiredFamily.requirement)
     || left.family.familyId - right.family.familyId
     || left.path[left.nextIndex] - right.path[right.nextIndex];
+}
+
+/**
+ * Held items that a still-pending confirmed progression consumes at a future
+ * accepted edge/UPGRADE step: every non-blocked pending goal contributes the
+ * from-items of its remaining confirmed steps when they are currently held.
+ * Held items that are not such sources stay unprotected even when they are
+ * components that were already consumed elsewhere.
+ */
+function activeProgressionProtectedItemIds(
+  pending: readonly PendingFamilyProgressionV2[],
+  projectedInventory: readonly number[],
+): ReadonlySet<number> {
+  const protectedIds = new Set<number>();
+  for (const entry of pending) {
+    if (entry.blocked) continue;
+    const edges = entry.family.progressionEdges ?? [];
+    if (edges.length === 0) continue;
+    for (let index = Math.max(1, entry.nextIndex); index < entry.path.length; index += 1) {
+      const consumedItemId = entry.path[index - 1];
+      const edge = edges.find((candidate) =>
+        candidate.fromItemId === consumedItemId && candidate.toItemId === entry.path[index],
+      );
+      if (edge && projectedInventory.includes(consumedItemId)) protectedIds.add(consumedItemId);
+    }
+  }
+  return protectedIds;
+}
+
+/**
+ * Fallback context for planners called without replacement facts: the
+ * replacement service then only sees empty matchup and lifecycle evidence and
+ * fails closed instead of selling blindly.
+ */
+function emptyReplacementContext(): FullBuildReplacementContextV2 {
+  return {
+    heroId: 0,
+    gameTimeSec: 0,
+    enemyHeroIds: [],
+    enemyThreats: [],
+    vsHeroRows: [],
+    lifecycleEvidence: [],
+  };
 }
 
 function progressionTime(entry: PendingFamilyProgressionV2): number {

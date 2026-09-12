@@ -35,6 +35,7 @@ import {
   FullBuildLifetimeResolverV2Input,
   FullBuildResolverV2Service,
 } from './full-build-resolver-v2.service';
+import type { FamilyFirstFullBuildLifetimeResolverV2Input } from './family-first-full-build-resolver-v2.service';
 import { ResolvedFullBuildPlanV2 } from './full-build-plan-v2';
 import { MatchupCandidateDiscoveryV2Service } from './matchup-candidate-discovery-v2.service';
 import {
@@ -50,6 +51,8 @@ import {
   StatlockerVsHeroWpaAggregateSourceV1,
   StatlockerVsHeroWpaRepositoryV1Service,
 } from './statlocker-vs-hero-wpa-repository-v1.service';
+import { StatlockerItemLifecycleRepositoryV1Service } from './statlocker-item-lifecycle-repository-v1.service';
+import { StatlockerHeroItemLifecycleV1 } from './statlocker-adaptive.types';
 
 const FULL_ENEMY_ROSTER_SIZE = 6;
 
@@ -76,6 +79,9 @@ export class AdaptiveRecommendationV2Service {
     private readonly discovery: MatchupCandidateDiscoveryV2Service,
     private readonly resolver: FullBuildResolverV2Service,
     private readonly traceStore: BuildDebugTraceStoreV2Service,
+    // Optional only so legacy direct constructions keep compiling; Nest injects
+    // the registered repository in production.
+    private readonly lifecycleRepository?: StatlockerItemLifecycleRepositoryV1Service,
   ) {}
 
   async recommend(request: AdaptiveRecommendationRequestV2): Promise<AdaptiveRecommendationResultV2> {
@@ -129,9 +135,10 @@ export class AdaptiveRecommendationV2Service {
     if (!Number.isInteger(capacity) || Number(capacity) <= 0) {
       return notReadyRecommendation(decision, ['SLOT_CAPACITY_UNAVAILABLE']);
     }
+    const lifecycleEvidence = await this.loadLifecycleEvidence(decision);
 
     const previousTrace = this.traceStore.get(request.matchId);
-    const resolverInput: FullBuildLifetimeResolverV2Input & { previousPlan?: ResolvedFullBuildPlanV2 } = {
+    const resolverInput: FamilyFirstFullBuildLifetimeResolverV2Input & { previousPlan?: ResolvedFullBuildPlanV2 } = {
       matchId: request.matchId,
       stateRevision: decision.stateRevision,
       heroId: decision.state.heroId,
@@ -146,6 +153,7 @@ export class AdaptiveRecommendationV2Service {
       vsHeroRows,
       wpaPatchData,
       t4Chains,
+      lifecycleEvidence,
       outsideCandidates,
       previousPlan: previousTrace?.finalPlan,
       trace,
@@ -168,6 +176,17 @@ export class AdaptiveRecommendationV2Service {
       lock,
       selection,
       plan,
+    });
+  }
+
+  private async loadLifecycleEvidence(
+    decision: AdaptiveDecisionStateV1,
+  ): Promise<readonly StatlockerHeroItemLifecycleV1[]> {
+    if (!this.lifecycleRepository) return [];
+    return this.lifecycleRepository.loadCurrentPatchForHero({
+      heroId: decision.state.heroId,
+      rulesetVersion: decision.rulesetId,
+      catalogSha256: decision.catalogSha256,
     });
   }
 

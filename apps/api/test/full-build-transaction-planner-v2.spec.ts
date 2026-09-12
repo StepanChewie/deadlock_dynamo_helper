@@ -1,7 +1,13 @@
 import { RecommendationItemDefinition, createRecommendationItemGraph } from '@deadlock-live-probe/build-domain';
 import { BuildArchetypeFamilyV2, BuildArchetypeV2, BuildObservedProgressionEdgeV2 } from '../src/statlocker-adaptive/build-archetype-v2';
-import { DesiredBuildStateV2 } from '../src/statlocker-adaptive/build-desired-state-v2.service';
+import { DesiredBuildStateV2, DesiredFamilyStateV2 } from '../src/statlocker-adaptive/build-desired-state-v2.service';
 import { simulateFullBuildInventoryV2 } from '../src/statlocker-adaptive/full-build-inventory-simulator-v2';
+import {
+  FullBuildReplacementContextV2,
+  FullBuildReplacementV2Input,
+  FullBuildReplacementV2Result,
+  FullBuildReplacementV2Service,
+} from '../src/statlocker-adaptive/full-build-replacement-v2.service';
 import { FullBuildTransactionPlannerV2Service } from '../src/statlocker-adaptive/full-build-transaction-planner-v2.service';
 
 const A = 101;
@@ -412,5 +418,402 @@ describe('FullBuildTransactionPlannerV2Service', () => {
 
     expect(result.actions).toEqual([]);
     expect(result.reasonCodes).toContain('REQUIRED_FAMILY_REGRESSION');
+  });
+
+  class StubFullBuildReplacementV2Service {
+    readonly calls: FullBuildReplacementV2Input[] = [];
+
+    constructor(private readonly respond?: (input: FullBuildReplacementV2Input) => FullBuildReplacementV2Result) {}
+
+    decide(input: FullBuildReplacementV2Input): FullBuildReplacementV2Result {
+      this.calls.push(input);
+      return this.respond
+        ? this.respond(input)
+        : { kind: 'BLOCKED', reasonCodes: ['STUB_BLOCKED'] };
+    }
+  }
+
+  function fillerInventory(count: number, startItemId = 2_000): number[] {
+    return Array.from({ length: count }, (_, index) => startItemId + index);
+  }
+
+  function standaloneFamily(
+    familyId: number,
+    itemId: number,
+    medianBuyTimeS: number,
+    requirement: 'REQUIRED' | 'OPTIONAL' = 'OPTIONAL',
+  ): BuildArchetypeFamilyV2 {
+    return {
+      familyId,
+      requirement,
+      aggregateFrequencyTier: 'FREQUENT',
+      sourceProfileCount: 5,
+      profileCoverage: 0.5,
+      purchaseRate: 0.5,
+      structuralPriority: 0.5,
+      progressionNodes: [{
+        itemId,
+        rawFrequencyTier: 'FREQUENT',
+        progressionRole: 'DEFAULT_TERMINAL',
+        sourceProfileCount: 5,
+        profileCoverage: 0.5,
+        purchaseRate: 0.5,
+        timing: { medianBuyTimeS, spreadS: 30, phase: 'MID' },
+      }],
+      progressionEdges: [],
+      terminalCandidates: [{
+        itemId,
+        kind: 'DEFAULT_TERMINAL',
+        sourceProfileCount: 5,
+        profileCoverage: 0.5,
+        purchaseRate: 0.5,
+        rawFrequencyTier: 'FREQUENT',
+      }],
+    };
+  }
+
+  function twoNodeFamily(
+    familyId: number,
+    fromItemId: number,
+    toItemId: number,
+    toMedianBuyTimeS: number,
+  ): BuildArchetypeFamilyV2 {
+    return {
+      familyId,
+      requirement: 'OPTIONAL',
+      aggregateFrequencyTier: 'FREQUENT',
+      sourceProfileCount: 5,
+      profileCoverage: 0.5,
+      purchaseRate: 0.5,
+      structuralPriority: 0.5,
+      progressionNodes: [
+        {
+          itemId: fromItemId,
+          rawFrequencyTier: 'FREQUENT',
+          progressionRole: 'ENTRY',
+          sourceProfileCount: 5,
+          profileCoverage: 0.5,
+          purchaseRate: 0.5,
+          timing: { medianBuyTimeS: 100, spreadS: 20, phase: 'EARLY' },
+        },
+        {
+          itemId: toItemId,
+          rawFrequencyTier: 'FREQUENT',
+          progressionRole: 'DEFAULT_TERMINAL',
+          sourceProfileCount: 5,
+          profileCoverage: 0.5,
+          purchaseRate: 0.5,
+          timing: { medianBuyTimeS: toMedianBuyTimeS, spreadS: 20, phase: 'MID' },
+        },
+      ],
+      progressionEdges: [observedEdge(fromItemId, toItemId, 100, toMedianBuyTimeS)],
+      terminalCandidates: [{
+        itemId: toItemId,
+        kind: 'DEFAULT_TERMINAL',
+        sourceProfileCount: 5,
+        profileCoverage: 0.5,
+        purchaseRate: 0.5,
+        rawFrequencyTier: 'FREQUENT',
+      }],
+    };
+  }
+
+  function goalFor(
+    family: BuildArchetypeFamilyV2,
+    terminalItemId: number,
+    requirement: 'REQUIRED' | 'OPTIONAL' = 'OPTIONAL',
+  ): DesiredFamilyStateV2 {
+    return {
+      familyId: family.familyId,
+      requirement,
+      goalKind: requirement === 'REQUIRED' ? 'REQUIRED' : 'OPTIONAL',
+      selectedTerminalItemId: terminalItemId,
+      selectedTerminalKind: 'DEFAULT_TERMINAL',
+      score: 0.5,
+      confidence: 1,
+      reasonCodes: [],
+    };
+  }
+
+  function desiredStateOf(goals: readonly DesiredFamilyStateV2[]): DesiredBuildStateV2 {
+    return { families: goals, selectedChoiceFamilyIdsByGroup: {}, reasonCodes: [] };
+  }
+
+  function purchasableGraph(itemIds: readonly number[]) {
+    return createRecommendationItemGraph(itemIds.map((itemId) => item(itemId)));
+  }
+
+  function replacementContext(): FullBuildReplacementContextV2 {
+    return {
+      heroId: 72,
+      gameTimeSec: 600,
+      enemyHeroIds: [1, 2, 3, 4, 5, 6],
+      enemyThreats: [],
+      vsHeroRows: [],
+      lifecycleEvidence: [],
+    };
+  }
+
+  describe('full capacity replacement integration', () => {
+    it('does not consult the replacement service for a family-entry BUY below capacity (11/12 + BUY)', () => {
+      const stub = new StubFullBuildReplacementV2Service();
+      const planner = new FullBuildTransactionPlannerV2Service(stub as unknown as FullBuildReplacementV2Service);
+      const filler = fillerInventory(11);
+      const extraItemId = 999;
+      const families = [standaloneFamily(extraItemId, extraItemId, 300)];
+
+      const result = planner.plan({
+        archetype: archetype(families),
+        desiredState: desiredStateOf([goalFor(families[0], extraItemId)]),
+        itemGraph: purchasableGraph([...filler, extraItemId]),
+        rulesetId: 'r1',
+        capacity: 12,
+        currentInventoryItemIds: filler,
+        replacementContext: replacementContext(),
+      });
+
+      expect(stub.calls).toHaveLength(0);
+      expect(result.actions).toEqual([
+        expect.objectContaining({ action: 'BUY', buyItemId: extraItemId }),
+      ]);
+      expect(result.reasonCodes).not.toContain('CAPACITY_BLOCKED_NO_SAFE_REPLACEMENT');
+      const simulation = simulateFullBuildInventoryV2({
+        rulesetId: 'r1',
+        itemGraph: purchasableGraph([...filler, extraItemId]),
+        capacity: 12,
+        initialInventoryItemIds: filler,
+        actions: result.actions,
+      });
+      expect(simulation.finalInventoryItemIds).toHaveLength(12);
+    });
+
+    it('does not consult the replacement service for an UPGRADE of a held component at 12/12', () => {
+      const stub = new StubFullBuildReplacementV2Service();
+      const planner = new FullBuildTransactionPlannerV2Service(stub as unknown as FullBuildReplacementV2Service);
+      const filler = fillerInventory(11);
+      const itemGraph = graph(filler);
+
+      const result = planner.plan({
+        archetype: archetype(),
+        desiredState: desired(D, 'OPTIONAL_TERMINAL'),
+        itemGraph,
+        rulesetId: 'r1',
+        capacity: 12,
+        currentInventoryItemIds: [C, ...filler],
+        replacementContext: replacementContext(),
+      });
+
+      expect(stub.calls).toHaveLength(0);
+      expect(result.actions[0]).toMatchObject({ action: 'UPGRADE', buyItemId: D, recipeId: 'C-to-D' });
+      const simulation = simulateFullBuildInventoryV2({
+        rulesetId: 'r1',
+        itemGraph,
+        capacity: 12,
+        initialInventoryItemIds: [C, ...filler],
+        actions: result.actions,
+      });
+      expect(simulation.finalInventoryItemIds).toHaveLength(12);
+    });
+
+    it('delegates exactly once to the replacement service for a new family-entry BUY at 12/12', () => {
+      const stub = new StubFullBuildReplacementV2Service(() => ({
+        kind: 'REPLACE',
+        sellItemId: 2_000,
+        reasonCodes: ['STUB_SELL'],
+      }));
+      const planner = new FullBuildTransactionPlannerV2Service(stub as unknown as FullBuildReplacementV2Service);
+      const filler = fillerInventory(12);
+      const extraItemId = 999;
+      const families = [standaloneFamily(extraItemId, extraItemId, 300)];
+      const context = replacementContext();
+
+      const result = planner.plan({
+        archetype: archetype(families),
+        desiredState: desiredStateOf([goalFor(families[0], extraItemId)]),
+        itemGraph: purchasableGraph([...filler, extraItemId]),
+        rulesetId: 'r1',
+        capacity: 12,
+        currentInventoryItemIds: filler,
+        replacementContext: context,
+      });
+
+      expect(stub.calls).toHaveLength(1);
+      expect(stub.calls[0].buyItemId).toBe(extraItemId);
+      expect(stub.calls[0].projectedInventoryItemIds).toEqual(filler);
+      expect(stub.calls[0].rulesetId).toBe('r1');
+      expect(stub.calls[0].context).toEqual(context);
+      expect([...stub.calls[0].activeProgressionProtectedItemIds]).toEqual([]);
+      expect(result.actions).toEqual([
+        expect.objectContaining({ action: 'REPLACE', sellItemId: 2_000, buyItemId: extraItemId }),
+      ]);
+      expect(result.actions[0].reasonCodes).toContain('FAMILY_ENTRY_REPLACEMENT');
+      const simulation = simulateFullBuildInventoryV2({
+        rulesetId: 'r1',
+        itemGraph: purchasableGraph([...filler, extraItemId]),
+        capacity: 12,
+        initialInventoryItemIds: filler,
+        actions: result.actions,
+      });
+      expect(simulation.finalInventoryItemIds).toHaveLength(12);
+      expect(simulation.finalInventoryItemIds).toContain(extraItemId);
+      expect(simulation.finalInventoryItemIds).not.toContain(2_000);
+    });
+
+    it('protects only held items consumed by future accepted upgrades when replacing at 12/12', () => {
+      const stub = new StubFullBuildReplacementV2Service(() => ({
+        kind: 'REPLACE',
+        sellItemId: 2_000,
+        reasonCodes: ['STUB_SELL'],
+      }));
+      const planner = new FullBuildTransactionPlannerV2Service(stub as unknown as FullBuildReplacementV2Service);
+      const filler = fillerInventory(10);
+      const extraItemId = 999;
+      const families = [family(), standaloneFamily(extraItemId, extraItemId, 300)];
+
+      const result = planner.plan({
+        archetype: archetype(families),
+        desiredState: desiredStateOf([
+          { ...goalFor(families[0], D), selectedTerminalKind: 'OPTIONAL_TERMINAL' },
+          goalFor(families[1], extraItemId),
+        ]),
+        itemGraph: graph([...filler, extraItemId]),
+        rulesetId: 'r1',
+        capacity: 12,
+        currentInventoryItemIds: [A, B, ...filler],
+        replacementContext: replacementContext(),
+      });
+
+      expect(stub.calls).toHaveLength(1);
+      expect(stub.calls[0].buyItemId).toBe(extraItemId);
+      expect([...stub.calls[0].activeProgressionProtectedItemIds]).toEqual([B]);
+      expect(result.actions[0]).toMatchObject({ action: 'REPLACE', sellItemId: 2_000, buyItemId: extraItemId });
+      expect(result.actions.some((action) => action.action === 'UPGRADE' && action.buyItemId === C)).toBe(true);
+    });
+
+    it('keeps planning past capacity with a 13th goal: more than 12 rows and never more than 12 held items', () => {
+      const stub = new StubFullBuildReplacementV2Service((input) => ({
+        kind: 'REPLACE',
+        sellItemId: input.projectedInventoryItemIds[0],
+        reasonCodes: ['STUB_SELL'],
+      }));
+      const planner = new FullBuildTransactionPlannerV2Service(stub as unknown as FullBuildReplacementV2Service);
+      const familyIds = Array.from({ length: 14 }, (_, index) => index + 1);
+      const families = familyIds.map((familyId) => standaloneFamily(familyId, familyId, 300));
+      const itemGraph = purchasableGraph(familyIds);
+
+      const result = planner.plan({
+        archetype: archetype(families),
+        desiredState: desiredStateOf(families.map((family) => goalFor(family, family.progressionNodes[0].itemId))),
+        itemGraph,
+        rulesetId: 'r1',
+        capacity: 12,
+        currentInventoryItemIds: [],
+        replacementContext: replacementContext(),
+      });
+
+      expect(result.actions.length).toBeGreaterThan(12);
+      expect(stub.calls).toHaveLength(2);
+      expect(result.reasonCodes).not.toContain('CAPACITY_BLOCKED_NO_SAFE_REPLACEMENT');
+      for (let prefixLength = 1; prefixLength <= result.actions.length; prefixLength += 1) {
+        const prefix = simulateFullBuildInventoryV2({
+          rulesetId: 'r1',
+          itemGraph,
+          capacity: 12,
+          initialInventoryItemIds: [],
+          actions: result.actions.slice(0, prefixLength),
+        });
+        expect(prefix.validation.valid).toBe(true);
+        expect(prefix.finalInventoryItemIds.length).toBeLessThanOrEqual(12);
+      }
+    });
+
+    it('upgrades a REPLACE-introduced component in place after unrelated interleaved transactions', () => {
+      const stub = new StubFullBuildReplacementV2Service(() => ({
+        kind: 'REPLACE',
+        sellItemId: 2_010,
+        reasonCodes: ['STUB_SELL'],
+      }));
+      const planner = new FullBuildTransactionPlannerV2Service(stub as unknown as FullBuildReplacementV2Service);
+      const filler = fillerInventory(11);
+      const componentItemId = 300;
+      const terminalItemId = 301;
+      const otherComponentItemId = 400;
+      const otherTerminalItemId = 401;
+      const itemGraph = createRecommendationItemGraph([
+        item(componentItemId),
+        item(terminalItemId, { recipeId: '300-to-301', consumedItemIds: [componentItemId] }),
+        item(otherComponentItemId),
+        item(otherTerminalItemId, { recipeId: '400-to-401', consumedItemIds: [otherComponentItemId] }),
+        ...filler.map((itemId) => item(itemId)),
+      ]);
+      const componentFamily = twoNodeFamily(componentItemId, componentItemId, terminalItemId, 900);
+      const otherFamily = twoNodeFamily(otherTerminalItemId, otherComponentItemId, otherTerminalItemId, 500);
+
+      const result = planner.plan({
+        archetype: archetype([componentFamily, otherFamily]),
+        desiredState: desiredStateOf([
+          goalFor(componentFamily, terminalItemId),
+          goalFor(otherFamily, otherTerminalItemId),
+        ]),
+        itemGraph,
+        rulesetId: 'r1',
+        capacity: 12,
+        currentInventoryItemIds: [otherComponentItemId, ...filler],
+        replacementContext: replacementContext(),
+      });
+
+      expect(stub.calls).toHaveLength(1);
+      expect([...stub.calls[0].activeProgressionProtectedItemIds]).toEqual([otherComponentItemId]);
+      expect(result.actions).toEqual([
+        expect.objectContaining({ action: 'REPLACE', sellItemId: 2_010, buyItemId: componentItemId }),
+        expect.objectContaining({ action: 'UPGRADE', buyItemId: otherTerminalItemId, recipeId: '400-to-401' }),
+        expect.objectContaining({ action: 'UPGRADE', buyItemId: terminalItemId, recipeId: '300-to-301' }),
+      ]);
+      const simulation = simulateFullBuildInventoryV2({
+        rulesetId: 'r1',
+        itemGraph,
+        capacity: 12,
+        initialInventoryItemIds: [otherComponentItemId, ...filler],
+        actions: result.actions,
+      });
+      expect(simulation.finalInventoryItemIds).toHaveLength(12);
+      expect(simulation.finalInventoryItemIds).toContain(terminalItemId);
+      expect(simulation.finalInventoryItemIds).toContain(otherTerminalItemId);
+      expect(simulation.steps[2].consumedItemIds).toEqual([componentItemId]);
+    });
+
+    it('blocks the incoming goal without selling when the replacement service is blocked and continues independent goals', () => {
+      const blockedItemId = 500;
+      const independentItemId = 501;
+      const stub = new StubFullBuildReplacementV2Service((input) =>
+        input.buyItemId === blockedItemId
+          ? { kind: 'BLOCKED', reasonCodes: ['STUB_NO_SAFE_SELL'] }
+          : { kind: 'REPLACE', sellItemId: 2_000, reasonCodes: ['STUB_SELL'] });
+      const planner = new FullBuildTransactionPlannerV2Service(stub as unknown as FullBuildReplacementV2Service);
+      const filler = fillerInventory(12);
+      const blockedFamily = standaloneFamily(blockedItemId, blockedItemId, 100, 'REQUIRED');
+      const independentFamily = standaloneFamily(independentItemId, independentItemId, 500);
+
+      const result = planner.plan({
+        archetype: archetype([blockedFamily, independentFamily]),
+        desiredState: desiredStateOf([
+          goalFor(blockedFamily, blockedItemId, 'REQUIRED'),
+          goalFor(independentFamily, independentItemId),
+        ]),
+        itemGraph: purchasableGraph([...filler, blockedItemId, independentItemId]),
+        rulesetId: 'r1',
+        capacity: 12,
+        currentInventoryItemIds: filler,
+        replacementContext: replacementContext(),
+      });
+
+      expect(stub.calls).toHaveLength(2);
+      expect(result.reasonCodes).toContain('CAPACITY_BLOCKED_NO_SAFE_REPLACEMENT');
+      expect(result.reasonCodes).toContain('STUB_NO_SAFE_SELL');
+      expect(result.reasonCodes).not.toContain('REQUIRED_FAMILY_REGRESSION');
+      expect(result.actions).toEqual([
+        expect.objectContaining({ action: 'REPLACE', sellItemId: 2_000, buyItemId: independentItemId }),
+      ]);
+    });
   });
 });
