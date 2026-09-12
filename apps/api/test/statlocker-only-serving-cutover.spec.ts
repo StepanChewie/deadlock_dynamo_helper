@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 function readRepoFile(relativePath: string): string {
@@ -95,5 +95,18 @@ describe('Statlocker-only recommendation serving cutover', () => {
 
     expect(adaptiveClientSource).toContain('/deadlock/adaptive/v2/recommend');
     expect(adaptiveClientSource).not.toContain('/deadlock/adaptive/v1/recommend');
+  });
+
+  test('V2 lifetime planning has no raw CORE override or obsolete flat-lifetime regression', () => {
+    const resolverSource = readRepoFile('api/src/statlocker-adaptive/full-build-resolver-v2.service.ts');
+    const obsoleteRegression = resolve(
+      __dirname,
+      'full-build-lifetime-mandatory-core-v2.spec.ts',
+    );
+
+    expect(resolverSource).not.toContain('MANDATORY_CORE_PROGRESSION_REPLACEMENT');
+    expect(resolverSource).not.toMatch(/\bmandatoryCore\b/);
+    expect(resolverSource).not.toContain('completedSemanticItemIds');
+    expect(existsSync(obsoleteRegression)).toBe(false);
   });
 });
