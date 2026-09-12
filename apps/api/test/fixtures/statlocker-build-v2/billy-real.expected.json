@@ -1,4 +1,5 @@
 {
+  "note": "Approved real-data golden for the frozen Billy capture. Confirmed same-profile progressions (Spirit Shielding, Weighted Shots, Greater Expansion) execute as component BUY followed by in-place UPGRADE. Pricing half of the real-data gate: verified Deadlock shop mechanic (full component credit, operator-observed) derives each upgrade surcharge from captured costs - Spirit Shielding 1600-800=800, Weighted Shots 3200-1600=1600, Greater Expansion 3200-800=2400. Confirmed terminals are never direct-BUYed.",
   "selectedArchetypeId": "archetype:hero:72:cluster:ed85aa4f11192e58",
   "desiredFamilies": [
     {
@@ -50,32 +51,23 @@
       "familyId": 709540378,
       "selectedTerminalItemId": 1009965641,
       "selectedTerminalKind": "DEFAULT_TERMINAL"
-    },
-    {
-      "familyId": 1548066885,
-      "selectedTerminalItemId": 2463960640,
-      "selectedTerminalKind": "DEFAULT_TERMINAL"
-    },
-    {
-      "familyId": 865958998,
-      "selectedTerminalItemId": 1250307611,
-      "selectedTerminalKind": "DEFAULT_TERMINAL"
     }
   ],
   "selectedChoiceFamilyIdsByGroup": {},
   "actionSemanticKeys": [
     "BUY:1009965641",
+    "BUY:1672893796",
     "BUY:1342610602",
     "BUY:98582110",
+    "BUY:393974127",
     "BUY:3190916303",
-    "BUY:112198670",
+    "UPGRADE:112198670:upgrade:112198670",
     "BUY:1235347618",
     "BUY:3731635960",
-    "BUY:3791587546",
-    "BUY:1193964439",
-    "BUY:2463960640",
-    "BUY:2417568017",
-    "BUY:1250307611"
+    "BUY:754480263",
+    "UPGRADE:3791587546:upgrade:3791587546",
+    "UPGRADE:1193964439:upgrade:1193964439",
+    "BUY:2417568017"
   ],
   "finalFamilySatisfaction": [
     {

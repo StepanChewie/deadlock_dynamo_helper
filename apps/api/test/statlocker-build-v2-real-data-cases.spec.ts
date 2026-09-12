@@ -115,6 +115,12 @@ function buildGraph(fixture: StatlockerBuildV2Fixture) {
       componentItemId: Number(row.componentItemId),
       componentOrder: row.componentOrder,
     })),
+    upgradePricingPolicy: {
+      mode: 'TARGET_COST_MINUS_VERIFIED_COMPONENT_CREDIT',
+      componentCreditRatio: 1,
+      evidence: 'OBSERVED',
+      source: 'deadlock-shop-full-component-credit',
+    },
   });
   return compileStrictRecommendationCatalogV1(source);
 }
@@ -246,13 +252,16 @@ describe('Statlocker build v2 captured replacement cases (Billy, hero 72)', () =
       replacementContext: replacementContext(fixture, rows, lifecycle),
     });
 
-    // The three confirmed-lineage families fail closed on the missing
-    // verified upgrade pricing and the remaining 14 standalone family goals
-    // fill the inventory, then one further family entry replaces at 12/12.
+    // Verified pricing unlocks the three confirmed progressions: each runs as
+    // a component BUY followed by an in-place UPGRADE. The 12 standalone and
+    // component purchases fill the inventory while the upgrades interleave
+    // without ever needing a new slot, so no replacement is required and the
+    // last goals stay blocked at 12/12 (no held item carries lifecycle
+    // evidence in this timeline, so no safe replacement exists).
     expect(result.actions.length).toBeGreaterThan(12);
     expect(result.actions.filter((action) => action.action === 'BUY')).toHaveLength(12);
-    expect(result.actions.filter((action) => action.action === 'REPLACE')).toHaveLength(1);
-    expect(result.actions.every((action) => action.action !== 'UPGRADE')).toBe(true);
+    expect(result.actions.filter((action) => action.action === 'UPGRADE')).toHaveLength(3);
+    expect(result.actions.every((action) => action.action !== 'REPLACE')).toBe(true);
 
     let maxHeld = 0;
     const inventoryByStep = simulateFullBuildInventoryV2({
@@ -271,26 +280,32 @@ describe('Statlocker build v2 captured replacement cases (Billy, hero 72)', () =
     // actually reaches 12/12 and never exceeds it.
     expect(maxHeld).toBe(CAPACITY);
 
-    const replaceStep = result.actions.findIndex((action) => action.action === 'REPLACE');
-    expect(replaceStep).toBeGreaterThan(11);
-    const replaceAction = result.actions[replaceStep];
-    if (replaceAction.action !== 'REPLACE') throw new Error('unreachable');
-    // The only lifecycle-evidenced held item (Juggernaut, real captured
-    // generalWpa 0.0419 / averagePurchaseTimeS 1863.4) is the sell pick; the
-    // last goal (Berserker) replaces it in place at exactly 12/12.
-    expect(replaceAction.sellItemId).toBe(1250307611);
-    expect(replaceAction.buyItemId).toBe(1414319208);
-    expect(replaceAction.reasonCodes).toContain('FAMILY_ENTRY_REPLACEMENT');
-    expect(replaceAction.reasonCodes).toContain('MATCHUP_PROTECTED');
-
-    // Confirmed-lineage families never fall back to a direct terminal BUY.
-    expect(result.reasonCodes).toContain('CONFIRMED_PROGRESSION_RECIPE_UNAVAILABLE');
-    const buyItemIds = result.actions
-      .filter((action) => action.action === 'BUY')
-      .map((action) => (action.action === 'BUY' ? action.buyItemId : 0));
-    for (const confirmedTerminal of [112198670, 3791587546, 1193964439]) {
-      expect(buyItemIds).not.toContain(confirmedTerminal);
+    // Every confirmed progression executes as component BUY before in-place
+    // UPGRADE, never a direct terminal BUY.
+    const confirmedProgressions: ReadonlyArray<readonly [number, number]> = [
+      [1672893796, 112198670],
+      [393974127, 3791587546],
+      [754480263, 1193964439],
+    ];
+    const semanticKeys = result.actions.map((action) =>
+      action.action === 'BUY'
+        ? `BUY:${action.buyItemId}`
+        : action.action === 'UPGRADE'
+          ? `UPGRADE:${action.buyItemId}:${action.recipeId}`
+          : `REPLACE:${action.sellItemId}->${action.buyItemId}`,
+    );
+    for (const [componentItemId, terminalItemId] of confirmedProgressions) {
+      expect(semanticKeys).not.toContain(`BUY:${terminalItemId}`);
+      const buyIndex = semanticKeys.indexOf(`BUY:${componentItemId}`);
+      const upgradeIndex = semanticKeys.indexOf(`UPGRADE:${terminalItemId}:upgrade:${terminalItemId}`);
+      expect(buyIndex).toBeGreaterThanOrEqual(0);
+      expect(upgradeIndex).toBeGreaterThan(buyIndex);
     }
+    expect(result.reasonCodes).not.toContain('CONFIRMED_PROGRESSION_RECIPE_UNAVAILABLE');
+    // The goals that would need a 13th slot stay honestly blocked: no held
+    // item carries lifecycle evidence, so no safe replacement exists.
+    expect(result.reasonCodes).toContain('CAPACITY_BLOCKED_NO_SAFE_REPLACEMENT');
+    expect(result.reasonCodes).toContain('ITEM_META_EVIDENCE_MISSING');
     for (const reasonCode of result.reasonCodes) {
       expect(['REQUIRED_FAMILY_REGRESSION', 'IMMEDIATE_BUY_REPLACE_CHURN', 'POINTLESS_PURCHASE_CHURN']).not.toContain(reasonCode);
     }
