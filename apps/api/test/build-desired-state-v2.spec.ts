@@ -97,12 +97,10 @@ function wpa(itemId: number, deltaWpa: number, count = 10_000): StatlockerVsHero
 function resolve(
   value: BuildArchetypeV2,
   rows: readonly StatlockerVsHeroWpaAggregateSourceV1[],
-  totalCapacity = 12,
 ) {
   return new BuildDesiredStateV2Service(new ThreatWeightedMatchupV1Service()).resolve({
     heroId: 72,
     archetype: value,
-    totalCapacity,
     enemyHeroIds: [6],
     enemyThreats: [],
     vsHeroRows: rows,
@@ -118,6 +116,7 @@ describe('BuildDesiredStateV2Service', () => {
     expect(result.families).toHaveLength(1);
     expect(result.families[0]).toMatchObject({
       familyId: 1000,
+      goalKind: 'REQUIRED',
       selectedTerminalItemId: 101,
       selectedTerminalKind: 'DEFAULT_TERMINAL',
     });
@@ -131,6 +130,7 @@ describe('BuildDesiredStateV2Service', () => {
 
     expect(result.families[0]).toMatchObject({
       familyId: 1000,
+      goalKind: 'REQUIRED',
       selectedTerminalItemId: 102,
       selectedTerminalKind: 'OPTIONAL_TERMINAL',
     });
@@ -158,12 +158,13 @@ describe('BuildDesiredStateV2Service', () => {
     expect(result.families[0]).toMatchObject({
       familyId: 2001,
       requirement: 'CHOICE',
+      goalKind: 'CHOICE_SELECTED',
       groupId: 'choice:defense',
       selectedTerminalItemId: 202,
     });
   });
 
-  it('fills remaining capacity with Statlocker-backed optional families even when WPA is below the buy-improvement floor', () => {
+  it('keeps all OPTIONAL goals and only matchup-supported SITUATIONAL goals', () => {
     const required = Array.from({ length: 8 }, (_, index) => family(3000 + index, 4000 + index));
     const choiceLeft = family(3100, 4100, undefined, 'OPTIONAL');
     const choiceRight = family(3101, 4101, undefined, 'OPTIONAL');
@@ -192,7 +193,7 @@ describe('BuildDesiredStateV2Service', () => {
       wpa(4203, -0.05),
     ];
 
-    const result = resolve(value, rows, 12);
+    const result = resolve(value, rows);
     const selectedFamilyIds = new Set(result.families.map((entry) => entry.familyId));
 
     for (const entry of required) expect(selectedFamilyIds.has(entry.familyId)).toBe(true);
@@ -202,16 +203,19 @@ describe('BuildDesiredStateV2Service', () => {
     expect(selectedFamilyIds.has(3202)).toBe(true);
     expect(selectedFamilyIds.has(3203)).toBe(false);
     expect(result.families).toHaveLength(12);
-    expect(result.reasonCodes).not.toContain('DESIRED_STATE_UNDER_CAPACITY');
   });
 
   it('keeps more than 12 eligible lifetime goals instead of truncating them to inventory capacity', () => {
     const required = Array.from({ length: 10 }, (_, index) => family(5000 + index, 6000 + index));
     const optional = Array.from({ length: 4 }, (_, index) => family(5100 + index, 6100 + index, undefined, 'OPTIONAL'));
 
-    const result = resolve(archetype([...required, ...optional]), [], 12);
+    const result = resolve(archetype([...required, ...optional]), []);
 
     expect(result.families).toHaveLength(14);
+    expect(result.families.map((entry) => entry.familyId)).toEqual([
+      ...required.map((entry) => entry.familyId),
+      ...optional.map((entry) => entry.familyId),
+    ]);
     expect(result.reasonCodes).not.toContain('DESIRED_STATE_CAPACITY_LIMITED');
   });
 
