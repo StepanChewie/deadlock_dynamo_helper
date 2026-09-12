@@ -1,9 +1,9 @@
-import { BuildArchetypeCompilerV2Service } from '../src/statlocker-adaptive/build-archetype-compiler-v2.service';
 import {
+  BuildArchetypeV2,
   StatlockerBuildProfileItemV2,
   StatlockerBuildProfileV2,
 } from '../src/statlocker-adaptive/build-archetype-v2';
-import { BuildArchetypeClusterV2 } from '../src/statlocker-adaptive/build-archetype-miner-v2.service';
+import { withSourceProfileProvenance } from '../src/statlocker-adaptive/build-archetype-refresh-v2.service';
 
 const HERO_ID = 72;
 
@@ -27,6 +27,20 @@ function profile(
   return { accountId, playerName, heroId: HERO_ID, items };
 }
 
+function family(familyId: number): NonNullable<BuildArchetypeV2['families']>[number] {
+  return {
+    familyId,
+    requirement: 'REQUIRED',
+    aggregateFrequencyTier: 'CORE',
+    sourceProfileCount: 2,
+    profileCoverage: 2 / 3,
+    purchaseRate: 0.9,
+    structuralPriority: 0.9,
+    progressionNodes: [],
+    terminalCandidates: [],
+  };
+}
+
 describe('Build archetype V2 family provenance', () => {
   it('keeps nicknames on the archetype and exact contributor account ids on each family', () => {
     const profiles = [
@@ -34,34 +48,33 @@ describe('Build archetype V2 family provenance', () => {
       profile('account-b', 'Bravo', [item(101, 101), item(201, 201)]),
       profile('account-c', 'Charlie', [item(201, 201)]),
     ];
-    const cluster: BuildArchetypeClusterV2 = {
-      clusterId: 'hero:72:provenance',
+    const archetype: BuildArchetypeV2 = {
+      archetypeId: 'archetype:test',
       heroId: HERO_ID,
-      profileAccountIds: profiles.map((entry) => entry.accountId),
-      support: 1,
-      internalSimilarity: 0.9,
-      separation: 0.5,
-      reasonCodes: [],
+      rulesetVersion: 'r1',
+      catalogSha256: 'a'.repeat(64),
+      statlockerPatchId: 'p1',
+      sourceProfileAccountIds: profiles.map((entry) => entry.accountId),
+      families: [family(101), family(201)],
+      items: [],
+      groups: [],
+      orderEdges: [],
+      relationships: [],
+      quality: { support: 1, coherence: 0.9, separation: 0.5, sourceProfileCount: 3 },
     };
 
-    const archetype = new BuildArchetypeCompilerV2Service().compile({
-      cluster,
-      profiles,
-      rulesetVersion: 'r1',
-      statlockerPatchId: 'p1',
-      catalogSha256: 'a'.repeat(64),
-    });
+    const decorated = withSourceProfileProvenance(archetype, profiles);
 
-    expect(archetype.sourceProfiles).toEqual([
+    expect(decorated.sourceProfiles).toEqual([
       { accountId: 'account-a', playerName: 'Alpha' },
       { accountId: 'account-b', playerName: 'Bravo' },
       { accountId: 'account-c', playerName: 'Charlie' },
     ]);
-    expect(archetype.families?.find((family) => family.familyId === 101)?.sourceProfileAccountIds).toEqual([
+    expect(decorated.families?.find((entry) => entry.familyId === 101)?.sourceProfileAccountIds).toEqual([
       'account-a',
       'account-b',
     ]);
-    expect(archetype.families?.find((family) => family.familyId === 201)?.sourceProfileAccountIds).toEqual([
+    expect(decorated.families?.find((entry) => entry.familyId === 201)?.sourceProfileAccountIds).toEqual([
       'account-b',
       'account-c',
     ]);
