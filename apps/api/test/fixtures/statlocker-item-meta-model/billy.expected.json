@@ -1,5 +1,5 @@
 {
-  "heroId": 6,
+  "heroId": 72,
   "heroName": "Billy",
   "patchId": "patch_676255623445218601",
   "sourcePath": "/api/info/wpa-filtered-items?hero=Billy&tier=all&rank=ranked&category=all&gameState=all&purchaseTime=all&teamComp=Average+Comp&buildType=all&patch=patch_676255623445218601&minSampleSize=500&searchTerm=&sortBy=wpa",
