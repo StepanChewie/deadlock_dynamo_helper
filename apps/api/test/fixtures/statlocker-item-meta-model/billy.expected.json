@@ -1,0 +1,50 @@
+{
+  "heroId": 6,
+  "heroName": "Billy",
+  "patchId": "patch_676255623445218601",
+  "sourcePath": "/api/info/wpa-filtered-items?hero=Billy&tier=all&rank=ranked&category=all&gameState=all&purchaseTime=all&teamComp=Average+Comp&buildType=all&patch=patch_676255623445218601&minSampleSize=500&searchTerm=&sortBy=wpa",
+  "items": [
+    {
+      "itemId": 3884003354,
+      "itemName": "Crippling Headshot",
+      "generalWpa": 0.05869257232212666,
+      "averagePurchaseTimeS": 1926.6389366692736,
+      "sampleSize": 1279
+    },
+    {
+      "itemId": 951866250,
+      "itemName": "Indomitable",
+      "generalWpa": 0.052879573712255774,
+      "averagePurchaseTimeS": 1977.1353463587918,
+      "sampleSize": 563
+    },
+    {
+      "itemId": 805079544,
+      "itemName": "Weapon Shielding",
+      "generalWpa": 0.04934861681731036,
+      "averagePurchaseTimeS": 734.475924404273,
+      "sampleSize": 3651
+    },
+    {
+      "itemId": 3357231760,
+      "itemName": "Unstoppable",
+      "generalWpa": 0.04202004555808656,
+      "averagePurchaseTimeS": 1924.6161731207294,
+      "sampleSize": 878
+    },
+    {
+      "itemId": 1250307611,
+      "itemName": "Juggernaut",
+      "generalWpa": 0.04189961656441718,
+      "averagePurchaseTimeS": 1863.4042944785288,
+      "sampleSize": 7824
+    },
+    {
+      "itemId": 3491236900,
+      "itemName": "Plated Armor",
+      "generalWpa": 0.041824032921810694,
+      "averagePurchaseTimeS": 1973.3367901234576,
+      "sampleSize": 1215
+    }
+  ]
+}
