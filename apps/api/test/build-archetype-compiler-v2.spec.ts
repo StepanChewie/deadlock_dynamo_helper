@@ -1,3 +1,4 @@
+import { createRecommendationItemGraph, RecommendationItemGraph } from '@deadlock-live-probe/build-domain';
 import { BuildArchetypeCompilerV2Service } from '../src/statlocker-adaptive/build-archetype-compiler-v2.service';
 import { StatlockerBuildProfileItemV2, StatlockerBuildProfileV2 } from '../src/statlocker-adaptive/build-archetype-v2';
 import { BuildArchetypeClusterV2 } from '../src/statlocker-adaptive/build-archetype-miner-v2.service';
@@ -43,14 +44,41 @@ function clusterFor(profiles: readonly StatlockerBuildProfileV2[]): BuildArchety
   };
 }
 
-function compile(profiles: readonly StatlockerBuildProfileV2[]) {
+function compile(
+  profiles: readonly StatlockerBuildProfileV2[],
+  itemGraph?: RecommendationItemGraph,
+) {
   return new BuildArchetypeCompilerV2Service().compile({
     cluster: clusterFor(profiles),
     profiles,
     rulesetVersion: 'r1',
     statlockerPatchId: 'p1',
     catalogSha256: 'a'.repeat(64),
+    itemGraph,
   });
+}
+
+function progressionGraph(): RecommendationItemGraph {
+  return createRecommendationItemGraph([
+    {
+      itemId: A,
+      name: 'Component',
+      slotType: 'weapon',
+      active: false,
+      availableRulesetIds: ['r1'],
+      directPurchaseCost: 1_600,
+      upgradeRecipes: [],
+    },
+    {
+      itemId: A_UPGRADE,
+      name: 'Upgrade',
+      slotType: 'weapon',
+      active: false,
+      availableRulesetIds: ['r1'],
+      directPurchaseCost: 6_400,
+      upgradeRecipes: [],
+    },
+  ], [{ parentItemId: A_UPGRADE, componentItemId: A }]);
 }
 
 function hasHardEdge(
@@ -126,6 +154,81 @@ describe('BuildArchetypeCompilerV2Service', () => {
     expect(archetype.items.filter((entry) => entry.familyId === A)).toHaveLength(1);
     expect(archetype.items[0].itemId).toBe(A_UPGRADE);
     expect(archetype.items[0].sourceProfileCount).toBe(3);
+  });
+
+  it('compiles same-profile observed progression with lineage-specific timing', () => {
+    const archetype = compile([
+      profile('p1', [
+        itemAt(A, 300, { familyId: A, frequencyTier: 'FREQUENT' }),
+        itemAt(A_UPGRADE, 900, { familyId: A }),
+      ]),
+      profile('p2', [
+        itemAt(A, 330, { familyId: A, frequencyTier: 'FREQUENT' }),
+        itemAt(A_UPGRADE, 960, { familyId: A }),
+      ]),
+      profile('p3', [
+        itemAt(A, 310, { familyId: A, frequencyTier: 'FREQUENT' }),
+        itemAt(A_UPGRADE, 920, { familyId: A }),
+      ]),
+    ], progressionGraph());
+
+    expect(archetype.families?.[0].progressionEdges).toEqual([
+      {
+        fromItemId: A,
+        toItemId: A_UPGRADE,
+        sourceProfileCount: 3,
+        orderedProfileCount: 3,
+        orderConfidence: 1,
+        timing: {
+          fromMedianBuyTimeS: 310,
+          toMedianBuyTimeS: 920,
+          fromSpreadS: 10,
+          toSpreadS: 20,
+        },
+        evidence: 'STATLOCKER_SAME_PROFILE',
+      },
+    ]);
+  });
+
+  it('does not synthesize progression from items observed only in different profiles', () => {
+    const archetype = compile([
+      profile('p1', [itemAt(A, 300, { familyId: A })]),
+      profile('p2', [itemAt(A, 320, { familyId: A })]),
+      profile('p3', [itemAt(A_UPGRADE, 900, { familyId: A })]),
+      profile('p4', [itemAt(A_UPGRADE, 920, { familyId: A })]),
+    ], progressionGraph());
+
+    expect(archetype.families?.[0].progressionEdges).toEqual([]);
+  });
+
+  it('rejects same-profile progression below soft order confidence', () => {
+    const archetype = compile([
+      profile('p1', [
+        itemAt(A, 300, { familyId: A }),
+        itemAt(A_UPGRADE, 900, { familyId: A }),
+      ]),
+      profile('p2', [
+        itemAt(A, 900, { familyId: A }),
+        itemAt(A_UPGRADE, 300, { familyId: A }),
+      ]),
+    ], progressionGraph());
+
+    expect(archetype.families?.[0].progressionEdges).toEqual([]);
+  });
+
+  it('ignores same-profile observations inside the order timing tolerance', () => {
+    const archetype = compile([
+      profile('p1', [
+        itemAt(A, 300, { familyId: A }),
+        itemAt(A_UPGRADE, 330, { familyId: A }),
+      ]),
+      profile('p2', [
+        itemAt(A, 500, { familyId: A }),
+        itemAt(A_UPGRADE, 530, { familyId: A }),
+      ]),
+    ], progressionGraph());
+
+    expect(archetype.families?.[0].progressionEdges).toEqual([]);
   });
 
   it('preserves a consistent Statlocker explicit CHOICE as one semantic group', () => {
