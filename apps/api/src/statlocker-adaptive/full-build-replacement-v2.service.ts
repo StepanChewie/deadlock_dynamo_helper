@@ -1,6 +1,10 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { RecommendationItemGraph } from '@deadlock-live-probe/build-domain';
 import {
+  ADAPTIVE_INVESTMENT_TYPES_V1,
+  investmentItemValueV1,
+} from './adaptive-economy-v1';
+import {
   BuildArchetypeFamilyV2,
   BuildArchetypeV2,
   BuildObservedProgressionEdgeV2,
@@ -99,7 +103,24 @@ export class FullBuildReplacementV2Service {
     );
     const candidates = dedupeItemIds(input.projectedInventoryItemIds)
       .filter((itemId) => !input.activeProgressionProtectedItemIds.has(itemId))
-      .filter((itemId) => !dependencies.has(itemId));
+      .filter((itemId) => !dependencies.has(itemId))
+      .filter((itemId) => {
+        // Hard invest guard: a sale that would drop an already-closed invest
+        // track below the breakpoint is forbidden unless the same-step buy
+        // restores the track. Sold items may still exit through an
+        // invest-neutral REPLACE.
+        const closed = investTracksAtOrAboveBreakpoint(
+          input.projectedInventoryItemIds,
+          input.itemGraph,
+          config.investBreakpointSouls,
+        );
+        if (closed.size === 0) return true;
+        const resulting = replaceItemId(input.projectedInventoryItemIds, itemId, input.buyItemId);
+        const after = investTracksAtOrAboveBreakpoint(resulting, input.itemGraph, config.investBreakpointSouls);
+        const breaks = [...closed].some((slotType) => !after.has(slotType));
+        if (breaks) diagnostics.push('INVEST_PROTECTED');
+        return !breaks;
+      });
 
     // Step 5: team matchup protection. Only protected=true removes a
     // candidate; missing rows never protect, and all diagnostics are retained.
@@ -266,4 +287,23 @@ function replaceItemId(
   if (index >= 0) result[index] = buyItemId;
   else result.push(buyItemId);
   return result;
+}
+
+/** Tracks whose invested souls already reach the invest breakpoint. */
+function investTracksAtOrAboveBreakpoint(
+  inventoryItemIds: readonly number[],
+  itemGraph: RecommendationItemGraph,
+  breakpointSouls: number,
+): Set<'weapon' | 'vitality' | 'spirit'> {
+  const totals: Record<'weapon' | 'vitality' | 'spirit', number> = { weapon: 0, vitality: 0, spirit: 0 };
+  for (const itemId of inventoryItemIds) {
+    const item = itemGraph.getItem(itemId);
+    if (!item) continue;
+    totals[item.slotType] += investmentItemValueV1(itemId, itemGraph);
+  }
+  const closed = new Set<'weapon' | 'vitality' | 'spirit'>();
+  for (const track of ADAPTIVE_INVESTMENT_TYPES_V1) {
+    if (totals[track] >= breakpointSouls) closed.add(track);
+  }
+  return closed;
 }

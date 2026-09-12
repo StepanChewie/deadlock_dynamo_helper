@@ -1,6 +1,7 @@
 import { createHash } from 'crypto';
 import { Injectable, Optional } from '@nestjs/common';
 import { RecommendationItemGraph } from '@deadlock-live-probe/build-domain';
+import { investmentItemValueV1 } from './adaptive-economy-v1';
 import {
   BuildDesiredStateV2Service,
   DesiredBuildStateV2,
@@ -449,9 +450,9 @@ function uniqueStrings(values: readonly string[]): string[] {
 }
 
 /**
- * Current per-track invested souls for flex invest-closing ranking, valued at
- * each held item's verified direct purchase cost (upgraded items carry their
- * full purchase value).
+ * Current per-track invested souls for flex invest-closing ranking. Values use
+ * the shared investment item value (cheapest verified acquisition path), the
+ * same semantics as sell protection.
  */
 function buildFlexInvestmentContext(
   itemGraph: RecommendationItemGraph,
@@ -465,11 +466,14 @@ function buildFlexInvestmentContext(
   for (const itemId of currentInventoryItemIds) {
     const item = itemGraph.getItem(itemId);
     if (!item) continue;
-    currentValueByType[item.slotType] += Math.max(0, item.directPurchaseCost ?? 0);
+    currentValueByType[item.slotType] += investmentItemValueV1(itemId, itemGraph);
   }
   return {
     slotTypeByItemId: (itemId) => itemGraph.getItem(itemId)?.slotType,
-    costByItemId: (itemId) => itemGraph.getItem(itemId)?.directPurchaseCost,
+    costByItemId: (itemId) => {
+      const item = itemGraph.getItem(itemId);
+      return item === undefined ? undefined : investmentItemValueV1(itemId, itemGraph);
+    },
     currentValueByType,
   };
 }

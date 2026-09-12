@@ -122,7 +122,7 @@ export interface StatlockerBuildV2Config {
   fullBuildResolver: FullBuildResolverV2Config;
   /** Souls per investment track (weapon/vitality/spirit) that a single flex
    * item's purchase must reach to count as closing the invest. */
-  flexInvestBreakpointSouls: number;
+  investBreakpointSouls: number;
 }
 
 export const STATLOCKER_BUILD_V2_CONFIG: Readonly<StatlockerBuildV2Config> = Object.freeze({
@@ -238,5 +238,5 @@ export const STATLOCKER_BUILD_V2_CONFIG: Readonly<StatlockerBuildV2Config> = Obj
     nearTermProtectedStepCount: 2,
     nearTermPlanSwitchMinImprovement: 0.16,
   }),
-  flexInvestBreakpointSouls: 4800,
+  investBreakpointSouls: 4800,
 });

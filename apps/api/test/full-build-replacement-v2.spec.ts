@@ -168,6 +168,7 @@ function makeInput(parts?: {
   desiredFamily?: DesiredFamilyStateV2;
   activeProgressionProtectedItemIds?: ReadonlySet<number>;
   context?: Partial<FullBuildReplacementContextV2>;
+  itemGraph?: ReturnType<typeof createRecommendationItemGraph>;
 }): FullBuildReplacementV2Input {
   return {
     archetype: parts?.archetype ?? archetypeFixture(),
@@ -176,10 +177,28 @@ function makeInput(parts?: {
     projectedInventoryItemIds: PROJECTED_INVENTORY,
     activeProgressionProtectedItemIds:
       parts?.activeProgressionProtectedItemIds ?? new Set<number>(),
-    itemGraph: createRecommendationItemGraph([]),
+    itemGraph: parts?.itemGraph ?? createRecommendationItemGraph([]),
     rulesetId: 'r1',
     context: { ...BASE_CONTEXT, ...parts?.context },
   };
+}
+
+function graphWith(
+  items: readonly {
+    itemId: number;
+    slotType: 'weapon' | 'vitality' | 'spirit';
+    directPurchaseCost?: number;
+  }[],
+): ReturnType<typeof createRecommendationItemGraph> {
+  return createRecommendationItemGraph(items.map((item) => ({
+    itemId: item.itemId,
+    name: `item-${item.itemId}`,
+    slotType: item.slotType,
+    active: false,
+    availableRulesetIds: ['r1'],
+    ...(item.directPurchaseCost === undefined ? {} : { directPurchaseCost: item.directPurchaseCost }),
+    upgradeRecipes: [],
+  })));
 }
 
 function makeService(pairs: ReadonlyMap<number, SellPairValueV2>, config?: StatlockerBuildV2Config) {
@@ -411,5 +430,52 @@ describe('FullBuildReplacementV2Service', () => {
       makeInput({ archetype: archetypeFixture({ roles: { 30: 'FREQUENT' } }), context: evidence }),
     );
     expect(frequent).toMatchObject({ kind: 'REPLACE', sellItemId: 30 });
+  });
+
+  it('never sells a held item whose sale would drop a closed invest track below the breakpoint', () => {
+    // Weapon track holds 3000 + 1800 = 4800 (closed); spirit track 1600 (open).
+    const itemGraph = graphWith([
+      { itemId: 30, slotType: 'weapon', directPurchaseCost: 3000 },
+      { itemId: 31, slotType: 'weapon', directPurchaseCost: 1800 },
+      { itemId: 32, slotType: 'spirit', directPurchaseCost: 1600 },
+      { itemId: 50, slotType: 'spirit', directPurchaseCost: 2200 },
+    ]);
+    const pairs = new Map<number, SellPairValueV2>([
+      [30, { marginalGain: 1, confidence: 1 }],
+      [32, { marginalGain: 1, confidence: 1 }],
+    ]);
+    const { service, evaluate } = makeService(pairs);
+    // Item 30 is the strongest lifecycle sell candidate, but selling it would
+    // drop the closed weapon track to 1800. The open spirit item stays sellable.
+    const context = { lifecycleEvidence: [lifecycleRow(30, 0.1, 100), lifecycleRow(32, 0.3, 300)] };
+
+    const result = service.decide(makeInput({ itemGraph, context }));
+
+    expect(result).toMatchObject({ kind: 'REPLACE', sellItemId: 32 });
+    expect(result.reasonCodes).toContain('INVEST_PROTECTED');
+    expect(soldItemIds(evaluate)).toEqual([32]);
+  });
+
+  it('allows selling inside a closed invest track when the same-step buy restores the breakpoint', () => {
+    // Weapon track 2600 + 2200 = 4800 (closed). Selling the 2200 item and
+    // buying the 2200 weapon target in the same REPLACE step keeps it closed.
+    const itemGraph = graphWith([
+      { itemId: 30, slotType: 'weapon', directPurchaseCost: 2600 },
+      { itemId: 31, slotType: 'weapon', directPurchaseCost: 2200 },
+      { itemId: 50, slotType: 'weapon', directPurchaseCost: 2200 },
+    ]);
+    const pairs = new Map<number, SellPairValueV2>([
+      [31, { marginalGain: 1, confidence: 1 }],
+    ]);
+    const { service, evaluate } = makeService(pairs);
+    const context = { lifecycleEvidence: [lifecycleRow(31, 0.1, 100)] };
+
+    const result = service.decide(makeInput({ itemGraph, context }));
+
+    expect(result).toMatchObject({ kind: 'REPLACE', sellItemId: 31 });
+    expect(soldItemIds(evaluate)).toEqual([31]);
+    // The INVEST_PROTECTED diagnostic refers to item 30: selling it without a
+    // large enough same-step buy would also have dropped the closed track.
+    expect(result.reasonCodes).toContain('INVEST_PROTECTED');
   });
 });

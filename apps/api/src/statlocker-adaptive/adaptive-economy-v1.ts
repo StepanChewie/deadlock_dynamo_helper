@@ -340,8 +340,15 @@ function investmentValueForItemV1(
   return value;
 }
 
-export function unknownAdaptiveInvestmentStateV1(): AdaptiveInvestmentStateV1 {
-  return {
+/** Verified investment value of one item: the cheapest acquisition path —
+ * direct purchase when known, otherwise the cheapest upgrade recipe including
+ * its component values. Shared by invest tracking, flex ranking, and sell
+ * protection so every consumer weighs souls identically. */
+export function investmentItemValueV1(itemId: number, graph: RecommendationItemGraph): number {
+  return investmentValueForItemV1(itemId, graph, new Map(), new Set());
+}
+
+export function unknownAdaptiveInvestmentStateV1(): AdaptiveInvestmentStateV1 {  return {
     tracks: {
       weapon: { type: 'weapon', currentValue: 0 },
       vitality: { type: 'vitality', currentValue: 0 },

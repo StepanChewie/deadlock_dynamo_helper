@@ -370,7 +370,7 @@ function closesInvestBreakpoint(
   const slotType = investment.slotTypeByItemId(itemId);
   const cost = investment.costByItemId(itemId);
   if (!slotType || cost === undefined) return false;
-  const remaining = STATLOCKER_BUILD_V2_CONFIG.flexInvestBreakpointSouls - investment.currentValueByType[slotType];
+  const remaining = STATLOCKER_BUILD_V2_CONFIG.investBreakpointSouls - investment.currentValueByType[slotType];
   return remaining > 0 && cost === remaining;
 }
 
