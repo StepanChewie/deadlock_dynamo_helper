@@ -46,6 +46,7 @@ export interface BuildArchetypeRefreshIdentityV2 {
 export interface BuildArchetypeRefreshSourceProfileV2 {
   accountId: string;
   rank: number;
+  playerName?: string;
 }
 
 export interface BuildArchetypeRefreshResultV2 {
@@ -118,7 +119,7 @@ export class BuildArchetypeRefreshV2Service {
       if (!profileRow) continue;
 
       const analysis = parseProBuild(profileRow.payload, heroId, source.accountId);
-      profiles.push(toStatlockerBuildProfileV2(analysis, catalogGraph, source.rank));
+      profiles.push(toStatlockerBuildProfileV2(analysis, catalogGraph, source.rank, source.playerName));
       availableSources.push(source);
     }
 
@@ -241,7 +242,14 @@ function selectTopTen(
       typeof profile.accountId === 'string' &&
       profile.accountId.trim() !== '',
     )
-    .map((profile) => ({ accountId: profile.accountId, rank: profile.rank }))
+    .map((profile) => {
+      const playerName = typeof profile.playerName === 'string' ? profile.playerName.trim() : '';
+      return {
+        accountId: profile.accountId,
+        rank: profile.rank,
+        ...(playerName ? { playerName } : {}),
+      };
+    })
     .sort((left, right) => left.rank - right.rank || left.accountId.localeCompare(right.accountId));
 
   const selected: BuildArchetypeRefreshSourceProfileV2[] = [];
@@ -307,7 +315,7 @@ function finiteNonNegative(value: number | undefined): boolean {
   return value !== undefined && Number.isFinite(Number(value)) && Number(value) >= 0;
 }
 
-function buildSnapshotId(
+export function buildSnapshotId(
   heroId: number,
   identity: BuildArchetypeRefreshIdentityV2,
   sourceProfiles: readonly BuildArchetypeRefreshSourceProfileV2[],
@@ -319,7 +327,7 @@ function buildSnapshotId(
       rulesetVersion: identity.rulesetVersion,
       catalogSha256: identity.catalogSha256.toLowerCase(),
       statlockerPatchId: identity.statlockerPatchId,
-      sourceProfiles,
+      sourceProfiles: sourceProfiles.map(({ accountId, rank }) => ({ accountId, rank })),
       archetypeIds: [...archetypeIds].sort(),
     }))
     .digest('hex')
