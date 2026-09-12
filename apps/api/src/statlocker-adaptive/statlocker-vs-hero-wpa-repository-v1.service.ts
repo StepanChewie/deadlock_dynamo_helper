@@ -71,7 +71,7 @@ export class StatlockerVsHeroWpaRepositoryV1Service {
       });
       if (!active) return [];
 
-      return this.findForSnapshotQuery({
+      return await this.findForSnapshotQuery({
         snapshotId: active.snapshotId,
         statlockerPatchId: input.statlockerPatchId,
         rulesetVersion: input.rulesetVersion,

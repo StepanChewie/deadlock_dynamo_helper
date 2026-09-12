@@ -108,4 +108,47 @@ describe('Statlocker VS_HERO_WPA relational row V1 contract', () => {
 
     expect(repository.find).not.toHaveBeenCalled();
   });
+
+  it('records active-query latency only after the WPA row query settles', async () => {
+    let resolveRows!: (rows: StatlockerVsHeroWpaRowV1Entity[]) => void;
+    let markQueryStarted!: () => void;
+    const rows = new Promise<StatlockerVsHeroWpaRowV1Entity[]>((resolve) => {
+      resolveRows = resolve;
+    });
+    const queryStarted = new Promise<void>((resolve) => {
+      markQueryStarted = resolve;
+    });
+    const repository = {
+      find: jest.fn(() => {
+        markQueryStarted();
+        return rows;
+      }),
+    };
+    const rawRepository = {
+      findOne: jest.fn(async () => ({ snapshotId: 'snapshot-a' })),
+    };
+    const observability = {
+      recordWpaQueryLatency: jest.fn(),
+    };
+    const service = new StatlockerVsHeroWpaRepositoryV1Service(
+      repository as never,
+      rawRepository as never,
+      observability as never,
+    );
+
+    const pending = service.findActive({
+      statlockerPatchId: 'patch-a',
+      rulesetVersion: 'ruleset-a',
+      catalogSha256: 'A'.repeat(64),
+      ourHeroId: 1,
+      enemyHeroIds: [2],
+    });
+    await queryStarted;
+
+    expect(observability.recordWpaQueryLatency).not.toHaveBeenCalled();
+
+    resolveRows([]);
+    await expect(pending).resolves.toEqual([]);
+    expect(observability.recordWpaQueryLatency).toHaveBeenCalledTimes(1);
+  });
 });
