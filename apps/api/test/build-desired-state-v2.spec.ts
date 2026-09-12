@@ -99,6 +99,11 @@ function resolve(
   value: BuildArchetypeV2,
   rows: readonly StatlockerVsHeroWpaAggregateSourceV1[],
   flexGoalCapacity?: number,
+  flexInvestment?: {
+    slotTypeByItemId: (itemId: number) => 'weapon' | 'vitality' | 'spirit' | undefined;
+    costByItemId: (itemId: number) => number | undefined;
+    currentValueByType: Readonly<Record<'weapon' | 'vitality' | 'spirit', number>>;
+  },
 ) {
   return new BuildDesiredStateV2Service(new ThreatWeightedMatchupV1Service()).resolve({
     heroId: 72,
@@ -107,6 +112,7 @@ function resolve(
     enemyThreats: [],
     vsHeroRows: rows,
     ...(flexGoalCapacity === undefined ? {} : { flexGoalCapacity }),
+    ...(flexInvestment === undefined ? {} : { flexInvestment }),
   });
 }
 
@@ -303,5 +309,120 @@ describe('BuildDesiredStateV2Service', () => {
 
     expect(result.families).toHaveLength(1);
     expect(result.families[0].goalKind).toBe('REQUIRED');
+  });
+
+  it('ranks an invest-closing flex item first even with worse WPA and later purchase timing', () => {
+    const required = family(7400, 7401);
+    // closer: later timing (2200s), more-negative WPA, but its 3000 souls
+    // close the spirit invest track (1800 held + 3000 >= 4800).
+    const closer = family(7500, 7501, undefined, 'SITUATIONAL', 2_200);
+    const weaker = family(7600, 7601, undefined, 'SITUATIONAL', 1_000);
+    const value = archetype([required, closer, weaker]);
+    const flexInvestment = {
+      slotTypeByItemId: (itemId: number) => itemId === 7501 ? 'spirit' as const : 'vitality' as const,
+      costByItemId: (itemId: number) => itemId === 7501 ? 3000 : 100,
+      currentValueByType: { weapon: 0, vitality: 1800, spirit: 1800 },
+    };
+
+    const result = resolve(
+      value,
+      [wpa(7501, -0.06), wpa(7601, -0.02)],
+      3,
+      flexInvestment,
+    );
+
+    expect(result.families).toHaveLength(3);
+    expect(result.families.slice(0, 1).map((entry) => entry.goalKind)).toEqual(['REQUIRED']);
+    const flex = result.families.slice(1);
+    expect(flex.map((entry) => entry.familyId)).toEqual([7500, 7600]);
+    for (const entry of flex) {
+      expect(entry.reasonCodes).toContain('FLEX_PROVISIONAL_FILL');
+    }
+  });
+
+  it('ranks non-closing flex items best-of-worst by matchup WPA instead of purchase timing', () => {
+    const required = family(7700, 7701);
+    // worse WPA has the earlier purchase timing, so a timing-first order would
+    // pick it first; best-of-worst must invert that.
+    const worseWpaEarlier = family(7800, 7801, undefined, 'SITUATIONAL', 1_000);
+    const betterWpaLater = family(7900, 7901, undefined, 'SITUATIONAL', 2_200);
+    const value = archetype([required, worseWpaEarlier, betterWpaLater]);
+    const flexInvestment = {
+      slotTypeByItemId: () => 'weapon' as const,
+      costByItemId: () => 100,
+      currentValueByType: { weapon: 0, vitality: 0, spirit: 0 },
+    };
+
+    const result = resolve(
+      value,
+      [wpa(7801, -0.06), wpa(7901, -0.02)],
+      3,
+      flexInvestment,
+    );
+
+    const flex = result.families.slice(1);
+    expect(flex.map((entry) => entry.familyId)).toEqual([7900, 7800]);
+  });
+
+  it('never lets a zero-evidence flex item outrank an evidenced-but-negative one', () => {
+    const required = family(8300, 8301);
+    const noRows = family(8400, 8401, undefined, 'SITUATIONAL', 1_000);
+    const measuredNegative = family(8500, 8501, undefined, 'SITUATIONAL', 2_200);
+    const value = archetype([required, noRows, measuredNegative]);
+    const flexInvestment = {
+      slotTypeByItemId: () => 'weapon' as const,
+      costByItemId: () => 100,
+      currentValueByType: { weapon: 0, vitality: 0, spirit: 0 },
+    };
+
+    const result = resolve(
+      value,
+      [wpa(8501, -0.02)],
+      3,
+      flexInvestment,
+    );
+
+    const flex = result.families.slice(1);
+    expect(flex.map((entry) => entry.familyId)).toEqual([8500, 8400]);
+  });
+
+  it('treats only exact top-up purchases as invest closers and never a big overshooting item', () => {
+    const required = family(8600, 8601);
+    // bigExpensive crosses the 4800 breakpoint from an empty track by itself,
+    // but overshoots it: closing with a big item is never a flex priority.
+    const bigExpensive = family(8700, 8701, undefined, 'SITUATIONAL', 1_000);
+    const measuredCheap = family(8800, 8801, undefined, 'SITUATIONAL', 2_200);
+    const value = archetype([required, bigExpensive, measuredCheap]);
+    const flexInvestment = {
+      slotTypeByItemId: (itemId: number) => itemId === 8701 ? 'spirit' as const : 'weapon' as const,
+      costByItemId: (itemId: number) => itemId === 8701 ? 6400 : 1600,
+      currentValueByType: { weapon: 0, vitality: 0, spirit: 0 },
+    };
+
+    const result = resolve(
+      value,
+      [wpa(8701, -0.06), wpa(8801, -0.02)],
+      3,
+      flexInvestment,
+    );
+
+    const flex = result.families.slice(1);
+    expect(flex.map((entry) => entry.familyId)).toEqual([8800, 8700]);
+  });
+
+  it('still ranks flex by purchase timing when no investment context is supplied', () => {
+    const required = family(8000, 8001);
+    const laterTiming = family(8100, 8101, undefined, 'SITUATIONAL', 2_200);
+    const earlierTiming = family(8200, 8201, undefined, 'SITUATIONAL', 1_000);
+    const value = archetype([required, laterTiming, earlierTiming]);
+
+    const result = resolve(
+      value,
+      [wpa(8101, -0.06), wpa(8201, -0.02)],
+      3,
+    );
+
+    const flex = result.families.slice(1);
+    expect(flex.map((entry) => entry.familyId)).toEqual([8200, 8100]);
   });
 });

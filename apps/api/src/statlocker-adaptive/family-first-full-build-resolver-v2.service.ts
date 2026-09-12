@@ -1,5 +1,6 @@
 import { createHash } from 'crypto';
 import { Injectable, Optional } from '@nestjs/common';
+import { RecommendationItemGraph } from '@deadlock-live-probe/build-domain';
 import {
   BuildDesiredStateV2Service,
   DesiredBuildStateV2,
@@ -100,6 +101,7 @@ export class FamilyFirstFullBuildResolverV2Service extends FullBuildResolverV2Se
       })),
       vsHeroRows: input.vsHeroRows,
       flexGoalCapacity: input.capacity,
+      flexInvestment: buildFlexInvestmentContext(input.itemGraph, input.currentInventoryItemIds),
     });
     const outsideCompetition = resolveOutsideCompetition(
       baseDesiredState,
@@ -444,4 +446,30 @@ function hasProtectedRecentPurchase(input: FullBuildLifetimeResolverV2Input): bo
 
 function uniqueStrings(values: readonly string[]): string[] {
   return [...new Set(values)];
+}
+
+/**
+ * Current per-track invested souls for flex invest-closing ranking, valued at
+ * each held item's verified direct purchase cost (upgraded items carry their
+ * full purchase value).
+ */
+function buildFlexInvestmentContext(
+  itemGraph: RecommendationItemGraph,
+  currentInventoryItemIds: readonly number[],
+): {
+  slotTypeByItemId: (itemId: number) => 'weapon' | 'vitality' | 'spirit' | undefined;
+  costByItemId: (itemId: number) => number | undefined;
+  currentValueByType: Readonly<Record<'weapon' | 'vitality' | 'spirit', number>>;
+} {
+  const currentValueByType: Record<'weapon' | 'vitality' | 'spirit', number> = { weapon: 0, vitality: 0, spirit: 0 };
+  for (const itemId of currentInventoryItemIds) {
+    const item = itemGraph.getItem(itemId);
+    if (!item) continue;
+    currentValueByType[item.slotType] += Math.max(0, item.directPurchaseCost ?? 0);
+  }
+  return {
+    slotTypeByItemId: (itemId) => itemGraph.getItem(itemId)?.slotType,
+    costByItemId: (itemId) => itemGraph.getItem(itemId)?.directPurchaseCost,
+    currentValueByType,
+  };
 }

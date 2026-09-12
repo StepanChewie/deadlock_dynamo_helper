@@ -58,6 +58,17 @@ export interface ResolveDesiredBuildStateV2Input {
    * primary goals are never truncated.
    */
   flexGoalCapacity?: number;
+  /**
+   * Current inventory investment context for flex ranking. When supplied,
+   * flex items whose purchase crosses the invest breakpoint on their track
+   * rank first regardless of matchup WPA; the rest rank best-of-worst by
+   * matchup WPA. Without it, flex ranks by purchase time.
+   */
+  flexInvestment?: {
+    slotTypeByItemId: (itemId: number) => 'weapon' | 'vitality' | 'spirit' | undefined;
+    costByItemId: (itemId: number) => number | undefined;
+    currentValueByType: Readonly<Record<'weapon' | 'vitality' | 'spirit', number>>;
+  };
 }
 
 interface FamilyEvaluationV2 {
@@ -154,18 +165,22 @@ export class BuildDesiredStateV2Service {
           !choiceFamilyIds.has(family.familyId) &&
           family.requirement === 'SITUATIONAL',
         )
-        .sort((left, right) =>
-          firstFamilyTiming(left.family) - firstFamilyTiming(right.family) ||
-          left.family.familyId - right.family.familyId,
-        );
-      for (const { family, index } of flexPool) {
+        .map(({ family, index }) => ({
+          family,
+          index,
+          evaluation: this.evaluateFamily(input, family, 'SITUATIONAL', 'FLEX_PROVISIONAL'),
+          defaultTerminalItemId: family.terminalCandidates.find(
+            (candidate) => candidate.kind === 'DEFAULT_TERMINAL',
+          )!.itemId,
+        }))
+        .sort(compareFlexPoolEntries(input.flexInvestment));
+      for (const { family, evaluation, defaultTerminalItemId } of flexPool) {
         if (selected.length + flexStates.length >= flexGoalCapacity) break;
-        const evaluation = this.evaluateFamily(input, family, 'SITUATIONAL', 'FLEX_PROVISIONAL');
         flexStates.push({
           ...evaluation,
           selectedTerminalItemId: evaluation.selectedTerminalKind === 'DEFAULT_TERMINAL'
             ? evaluation.selectedTerminalItemId
-            : family.terminalCandidates.find((candidate) => candidate.kind === 'DEFAULT_TERMINAL')!.itemId,
+            : defaultTerminalItemId,
           selectedTerminalKind: 'DEFAULT_TERMINAL',
           reasonCodes: ['FLEX_PROVISIONAL_FILL'],
         });
@@ -306,6 +321,57 @@ function compareFamilyEvaluation(left: FamilyEvaluationV2, right: FamilyEvaluati
 
 function firstFamilyTiming(family: BuildArchetypeFamilyV2): number {
   return family.progressionNodes[0]?.timing.medianBuyTimeS ?? 0;
+}
+
+interface FlexPoolEntryV2 {
+  family: BuildArchetypeFamilyV2;
+  index: number;
+  evaluation: DesiredFamilyStateV2;
+  defaultTerminalItemId: number;
+}
+
+function compareFlexPoolEntries(
+  investment: ResolveDesiredBuildStateV2Input['flexInvestment'],
+): (left: FlexPoolEntryV2, right: FlexPoolEntryV2) => number {
+  return (left, right) => {
+    if (investment) {
+      const leftCloses = closesInvestBreakpoint(left.defaultTerminalItemId, investment);
+      const rightCloses = closesInvestBreakpoint(right.defaultTerminalItemId, investment);
+      if (leftCloses !== rightCloses) return leftCloses ? -1 : 1;
+      if (!leftCloses) {
+        // Best of the worst: items with measured matchup evidence rank before
+        // zero-evidence ones (no data is not "least bad"), then the
+        // least-negative matchup WPA fills the next flex slot; purchase
+        // timing only breaks full ties.
+        const leftHasEvidence = left.evaluation.confidence > 0;
+        const rightHasEvidence = right.evaluation.confidence > 0;
+        if (leftHasEvidence !== rightHasEvidence) return leftHasEvidence ? -1 : 1;
+        return right.evaluation.score - left.evaluation.score ||
+          right.evaluation.confidence - left.evaluation.confidence ||
+          firstFamilyTiming(left.family) - firstFamilyTiming(right.family) ||
+          left.family.familyId - right.family.familyId;
+      }
+    }
+    return firstFamilyTiming(left.family) - firstFamilyTiming(right.family) ||
+      left.family.familyId - right.family.familyId;
+  };
+}
+
+/**
+ * A flex item closes the invest only as an exact top-up: its cost fills the
+ * remaining gap on its track without overshoot. Big items that cross the
+ * breakpoint on their own are never closers — closing with an expensive
+ * purchase is not a flex priority.
+ */
+function closesInvestBreakpoint(
+  itemId: number,
+  investment: NonNullable<ResolveDesiredBuildStateV2Input['flexInvestment']>,
+): boolean {
+  const slotType = investment.slotTypeByItemId(itemId);
+  const cost = investment.costByItemId(itemId);
+  if (!slotType || cost === undefined) return false;
+  const remaining = STATLOCKER_BUILD_V2_CONFIG.flexInvestBreakpointSouls - investment.currentValueByType[slotType];
+  return remaining > 0 && cost === remaining;
 }
 
 function validateInput(input: ResolveDesiredBuildStateV2Input): void {
