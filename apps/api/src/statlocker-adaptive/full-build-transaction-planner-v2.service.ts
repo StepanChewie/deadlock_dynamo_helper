@@ -160,9 +160,17 @@ export class FullBuildTransactionPlannerV2Service {
         reasonCodes: ['FAMILY_ENTRY_REPLACEMENT'],
       };
       const nextInventory = simulateOne(input, projectedInventory, action);
-      const beforeRequired = requiredFamilyCount(input.archetype, projectedInventory, input.itemGraph);
-      const afterRequired = requiredFamilyCount(input.archetype, nextInventory, input.itemGraph);
-      if (afterRequired < beforeRequired) continue;
+      const beforeRequired = satisfiedRequiredFamilyIds(
+        input.archetype,
+        projectedInventory,
+        input.itemGraph,
+      );
+      const afterRequired = satisfiedRequiredFamilyIds(
+        input.archetype,
+        nextInventory,
+        input.itemGraph,
+      );
+      if ([...beforeRequired].some((familyId) => !afterRequired.has(familyId))) continue;
       return { sellItemId };
     }
 
@@ -299,17 +307,21 @@ function simulateOne(
   }).finalInventoryItemIds];
 }
 
-function requiredFamilyCount(
+function satisfiedRequiredFamilyIds(
   archetype: BuildArchetypeV2,
   inventoryItemIds: readonly number[],
   itemGraph: RecommendationItemGraph,
-): number {
+): ReadonlySet<number> {
   const statusByFamily = new Map(
     evaluateBuildFamilySatisfactionV2(archetype, inventoryItemIds, itemGraph)
       .map((entry) => [entry.familyId, entry.status] as const),
   );
-  return (archetype.families ?? []).filter((family) =>
-    family.requirement === 'REQUIRED'
-      && isTerminalFamilySatisfactionV2(statusByFamily.get(family.familyId) ?? 'UNSATISFIED'),
-  ).length;
+  return new Set(
+    (archetype.families ?? [])
+      .filter((family) =>
+        family.requirement === 'REQUIRED'
+          && isTerminalFamilySatisfactionV2(statusByFamily.get(family.familyId) ?? 'UNSATISFIED'),
+      )
+      .map((family) => family.familyId),
+  );
 }

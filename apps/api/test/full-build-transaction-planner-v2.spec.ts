@@ -254,4 +254,60 @@ describe('FullBuildTransactionPlannerV2Service', () => {
     expect(result.actions).toEqual([]);
     expect(result.reasonCodes).toContain('REQUIRED_FAMILY_REGRESSION');
   });
+
+  it('preserves each satisfied REQUIRED family when another REQUIRED family is missing', () => {
+    const missingRequiredItemId = 999;
+    const fillerItemId = 2_000;
+    const missingRequiredFamily: BuildArchetypeFamilyV2 = {
+      familyId: missingRequiredItemId,
+      requirement: 'REQUIRED',
+      aggregateFrequencyTier: 'CORE',
+      sourceProfileCount: 10,
+      profileCoverage: 1,
+      purchaseRate: 0.95,
+      structuralPriority: 1,
+      progressionNodes: [{
+        itemId: missingRequiredItemId,
+        rawFrequencyTier: 'CORE',
+        progressionRole: 'DEFAULT_TERMINAL',
+        sourceProfileCount: 10,
+        profileCoverage: 1,
+        purchaseRate: 0.95,
+        timing: { medianBuyTimeS: 1_200, spreadS: 60, phase: 'MID' },
+      }],
+      terminalCandidates: [{
+        itemId: missingRequiredItemId,
+        kind: 'DEFAULT_TERMINAL',
+        sourceProfileCount: 10,
+        profileCoverage: 1,
+        purchaseRate: 0.95,
+        rawFrequencyTier: 'CORE',
+      }],
+    };
+    const value = archetype([family(), missingRequiredFamily]);
+    const target: DesiredBuildStateV2 = {
+      families: [
+        { familyId: A, requirement: 'REQUIRED', selectedTerminalItemId: C, selectedTerminalKind: 'DEFAULT_TERMINAL', score: 1, confidence: 1, reasonCodes: [] },
+        { familyId: missingRequiredItemId, requirement: 'REQUIRED', selectedTerminalItemId: missingRequiredItemId, selectedTerminalKind: 'DEFAULT_TERMINAL', score: 1, confidence: 1, reasonCodes: [] },
+      ],
+      selectedChoiceFamilyIdsByGroup: {},
+      reasonCodes: [],
+    };
+
+    const result = planner.plan({
+      archetype: value,
+      desiredState: target,
+      itemGraph: createRecommendationItemGraph([
+        item(C),
+        item(missingRequiredItemId),
+        item(fillerItemId),
+      ]),
+      rulesetId: 'r1',
+      capacity: 2,
+      currentInventoryItemIds: [C, fillerItemId],
+    });
+
+    expect(result.actions).toEqual([]);
+    expect(result.reasonCodes).toContain('REQUIRED_FAMILY_REGRESSION');
+  });
 });
