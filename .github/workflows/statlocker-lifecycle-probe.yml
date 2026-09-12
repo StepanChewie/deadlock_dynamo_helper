@@ -28,15 +28,6 @@ jobs:
           docker run --rm -i --entrypoint node deadlock-statlocker-probe:ci - <<'NODE' > "$RUNNER_TEMP/statlocker-lifecycle-probe.json"
           const puppeteer = require('puppeteer-core');
 
-          const TARGET_NAMES = [
-            'Crippling Headshot',
-            'Weapon Shielding',
-            'Bullet Resist Shredder',
-            'Long Range',
-            'Lucky Shot',
-            'Witchmail',
-          ];
-
           (async () => {
             const browser = await puppeteer.launch({
               executablePath: process.env.CHROMIUM_PATH,
@@ -55,7 +46,7 @@ jobs:
               await page.goto(requestedUrl, { waitUntil: 'networkidle2', timeout: 90000 });
               await new Promise((resolve) => setTimeout(resolve, 3000));
 
-              const proof = await page.evaluate(async (targetNames) => {
+              const proof = await page.evaluate(async () => {
                 async function fetchJson(path) {
                   const response = await fetch(path, { credentials: 'same-origin' });
                   const text = await response.text();
@@ -75,8 +66,12 @@ jobs:
                   return output;
                 }
 
-                function pickName(row) {
+                function metadataName(row) {
                   return row?.name ?? row?.item_name ?? row?.itemName ?? row?.display_name ?? row?.displayName;
+                }
+
+                function lifecycleName(row) {
+                  return row?.item ?? row?.name ?? row?.item_name ?? row?.itemName;
                 }
 
                 function pickId(row) {
@@ -93,41 +88,41 @@ jobs:
                 ]);
 
                 const metadataRows = [...flatten(itemsFullRaw), ...flatten(itemsRaw)];
-                const metadataByName = new Map();
+                const itemIdByName = new Map();
                 for (const row of metadataRows) {
-                  const name = pickName(row);
+                  const name = metadataName(row);
                   const id = pickId(row);
-                  if (typeof name === 'string' && id !== undefined && !metadataByName.has(name)) {
-                    metadataByName.set(name, { itemId: id, sourceRow: row });
+                  if (typeof name === 'string' && id !== undefined && !itemIdByName.has(name)) {
+                    itemIdByName.set(name, id);
                   }
                 }
 
-                const lifecycleRows = flatten(lifecycleRaw).filter((row) =>
-                  typeof row?.wpaValue === 'number' &&
-                  typeof row?.mean_purchase_time_min === 'number' &&
-                  typeof pickName(row) === 'string'
-                );
-
-                const matches = targetNames.map((name) => {
-                  const lifecycle = lifecycleRows.find((row) => pickName(row) === name);
-                  const metadata = metadataByName.get(name);
-                  return {
-                    name,
-                    itemId: metadata?.itemId,
-                    wpaValue: lifecycle?.wpaValue,
-                    sampleSize: lifecycle?.sampleSize,
-                    mean_purchase_time_min: lifecycle?.mean_purchase_time_min,
-                    lifecycleRow: lifecycle,
-                    metadataRow: metadata?.sourceRow,
-                  };
-                });
+                const lifecycleRows = Array.isArray(lifecycleRaw?.items) ? lifecycleRaw.items : [];
+                const matches = lifecycleRows
+                  .map((row) => ({
+                    item: lifecycleName(row),
+                    itemId: itemIdByName.get(lifecycleName(row)),
+                    heroName: row?.heroName,
+                    wpaValue: row?.wpaValue,
+                    sampleSize: row?.sampleSize,
+                    mean_purchase_time_min: row?.mean_purchase_time_min,
+                  }))
+                  .filter((row) =>
+                    typeof row.item === 'string' &&
+                    Number.isInteger(row.itemId) &&
+                    row.itemId > 0 &&
+                    row.heroName === 'Billy' &&
+                    typeof row.wpaValue === 'number' &&
+                    typeof row.mean_purchase_time_min === 'number'
+                  )
+                  .slice(0, 20);
 
                 return {
                   lifecyclePath,
                   lifecycleRaw,
                   matches,
                 };
-              }, TARGET_NAMES);
+              });
 
               process.stdout.write(JSON.stringify({
                 requestedUrl,
