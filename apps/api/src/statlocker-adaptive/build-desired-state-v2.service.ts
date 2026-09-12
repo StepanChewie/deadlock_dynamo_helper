@@ -18,9 +18,16 @@ export interface DesiredFamilySourceProfileV2 {
   playerName?: string;
 }
 
+export type DesiredFamilyGoalKindV2 =
+  | 'REQUIRED'
+  | 'CHOICE_SELECTED'
+  | 'OPTIONAL'
+  | 'SITUATIONAL_MATCHUP_SELECTED';
+
 export interface DesiredFamilyStateV2 {
   familyId: number;
   requirement: BuildFamilyRequirementV2 | 'CHOICE';
+  goalKind: DesiredFamilyGoalKindV2;
   selectedTerminalItemId: number;
   selectedTerminalKind: 'DEFAULT_TERMINAL' | 'OPTIONAL_TERMINAL';
   groupId?: string;
@@ -39,7 +46,6 @@ export interface DesiredBuildStateV2 {
 export interface ResolveDesiredBuildStateV2Input {
   heroId: number;
   archetype: BuildArchetypeV2;
-  totalCapacity: number;
   enemyHeroIds: readonly number[];
   enemyThreats: readonly EnemyThreatWeightV1[];
   vsHeroRows: readonly StatlockerVsHeroWpaAggregateSourceV1[];
@@ -69,11 +75,13 @@ export class BuildDesiredStateV2Service {
     const choiceFamilyIds = new Set(choiceGroups.flatMap((group) => resolveGroupFamilyIds(group, itemToFamily)));
     const selected: FamilyEvaluationV2[] = [];
     const selectedChoiceFamilyIdsByGroup: Record<string, readonly number[]> = {};
-    const reasonCodes = new Set<string>();
 
     for (const { family, index } of familyById.values()) {
       if (family.requirement !== 'REQUIRED' || choiceFamilyIds.has(family.familyId)) continue;
-      selected.push({ state: this.evaluateFamily(input, family, family.requirement), familyOrder: index });
+      selected.push({
+        state: this.evaluateFamily(input, family, family.requirement, 'REQUIRED'),
+        familyOrder: index,
+      });
     }
 
     for (const group of choiceGroups) {
@@ -82,7 +90,7 @@ export class BuildDesiredStateV2Service {
         .map((familyId) => familyById.get(familyId))
         .filter((entry): entry is { family: BuildArchetypeFamilyV2; index: number } => entry !== undefined)
         .map(({ family, index }) => ({
-          state: this.evaluateFamily(input, family, 'CHOICE', group.groupId),
+          state: this.evaluateFamily(input, family, 'CHOICE', 'CHOICE_SELECTED', group.groupId),
           familyOrder: index,
         }))
         .sort(compareFamilyEvaluation);
@@ -97,37 +105,33 @@ export class BuildDesiredStateV2Service {
         .sort((a, b) => a - b);
     }
 
-    if (selected.length > input.totalCapacity) {
-      throw new Error('Build desired state v2: mandatory family occupancy exceeds capacity');
-    }
-
     const alreadySelected = new Set(selected.map((entry) => entry.state.familyId));
-    const optionalCandidates = families
-      .map((family, index) => ({ family, index }))
-      .filter(({ family }) => !alreadySelected.has(family.familyId))
-      .filter(({ family }) => !choiceFamilyIds.has(family.familyId))
-      .filter(({ family }) => family.requirement === 'OPTIONAL' || family.requirement === 'SITUATIONAL')
-      .map(({ family, index }) => ({
-        state: this.evaluateFamily(input, family, family.requirement),
-        familyOrder: index,
-      }))
-      .sort(compareFamilyEvaluation);
+    for (const [index, family] of families.entries()) {
+      if (alreadySelected.has(family.familyId) || choiceFamilyIds.has(family.familyId)) continue;
 
-    const remainingCapacity = Math.max(0, input.totalCapacity - selected.length);
-    const acceptedOptional = optionalCandidates.slice(0, remainingCapacity).map((entry) => ({
-      ...entry,
-      state: {
-        ...entry.state,
-        reasonCodes: [...new Set([...entry.state.reasonCodes, 'OPTIONAL_FAMILY_CAPACITY_SELECTED'])].sort(),
-      },
-    }));
-    selected.push(...acceptedOptional);
+      if (family.requirement === 'OPTIONAL') {
+        selected.push({
+          state: this.evaluateFamily(input, family, 'OPTIONAL', 'OPTIONAL'),
+          familyOrder: index,
+        });
+        continue;
+      }
 
-    if (optionalCandidates.length > acceptedOptional.length) {
-      reasonCodes.add('DESIRED_STATE_CAPACITY_LIMITED');
-    }
-    if (selected.length < input.totalCapacity) {
-      reasonCodes.add('DESIRED_STATE_UNDER_CAPACITY');
+      if (family.requirement !== 'SITUATIONAL') continue;
+      const evaluation = this.evaluateFamily(
+        input,
+        family,
+        'SITUATIONAL',
+        'SITUATIONAL_MATCHUP_SELECTED',
+      );
+      const config = STATLOCKER_BUILD_V2_CONFIG.outsideMatchupDiscovery;
+      if (
+        evaluation.confidence < config.minConfidence ||
+        evaluation.score < config.minNormalizedSupport
+      ) {
+        continue;
+      }
+      selected.push({ state: evaluation, familyOrder: index });
     }
 
     return {
@@ -135,7 +139,7 @@ export class BuildDesiredStateV2Service {
         .sort((left, right) => left.familyOrder - right.familyOrder || left.state.familyId - right.state.familyId)
         .map((entry) => entry.state),
       selectedChoiceFamilyIdsByGroup,
-      reasonCodes: [...reasonCodes].sort(),
+      reasonCodes: [],
     };
   }
 
@@ -143,6 +147,7 @@ export class BuildDesiredStateV2Service {
     input: ResolveDesiredBuildStateV2Input,
     family: BuildArchetypeFamilyV2,
     requirement: BuildFamilyRequirementV2 | 'CHOICE',
+    goalKind: DesiredFamilyGoalKindV2,
     groupId?: string,
   ): DesiredFamilyStateV2 {
     const defaultTerminal = family.terminalCandidates.find((candidate) => candidate.kind === 'DEFAULT_TERMINAL');
@@ -177,6 +182,7 @@ export class BuildDesiredStateV2Service {
       return {
         familyId: family.familyId,
         requirement,
+        goalKind,
         selectedTerminalItemId: promoted.candidate.itemId,
         selectedTerminalKind: 'OPTIONAL_TERMINAL',
         ...(groupId === undefined ? {} : { groupId }),
@@ -193,6 +199,7 @@ export class BuildDesiredStateV2Service {
     return {
       familyId: family.familyId,
       requirement,
+      goalKind,
       selectedTerminalItemId: defaultTerminal.itemId,
       selectedTerminalKind: 'DEFAULT_TERMINAL',
       ...(groupId === undefined ? {} : { groupId }),
@@ -259,9 +266,6 @@ function compareFamilyEvaluation(left: FamilyEvaluationV2, right: FamilyEvaluati
 function validateInput(input: ResolveDesiredBuildStateV2Input): void {
   if (!Number.isInteger(input.heroId) || input.heroId <= 0 || input.archetype.heroId !== input.heroId) {
     throw new Error('Build desired state v2: hero identity is invalid');
-  }
-  if (!Number.isInteger(input.totalCapacity) || input.totalCapacity <= 0) {
-    throw new Error('Build desired state v2: totalCapacity must be a positive integer');
   }
   if (input.enemyHeroIds.some((heroId) => !Number.isInteger(heroId) || heroId <= 0)) {
     throw new Error('Build desired state v2: enemyHeroIds are invalid');
