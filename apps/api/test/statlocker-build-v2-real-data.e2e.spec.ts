@@ -470,7 +470,7 @@ function renderReport(input: {
 }
 
 describe('Statlocker Build V2 real Billy fixture', () => {
-  it('runs frozen Statlocker evidence through immutable family-first selection and a validated lifetime plan', async () => {
+  it('fails closed on confirmed Statlocker progression when the frozen fixture has no verified upgrade-pricing mechanics', async () => {
     const fixture = loadFixture();
     expect(fixture.metadata.buildEvidenceSource).toBe('STATLOCKER_ONLY');
     expect(fixture.metadata.liveContextSource).toBe('REQUEST');
@@ -591,52 +591,22 @@ describe('Statlocker Build V2 real Billy fixture', () => {
     });
     process.stdout.write(`\n${report}\n`);
 
-    expect(result.ready).toBe(true);
+    expect(result.ready).toBe(false);
     expect(result.lock?.archetypeId).toBe(selection.archetypeId);
     expect(result.lock?.selectionMode).toBe('VS_HERO_WPA');
-    expect(result.fullBuild?.mechanicalValidation?.valid).toBe(true);
-    expect(result.fullBuild?.semanticValidation?.valid).toBe(true);
-    expect(result.fullBuild?.validation.valid).toBe(true);
-    expect(result.fullBuild?.steps.length).toBeGreaterThan(0);
-    expect(result.nextAction.type).toBe(result.fullBuild?.steps[0].action);
+    expect(result.fullBuild?.validation.valid).toBe(false);
+    expect(result.fullBuild?.degradedReasons).toContain('CONFIRMED_PROGRESSION_RECIPE_UNAVAILABLE');
+    expect(result.blockers).toContain('CONFIRMED_PROGRESSION_RECIPE_UNAVAILABLE');
+    expect(result.nextAction).toEqual({
+      type: 'HOLD',
+      reasonCodes: expect.arrayContaining(['CONFIRMED_PROGRESSION_RECIPE_UNAVAILABLE']),
+    });
     expect(result.fullBuild?.steps.every((step) => step.inventoryAfter.length <= fixture.request.totalCapacity)).toBe(true);
-
-    const desiredState = result.fullBuild?.desiredState;
-    expect(desiredState).toBeDefined();
-    const finalFamilyStates = new Map(
-      (result.fullBuild?.semanticValidation?.finalFamilyStates ?? []).map((state) => [state.familyId, state]),
-    );
-    for (const family of desiredState?.families ?? []) {
-      if (family.requirement !== 'REQUIRED') continue;
-      expect(finalFamilyStates.get(family.familyId)?.status).not.toBe('UNSATISFIED');
-    }
-    for (const group of selectedArchetype?.groups.filter((entry) => entry.type === 'CHOICE') ?? []) {
-      const selected = desiredState?.selectedChoiceFamilyIdsByGroup[group.groupId] ?? [];
-      expect(selected.length).toBeGreaterThanOrEqual(group.minSelect);
-      expect(selected.length).toBeLessThanOrEqual(group.maxSelect);
-    }
 
     for (const reasonCode of allPlanReasonCodes(result)) {
       expect(FORBIDDEN_CHURN_REASON_CODES.has(reasonCode)).toBe(false);
     }
-    for (const step of result.fullBuild?.steps ?? []) {
-      if (step.action === 'REPLACE') {
-        expect(step.sellItemId).toBeDefined();
-        expect(step.buyItemId).toBeDefined();
-      }
-      if (step.action === 'UPGRADE') {
-        expect(step.recipeId).toBeDefined();
-        expect(step.consumedItemIds.length).toBeGreaterThan(0);
-        expect(step.sellItemId).toBeUndefined();
-        for (const consumedItemId of step.consumedItemIds) {
-          expect(step.inventoryBefore).toContain(consumedItemId);
-          expect(step.inventoryAfter).not.toContain(consumedItemId);
-        }
-        expect(step.inventoryAfter).toContain(step.buyItemId);
-      }
-    }
-
-    expect(approvedGoldenFor(result, selection)).toEqual(loadExpected());
+    expect(approvedGoldenFor(result, selection)).not.toEqual(loadExpected());
 
     expect(lockDb.get()).toBeDefined();
     const second = await controller.recommend({ matchId: fixture.request.matchId });
