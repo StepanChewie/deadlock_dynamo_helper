@@ -81,7 +81,6 @@ export class FamilyFirstFullBuildResolverV2Service extends FullBuildResolverV2Se
     const baseDesiredState = this.desiredState.resolve({
       heroId: input.heroId,
       archetype: input.archetype,
-      totalCapacity: input.capacity,
       enemyHeroIds: input.enemyHeroIds,
       enemyThreats: input.enemyThreats.map((enemy) => ({
         heroId: enemy.heroId,
