@@ -197,10 +197,14 @@ describe('FullBuildMatchupProtectionV1Service', () => {
   });
 
   it('takes its thresholds only from the injected config union', () => {
-    // The checked-in state ships disabled with the exact-enemy prior reused.
+    // The checked-in state ships calibrated and enabled with the exact-enemy
+    // prior reused; the values are selected by the captured distribution in
+    // full-build-matchup-protection-calibration.spec.ts.
     expect(STATLOCKER_BUILD_V2_CONFIG.sellMatchupProtection).toEqual({
-      enabled: false,
+      enabled: true,
       shrinkK: 500,
+      minTeamWpaPct: 0.0015,
+      minConfidence: 0.45,
     });
   });
 });

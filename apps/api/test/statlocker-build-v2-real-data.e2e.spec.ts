@@ -89,6 +89,19 @@ function loadExpected(): ApprovedBillyGoldenV2 {
   )) as ApprovedBillyGoldenV2;
 }
 
+interface FailClosedBillyGoldenV2 {
+  note: string;
+  confirmedProgressionTerminalItemIds: readonly number[];
+  golden: ApprovedBillyGoldenV2;
+}
+
+function loadFailClosedExpected(): FailClosedBillyGoldenV2 {
+  return JSON.parse(readFileSync(
+    join(__dirname, 'fixtures/statlocker-build-v2/billy-real.failclosed.expected.json'),
+    'utf8',
+  )) as FailClosedBillyGoldenV2;
+}
+
 function buildGraph(fixture: StatlockerBuildV2Fixture) {
   const version = fixture.catalog.version;
   const source = buildRecommendationRulesetCatalogV1({
@@ -606,6 +619,46 @@ describe('Statlocker Build V2 real Billy fixture', () => {
     for (const reasonCode of allPlanReasonCodes(result)) {
       expect(FORBIDDEN_CHURN_REASON_CODES.has(reasonCode)).toBe(false);
     }
+
+    // Real-data gate: the captured fixture proves the evidence half (same-profile
+    // component-before-terminal edges with at least two profiles and at least
+    // 0.65 confidence) but carries no verified executable upgrade pricing, so
+    // confirmed progression must fail closed instead of emitting a direct
+    // terminal BUY.
+    if (!selectedArchetype) throw new Error('selected archetype missing');
+    const failClosed = loadFailClosedExpected();
+    const confirmedEdges = (selectedArchetype.families ?? []).flatMap((family) =>
+      (family.progressionEdges ?? [])
+        .filter((edge) => edge.sourceProfileCount >= 2 && edge.orderConfidence >= 0.65)
+        .map((edge) => ({ familyId: family.familyId, ...edge })),
+    );
+    const confirmedTerminalItemIds = [...new Set(confirmedEdges.map((edge) => edge.toItemId))]
+      .sort((left, right) => left - right);
+    expect(confirmedTerminalItemIds).toEqual([...failClosed.confirmedProgressionTerminalItemIds].sort((left, right) => left - right));
+    for (const edge of confirmedEdges) {
+      expect(edge.evidence).toBe('STATLOCKER_SAME_PROFILE');
+      expect(edge.orderedProfileCount).toBe(edge.sourceProfileCount);
+    }
+    // The captured catalog exposes no executable upgrade recipe for the
+    // confirmed terminals: the pricing half of the real-data gate is unmet.
+    for (const terminalItemId of confirmedTerminalItemIds) {
+      expect(compiled.graph.getItem(terminalItemId)?.upgradeRecipes ?? []).toEqual([]);
+    }
+    // No step may fall back to a direct BUY of a confirmed progression target.
+    const semanticKeys = (result.fullBuild?.steps ?? []).map(actionSemanticKey);
+    for (const terminalItemId of confirmedTerminalItemIds) {
+      expect(semanticKeys).not.toContain(`BUY:${terminalItemId}`);
+    }
+    const finalStates = new Map(
+      (result.fullBuild?.semanticValidation?.finalFamilyStates ?? []).map((state: any) => [state.familyId, state]),
+    );
+    for (const edge of confirmedEdges) {
+      expect(finalStates.get(edge.familyId)?.status).toBe('UNSATISFIED');
+    }
+    // The frozen fail-closed golden: same output as long as the pricing half
+    // of the gate stays unverified, and distinct from the historical approved
+    // 12-buy golden that assumed direct terminal purchases.
+    expect(approvedGoldenFor(result, selection)).toEqual(failClosed.golden);
     expect(approvedGoldenFor(result, selection)).not.toEqual(loadExpected());
 
     expect(lockDb.get()).toBeDefined();

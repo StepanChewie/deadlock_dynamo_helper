@@ -216,11 +216,13 @@ describe('FullBuildReplacementV2Service', () => {
 
     // Item 30 is earlier and lower-WPA, so it dominates and is picked despite
     // item 31 clearing the gates with a higher marginal gain. The ten held
-    // fillers carry no lifecycle evidence and are reported as dropped.
+    // fillers carry no lifecycle evidence and are reported as dropped. With
+    // the calibrated production config and no captured rows the protection
+    // gate reports insufficient evidence instead of the uncalibrated marker.
     expect(result).toEqual({
       kind: 'REPLACE',
       sellItemId: 30,
-      reasonCodes: ['MATCHUP_PROTECTION_UNCALIBRATED', 'SELL_CANDIDATE_LIFECYCLE_MISSING'],
+      reasonCodes: ['INSUFFICIENT_MATCHUP_EVIDENCE', 'SELL_CANDIDATE_LIFECYCLE_MISSING'],
     });
     expect(evaluate).toHaveBeenCalledTimes(2);
     expect(soldItemIds(evaluate)).toEqual([30, 31]);

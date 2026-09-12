@@ -214,8 +214,17 @@ export const STATLOCKER_BUILD_V2_CONFIG: Readonly<StatlockerBuildV2Config> = Obj
     coreReplacementMinImprovement: 0.45,
   }),
   sellMatchupProtection: Object.freeze<SellMatchupProtectionV1Config>({
-    enabled: false,
+    enabled: true,
     shrinkK: 500,
+    // Calibrated from captured current-patch VS_HERO_WPA aggregates
+    // (test/fixtures/statlocker-vs-hero-wpa/sell-protection-calibration.json;
+    // see full-build-matchup-protection-calibration.spec.ts): minTeamWpaPct
+    // sits between the mixed-sign full-roster noise cluster (max 0.001105)
+    // and the consistently positive cluster (min 0.001847); minConfidence
+    // sits between the two weakest full-roster evidence rows (0.417) and the
+    // next weakest (0.509).
+    minTeamWpaPct: 0.0015,
+    minConfidence: 0.45,
   }),
   fullBuildResolver: Object.freeze({
     buyMinImprovement: 0.08,
