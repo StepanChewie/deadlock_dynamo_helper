@@ -15,6 +15,8 @@ const REQUIRED_NEW_TABLES = [
   'recommendation_item_catalog_versions_v1',
   'recommendation_item_catalog_items_v1',
   'recommendation_item_catalog_recipes_v1',
+  'build_archetype_snapshots_v2',
+  'build_archetype_match_locks_v2',
 ] as const;
 
 const PREEXISTING_MIGRATIONS = [
@@ -118,12 +120,19 @@ integrationDescribe('production database migration integration', () => {
     }
   });
 
-  it('records the additive runtime migration', async () => {
+  it('records the runtime migrations and leaves no migration pending', async () => {
     const rows = (await dataSource.query(
-      'SELECT name FROM migrations WHERE name = $1',
-      ['CreateRecommendationRuntimeTables1788220800000'],
+      'SELECT name FROM migrations WHERE name = ANY($1::varchar[]) ORDER BY name',
+      [[
+        'CreateRecommendationRuntimeTables1788220800000',
+        'CreateBuildArchetypeV2Runtime1789056000000',
+      ]],
     )) as Array<{ name: string }>;
 
-    expect(rows).toHaveLength(1);
+    expect(rows.map((row) => row.name)).toEqual([
+      'CreateBuildArchetypeV2Runtime1789056000000',
+      'CreateRecommendationRuntimeTables1788220800000',
+    ]);
+    expect(await dataSource.showMigrations()).toBe(false);
   });
 });

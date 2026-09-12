@@ -22,6 +22,7 @@ const REQUIRED_NEW_TABLES = [
 
 describe('production database policy', () => {
   const srcRoot = path.resolve(__dirname, '../src');
+  const repoRoot = path.resolve(__dirname, '../../..');
   const appModulePath = path.join(srcRoot, 'app.module.ts');
   const dataSourcePath = path.join(srcRoot, 'database', 'data-source.ts');
   const migrationsPath = path.join(srcRoot, 'database', 'migrations');
@@ -54,5 +55,22 @@ describe('production database policy', () => {
     }
 
     expect(migrationSource).not.toMatch(/(?:ALTER|DROP)\s+TABLE\s+["']?item_catalog_/i);
+  });
+
+  it('runs explicit migrations before the production API begins serving', () => {
+    const deploySource = fs.readFileSync(
+      path.join(repoRoot, '.github', 'workflows', 'deploy.yml'),
+      'utf8',
+    );
+    const migrationCommand = 'docker compose run --rm --no-deps api node run-migrations.js';
+    const serveCommand = 'docker compose up -d --force-recreate --no-build --no-deps api';
+    const migrationIndex = deploySource.indexOf(migrationCommand);
+    const serveIndex = deploySource.indexOf(serveCommand);
+
+    expect(migrationIndex).toBeGreaterThanOrEqual(0);
+    expect(serveIndex).toBeGreaterThanOrEqual(0);
+    expect(migrationIndex).toBeLessThan(serveIndex);
+    expect(deploySource).toContain("DB_RUN_MIGRATIONS='false'");
+    expect(fs.existsSync(path.join(repoRoot, 'apps', 'api', 'run-migrations.js'))).toBe(true);
   });
 });

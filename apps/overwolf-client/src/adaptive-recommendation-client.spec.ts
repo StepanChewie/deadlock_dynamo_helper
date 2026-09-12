@@ -57,7 +57,7 @@ describe('AdaptiveRecommendationClient', () => {
     await flush();
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(fetcher).toHaveBeenCalledWith(
-      'https://api.example/deadlock/adaptive/v1/recommend',
+      'https://api.example/deadlock/adaptive/v2/recommend',
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ matchId: 'match-a', localSteamId: 'steam-a' }),

@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { StatlockerVsHeroWpaRawSnapshotV1Entity } from '../deadlock-live/entities/statlocker-vs-hero-wpa-raw-snapshot-v1.entity';
 import { StatlockerVsHeroWpaRowV1Entity } from '../deadlock-live/entities/statlocker-vs-hero-wpa-row-v1.entity';
+import { AdaptiveRecommendationObservabilityV1Service } from './adaptive-recommendation-observability-v1.service';
 
 export interface FindStatlockerVsHeroWpaRowsForSnapshotV1Input {
   snapshotId: string;
@@ -47,40 +48,59 @@ export class StatlockerVsHeroWpaRepositoryV1Service {
     @Optional()
     @InjectRepository(StatlockerVsHeroWpaRawSnapshotV1Entity)
     private readonly rawRepository?: Repository<StatlockerVsHeroWpaRawSnapshotV1Entity>,
+    @Optional()
+    private readonly observability?: AdaptiveRecommendationObservabilityV1Service,
   ) {}
 
   async findActive(
     input: FindActiveStatlockerVsHeroWpaRowsV1Input,
   ): Promise<StatlockerVsHeroWpaRowV1Entity[]> {
-    if (input.enemyHeroIds.length === 0 || !this.rawRepository) return [];
+    const enemyHeroIds = normalizeEnemyHeroIds(input.enemyHeroIds);
+    if (enemyHeroIds.length === 0 || !this.rawRepository) return [];
 
-    const active = await this.rawRepository.findOne({
-      where: {
+    const startedAt = Date.now();
+    try {
+      const active = await this.rawRepository.findOne({
+        where: {
+          statlockerPatchId: input.statlockerPatchId,
+          rulesetVersion: input.rulesetVersion,
+          catalogSha256: input.catalogSha256.toLowerCase(),
+          ingestStatus: 'PUBLISHED',
+        },
+        order: { fetchedAt: 'DESC' },
+      });
+      if (!active) return [];
+
+      return await this.findForSnapshotQuery({
+        snapshotId: active.snapshotId,
         statlockerPatchId: input.statlockerPatchId,
         rulesetVersion: input.rulesetVersion,
-        catalogSha256: input.catalogSha256.toLowerCase(),
-        ingestStatus: 'PUBLISHED',
-      },
-      order: { fetchedAt: 'DESC' },
-    });
-    if (!active) return [];
-
-    return this.findForSnapshot({
-      snapshotId: active.snapshotId,
-      statlockerPatchId: input.statlockerPatchId,
-      rulesetVersion: input.rulesetVersion,
-      catalogSha256: input.catalogSha256,
-      ourHeroId: input.ourHeroId,
-      enemyHeroIds: input.enemyHeroIds,
-    });
+        catalogSha256: input.catalogSha256,
+        ourHeroId: input.ourHeroId,
+        enemyHeroIds,
+      });
+    } finally {
+      this.observability?.recordWpaQueryLatency(Date.now() - startedAt);
+    }
   }
 
   async findForSnapshot(
     input: FindStatlockerVsHeroWpaRowsForSnapshotV1Input,
   ): Promise<StatlockerVsHeroWpaRowV1Entity[]> {
-    const enemyHeroIds = [...new Set(input.enemyHeroIds)].sort((a, b) => a - b);
+    const enemyHeroIds = normalizeEnemyHeroIds(input.enemyHeroIds);
     if (enemyHeroIds.length === 0) return [];
 
+    const startedAt = Date.now();
+    try {
+      return await this.findForSnapshotQuery({ ...input, enemyHeroIds });
+    } finally {
+      this.observability?.recordWpaQueryLatency(Date.now() - startedAt);
+    }
+  }
+
+  private async findForSnapshotQuery(
+    input: FindStatlockerVsHeroWpaRowsForSnapshotV1Input,
+  ): Promise<StatlockerVsHeroWpaRowV1Entity[]> {
     const identity = {
       snapshotId: input.snapshotId,
       statlockerPatchId: input.statlockerPatchId,
@@ -90,7 +110,7 @@ export class StatlockerVsHeroWpaRepositoryV1Service {
     };
 
     return this.repository.find({
-      where: enemyHeroIds.map((enemyHeroId) => ({
+      where: input.enemyHeroIds.map((enemyHeroId) => ({
         ...identity,
         enemyHeroId,
       })),
@@ -153,4 +173,8 @@ export function aggregateStatlockerVsHeroWpaRowsV1(
       a.enemyHeroId - b.enemyHeroId ||
       a.itemId - b.itemId,
     );
+}
+
+function normalizeEnemyHeroIds(enemyHeroIds: readonly number[]): number[] {
+  return [...new Set(enemyHeroIds)].sort((a, b) => a - b);
 }

@@ -1,0 +1,129 @@
+{
+  "selectedArchetypeId": "archetype:hero:72:cluster:ed85aa4f11192e58",
+  "desiredFamilies": [
+    {
+      "familyId": 112198670,
+      "selectedTerminalItemId": 112198670,
+      "selectedTerminalKind": "DEFAULT_TERMINAL"
+    },
+    {
+      "familyId": 1342610602,
+      "selectedTerminalItemId": 1342610602,
+      "selectedTerminalKind": "DEFAULT_TERMINAL"
+    },
+    {
+      "familyId": 98582110,
+      "selectedTerminalItemId": 98582110,
+      "selectedTerminalKind": "DEFAULT_TERMINAL"
+    },
+    {
+      "familyId": 393974127,
+      "selectedTerminalItemId": 3791587546,
+      "selectedTerminalKind": "DEFAULT_TERMINAL"
+    },
+    {
+      "familyId": 465043967,
+      "selectedTerminalItemId": 3190916303,
+      "selectedTerminalKind": "DEFAULT_TERMINAL"
+    },
+    {
+      "familyId": 1235347618,
+      "selectedTerminalItemId": 1235347618,
+      "selectedTerminalKind": "DEFAULT_TERMINAL"
+    },
+    {
+      "familyId": 3731635960,
+      "selectedTerminalItemId": 3731635960,
+      "selectedTerminalKind": "DEFAULT_TERMINAL"
+    },
+    {
+      "familyId": 754480263,
+      "selectedTerminalItemId": 1193964439,
+      "selectedTerminalKind": "DEFAULT_TERMINAL"
+    },
+    {
+      "familyId": 2417568017,
+      "selectedTerminalItemId": 2417568017,
+      "selectedTerminalKind": "DEFAULT_TERMINAL"
+    },
+    {
+      "familyId": 709540378,
+      "selectedTerminalItemId": 1009965641,
+      "selectedTerminalKind": "DEFAULT_TERMINAL"
+    },
+    {
+      "familyId": 1548066885,
+      "selectedTerminalItemId": 2463960640,
+      "selectedTerminalKind": "DEFAULT_TERMINAL"
+    },
+    {
+      "familyId": 865958998,
+      "selectedTerminalItemId": 1250307611,
+      "selectedTerminalKind": "DEFAULT_TERMINAL"
+    }
+  ],
+  "selectedChoiceFamilyIdsByGroup": {},
+  "actionSemanticKeys": [
+    "BUY:1009965641",
+    "BUY:1342610602",
+    "BUY:98582110",
+    "BUY:3190916303",
+    "BUY:112198670",
+    "BUY:1235347618",
+    "BUY:3731635960",
+    "BUY:3791587546",
+    "BUY:1193964439",
+    "BUY:2463960640",
+    "BUY:2417568017",
+    "BUY:1250307611"
+  ],
+  "finalFamilySatisfaction": [
+    {
+      "familyId": 112198670,
+      "status": "DEFAULT_TERMINAL_SATISFIED",
+      "terminalItemId": 112198670
+    },
+    {
+      "familyId": 1342610602,
+      "status": "DEFAULT_TERMINAL_SATISFIED",
+      "terminalItemId": 1342610602
+    },
+    {
+      "familyId": 98582110,
+      "status": "DEFAULT_TERMINAL_SATISFIED",
+      "terminalItemId": 98582110
+    },
+    {
+      "familyId": 393974127,
+      "status": "DEFAULT_TERMINAL_SATISFIED",
+      "terminalItemId": 3791587546
+    },
+    {
+      "familyId": 465043967,
+      "status": "DEFAULT_TERMINAL_SATISFIED",
+      "terminalItemId": 3190916303
+    },
+    {
+      "familyId": 1235347618,
+      "status": "DEFAULT_TERMINAL_SATISFIED",
+      "terminalItemId": 1235347618
+    },
+    {
+      "familyId": 3731635960,
+      "status": "DEFAULT_TERMINAL_SATISFIED",
+      "terminalItemId": 3731635960
+    },
+    {
+      "familyId": 754480263,
+      "status": "DEFAULT_TERMINAL_SATISFIED",
+      "terminalItemId": 1193964439
+    },
+    {
+      "familyId": 2417568017,
+      "status": "DEFAULT_TERMINAL_SATISFIED",
+      "terminalItemId": 2417568017
+    }
+  ],
+  "mechanicalValidation": true,
+  "semanticValidation": true
+}

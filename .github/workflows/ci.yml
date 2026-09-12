@@ -138,6 +138,9 @@ jobs:
           fi
           tail -n 20 "$RUNNER_TEMP/api-tests.log"
 
+      - name: Run frozen Billy family-first review gate
+        run: yarn workspace @deadlock-live-probe/api test --runTestsByPath test/statlocker-build-v2-real-data.e2e.spec.ts
+
       - name: Run structured replay release gate
         run: yarn workspace @deadlock-live-probe/api test adaptive-replay-structured-v1.spec.ts
 
@@ -217,6 +220,16 @@ jobs:
           DB_PASSWORD: postgres
           DB_NAME: deadlock_builds
         run: yarn workspace @deadlock-live-probe/api test production-database-migration.integration.spec.ts
+
+      - name: Test real VS_HERO_WPA PostgreSQL serving path
+        env:
+          WPA_REPOSITORY_INTEGRATION: 'true'
+          DB_HOST: 127.0.0.1
+          DB_PORT: '5432'
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          DB_NAME: deadlock_builds
+        run: yarn workspace @deadlock-live-probe/api test statlocker-vs-hero-wpa-v2.integration.spec.ts
 
       - name: Validate adaptive Compose config
         env:

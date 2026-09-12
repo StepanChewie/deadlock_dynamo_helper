@@ -1,120 +1,48 @@
+import type { AdaptiveRecommendationResultV2 } from '@deadlock-live-probe/shared';
 import { AdaptiveRecommendationClient } from './adaptive-recommendation-client';
 import { buildAdaptiveRecommendationPresentation } from './adaptive-recommendation-presentation';
 
 const itemIds = [1342610602, 3862866912, 968099481, 1437614329, 7409189];
 
-function plannedItem(itemId: number, position: number, status: 'NEXT' | 'PLANNED') {
-  return {
-    itemId,
-    position,
-    status,
-    score: 0.5,
-    confidence: 0.5,
-    skeletonStrength: 0.5,
-    contextualSupport: 0.5,
-    reasonCodes: [],
-  };
-}
-
-function payload(): any {
+function payload(): AdaptiveRecommendationResultV2 {
   return {
     ready: true,
     blockers: [],
-    decisionId: 'decision-client-full-build',
-    stateRevision: 'revision-client-full-build',
-    gameState: 'BEHIND',
+    decisionId: 'decision-client-full-build-v2',
+    stateRevision: 'revision-client-full-build-v2',
+    heroId: 72,
     nextAction: {
-      actionKey: 'HOLD:1342610602',
       type: 'HOLD',
-      targetItemId: 1342610602,
+      buyItemId: itemIds[0],
       reasonCodes: ['PLAN_REQUIREMENTS_BLOCKED'],
     },
-    nextTargetItemId: 1342610602,
-    planActions: [
-      {
-        planActionId: 'close-quarters:wait-current',
-        sequence: 1,
-        status: 'BLOCKED',
-        action: {
-          actionKey: 'WAIT:1342610602',
-          type: 'WAIT',
-          targetItemId: 1342610602,
-          reasonCodes: ['WAIT_FOR_REQUIREMENTS'],
-        },
-        targetItemId: 1342610602,
-        sourceItemIds: [],
-        requirements: [
-          {
-            type: 'SOULS',
-            requiredSouls: 800,
-            currentSouls: 650,
-            shortfallSouls: 150,
-            evidence: 'OBSERVED',
-          },
-        ],
-        goalId: 'close-quarters-goal',
+    fullBuild: {
+      planRevision: 'plan-client-full-build-v2',
+      steps: itemIds.map((itemId, index) => ({
+        sequence: index + 1,
+        action: 'BUY' as const,
+        buyItemId: itemId,
+        consumedItemIds: [],
+        inventoryBefore: itemIds.slice(0, index),
+        inventoryAfter: itemIds.slice(0, index + 1),
         reasonCodes: [],
-      },
-      {
-        planActionId: 'close-quarters:wait-for-souls',
-        sequence: 2,
-        status: 'PLANNED',
-        action: {
-          actionKey: 'WAIT_FOR_SOULS:1342610602',
-          type: 'WAIT',
-          targetItemId: 1342610602,
-          reasonCodes: [],
-        },
-        targetItemId: 1342610602,
-        sourceItemIds: [],
-        requirements: [
-          {
-            type: 'SOULS',
-            requiredSouls: 800,
-            evidence: 'UNKNOWN',
-          },
-        ],
-        goalId: 'close-quarters-goal',
-        reasonCodes: [],
-      },
-      {
-        planActionId: 'close-quarters:buy',
-        sequence: 3,
-        status: 'PLANNED',
-        action: {
-          actionKey: 'BUY:1342610602',
-          type: 'BUY',
-          buyItemId: 1342610602,
-          targetItemId: 1342610602,
-          reasonCodes: [],
-        },
-        targetItemId: 1342610602,
-        sourceItemIds: [],
-        requirements: [],
-        goalId: 'close-quarters-goal',
-        reasonCodes: [],
-      },
-    ],
-    recommendedBuild: itemIds.map((itemId, index) => plannedItem(
-      itemId,
-      index + 1,
-      index === 0 ? 'NEXT' : 'PLANNED',
-    )),
-    changes: [],
-    rankedImmediateCandidates: [],
-    totalScore: 0.72,
-    confidence: 0.56,
-    scorerVersion: 'adaptive-evidence-scorer-v1',
-    plannerVersion: 'adaptive-build-planner-v1',
-    configVersion: 'statlocker-adaptive-v1.3.0',
+      })),
+      degradedReasons: [],
+      validation: { valid: true, reasonCodes: [] },
+      mechanicalValidation: { valid: true, reasonCodes: [] },
+      semanticValidation: { valid: true, reasonCodes: [], finalFamilyStates: [] },
+    },
+    score: { total: 0.72, confidence: 0.56 },
     evidence: {
       rulesetVersion: 'ruleset-a',
       catalogSha256: 'a'.repeat(64),
       statlockerPatchId: '15-1',
-      snapshotIds: ['snapshot-a'],
+      sourceProfileCount: 10,
+      sourceProfileAccountIds: [],
       families: [],
       degradedReasons: [],
     },
+    degradedReasons: [],
   };
 }
 
@@ -124,11 +52,11 @@ async function flush(): Promise<void> {
   await Promise.resolve();
 }
 
-describe('adaptive recommendation full-build client pipeline', () => {
+describe('adaptive recommendation full-build V2 client pipeline', () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => jest.useRealTimers());
 
-  it('renders the complete semantic build received from the recommendation endpoint', async () => {
+  it('renders the complete V2 full build received from the recommendation endpoint', async () => {
     const fetcher = jest.fn().mockResolvedValue({
       ok: true,
       status: 201,
@@ -141,7 +69,7 @@ describe('adaptive recommendation full-build client pipeline', () => {
       { matchId: 'match-a', localSteamId: 'steam-a' },
       {
         onResult: (result) => {
-          presented = buildAdaptiveRecommendationPresentation(result);
+          presented = buildAdaptiveRecommendationPresentation(result as any);
         },
       },
     );
@@ -149,15 +77,15 @@ describe('adaptive recommendation full-build client pipeline', () => {
     await flush();
 
     expect(fetcher).toHaveBeenCalledWith(
-      'https://api.example/deadlock/adaptive/v1/recommend',
+      'https://api.example/deadlock/adaptive/v2/recommend',
       expect.objectContaining({ method: 'POST' }),
     );
     expect(presented?.plan.items.map((row) => row.item.id)).toEqual(itemIds);
+    expect(presented?.plan.items.map((row) => row.position)).toEqual([1, 2, 3, 4, 5]);
     expect(presented?.plan.items).toHaveLength(5);
     expect(presented?.plan.items[0]).toMatchObject({
       statusLabel: 'Next',
       actionLabel: 'Hold',
-      requirements: ['Save until 800 souls'],
     });
     expect(presented?.plan.items.slice(1).every((row) => row.actionLabel === 'Planned')).toBe(true);
   });

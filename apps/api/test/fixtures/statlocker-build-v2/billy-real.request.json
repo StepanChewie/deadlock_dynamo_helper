@@ -1,0 +1,14 @@
+{
+  "matchId": "676255623445218601",
+  "heroId": 72,
+  "gameTimeSec": 0,
+  "ownedItemIds": [],
+  "spendableSouls": 0,
+  "enemyHeroIds": [6, 10, 13, 27, 31, 35],
+  "enemyLiveStates": [],
+  "allyItemIds": [],
+  "enemyItemIds": [],
+  "unlockedFlexSlots": 0,
+  "totalCapacity": 12,
+  "stateRevision": "billy-statlocker-request-v1"
+}

@@ -1,17 +1,17 @@
 import {
-  AdaptiveRecommendationRequestV1,
-  AdaptiveRecommendationResultV1,
+  AdaptiveRecommendationRequestV2,
+  AdaptiveRecommendationResultV2,
 } from '@deadlock-live-probe/shared';
 
 export interface AdaptiveRecommendationClientHandlers {
-  onResult: (result: AdaptiveRecommendationResultV1) => void;
+  onResult: (result: AdaptiveRecommendationResultV2) => void;
   onError?: (error: Error) => void;
 }
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 interface PendingRequest {
-  request: AdaptiveRecommendationRequestV1;
+  request: AdaptiveRecommendationRequestV2;
   payload: string;
   handlers: AdaptiveRecommendationClientHandlers;
   cancellationRevision: number;
@@ -34,7 +34,7 @@ export class AdaptiveRecommendationClient {
   ) {}
 
   schedule(
-    request: AdaptiveRecommendationRequestV1,
+    request: AdaptiveRecommendationRequestV2,
     handlers: AdaptiveRecommendationClientHandlers,
     force = false,
   ): void {
@@ -103,9 +103,9 @@ export class AdaptiveRecommendationClient {
 
   private async execute(pending: PendingRequest): Promise<void> {
     let shouldRetry = true;
-    let result: AdaptiveRecommendationResultV1;
+    let result: AdaptiveRecommendationResultV2;
     try {
-      const response = await this.fetcher(`${this.apiBaseUrl}/deadlock/adaptive/v1/recommend`, {
+      const response = await this.fetcher(`${this.apiBaseUrl}/deadlock/adaptive/v2/recommend`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: pending.payload,
@@ -115,7 +115,8 @@ export class AdaptiveRecommendationClient {
         throw new Error(`Adaptive recommendation HTTP ${response.status}`);
       }
       shouldRetry = false;
-      result = await response.json() as AdaptiveRecommendationResultV1;
+      const raw = await response.json() as AdaptiveRecommendationResultV2;
+      result = projectAdaptiveRecommendationV2ForPresentation(raw);
     } catch (error) {
       if (pending.cancellationRevision !== this.cancellationRevision) return;
       if (
@@ -144,7 +145,7 @@ export class AdaptiveRecommendationClient {
   }
 }
 
-function normalizeRequest(request: AdaptiveRecommendationRequestV1): AdaptiveRecommendationRequestV1 {
+function normalizeRequest(request: AdaptiveRecommendationRequestV2): AdaptiveRecommendationRequestV2 {
   if (!request || typeof request.matchId !== 'string' || request.matchId.trim() === '') {
     throw new Error('Adaptive recommendation matchId is required');
   }
@@ -153,6 +154,109 @@ function normalizeRequest(request: AdaptiveRecommendationRequestV1): AdaptiveRec
     matchId: request.matchId.trim(),
     localSteamId: localSteamId || undefined,
   };
+}
+
+export function projectAdaptiveRecommendationV2ForPresentation(
+  result: AdaptiveRecommendationResultV2,
+): AdaptiveRecommendationResultV2 {
+  if (!result || typeof result !== 'object' || !result.score) {
+    return result;
+  }
+
+  const steps = [...(result.fullBuild?.steps ?? [])]
+    .sort((left, right) => left.sequence - right.sequence);
+  const firstStep = steps[0];
+  const nextTargetItemId = result.nextAction.buyItemId ?? firstStep?.buyItemId;
+  const nextActionKey = actionKey(
+    result.nextAction.type,
+    result.nextAction.buyItemId,
+    result.nextAction.sellItemId,
+    result.nextAction.recipeId,
+  );
+
+  const recommendedBuild = steps.map((step, index) => ({
+    itemId: step.buyItemId,
+    position: index + 1,
+    status: index === 0 ? 'NEXT' : 'PLANNED',
+    score: result.score.total,
+    confidence: result.score.confidence,
+    skeletonStrength: 0,
+    contextualSupport: 0,
+    reasonCodes: [...step.reasonCodes],
+  }));
+
+  const planActions = steps.map((step, index) => ({
+    planActionId: `v2:${result.fullBuild?.planRevision ?? result.stateRevision}:${step.sequence}`,
+    sequence: step.sequence,
+    status: index === 0 ? 'READY' : 'PLANNED',
+    action: {
+      actionKey: actionKey(step.action, step.buyItemId, step.sellItemId, step.recipeId),
+      type: step.action,
+      buyItemId: step.buyItemId,
+      sellItemId: step.sellItemId,
+      targetItemId: step.buyItemId,
+      reasonCodes: [...step.reasonCodes],
+    },
+    targetItemId: step.buyItemId,
+    sourceItemIds: [...step.consumedItemIds],
+    requirements: [],
+    goalId: `v2-step:${step.sequence}`,
+    reasonCodes: [...step.reasonCodes],
+  }));
+
+  const evidence = result.evidence
+    ? {
+        ...result.evidence,
+        snapshotIds: result.lock?.snapshotId ? [result.lock.snapshotId] : [],
+        families: result.evidence.families.map((family) => ({
+          ...family,
+          freshness: family.available ? 'FRESH' : 'UNAVAILABLE',
+          confidence: family.confidence ?? (family.available ? 1 : 0),
+        })),
+      }
+    : {
+        rulesetVersion: '',
+        catalogSha256: '',
+        statlockerPatchId: '',
+        sourceProfileCount: 0,
+        sourceProfileAccountIds: [],
+        families: [],
+        degradedReasons: [...result.degradedReasons],
+        snapshotIds: result.lock?.snapshotId ? [result.lock.snapshotId] : [],
+      };
+
+  return {
+    ...result,
+    gameState: 'UNKNOWN',
+    nextAction: {
+      ...result.nextAction,
+      actionKey: nextActionKey,
+      targetItemId: nextTargetItemId,
+    },
+    nextTargetItemId,
+    planActions,
+    recommendedBuild,
+    changes: [],
+    rankedImmediateCandidates: [],
+    totalScore: result.score.total,
+    confidence: result.score.confidence,
+    scorerVersion: 'statlocker-family-first-v2',
+    plannerVersion: 'family-first-full-build-v2',
+    configVersion: 'statlocker-adaptive-v2',
+    plannerMethod: 'STRATEGY_FIRST',
+    evidence,
+  } as AdaptiveRecommendationResultV2;
+}
+
+function actionKey(
+  type: 'BUY' | 'UPGRADE' | 'REPLACE' | 'HOLD',
+  buyItemId?: number,
+  sellItemId?: number,
+  recipeId?: string,
+): string {
+  if (type === 'REPLACE') return `REPLACE:${sellItemId ?? 0}->${buyItemId ?? 0}`;
+  if (type === 'UPGRADE') return `UPGRADE:${buyItemId ?? 0}:${recipeId ?? 'direct'}`;
+  return `${type}:${buyItemId ?? 0}`;
 }
 
 function toError(error: unknown): Error {

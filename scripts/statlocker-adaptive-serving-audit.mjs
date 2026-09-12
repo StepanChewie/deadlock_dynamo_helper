@@ -68,8 +68,11 @@ if (!fs.existsSync(overwolfClientPath)) {
   fail('missing Overwolf adaptive recommendation client');
 } else {
   const adaptiveClientSource = fs.readFileSync(overwolfClientPath, 'utf8');
-  if (!adaptiveClientSource.includes('/deadlock/adaptive/v1/recommend')) {
-    fail('Overwolf adaptive client does not target /deadlock/adaptive/v1/recommend');
+  if (!adaptiveClientSource.includes('/deadlock/adaptive/v2/recommend')) {
+    fail('Overwolf adaptive client does not target /deadlock/adaptive/v2/recommend');
+  }
+  if (adaptiveClientSource.includes('/deadlock/adaptive/v1/recommend')) {
+    fail('Overwolf adaptive client still targets the retired V1 recommendation endpoint');
   }
 }
 

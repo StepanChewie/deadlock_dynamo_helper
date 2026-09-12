@@ -4,6 +4,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import * as puppeteer from 'puppeteer-core';
 import { DeadlockLiveModule } from '../deadlock-live/deadlock-live.module';
 import { AdaptiveRecommendationDecisionV1Entity } from '../deadlock-live/entities/adaptive-recommendation-decision-v1.entity';
+import { BuildArchetypeMatchLockV2Entity } from '../deadlock-live/entities/build-archetype-match-lock-v2.entity';
+import { BuildArchetypeSnapshotV2Entity } from '../deadlock-live/entities/build-archetype-snapshot-v2.entity';
 import { BuildStrategySnapshotV1Entity } from '../deadlock-live/entities/build-strategy-snapshot-v1.entity';
 import { MatchPlayer } from '../deadlock-live/entities/match-player.entity';
 import { RecommendationEconomyRulesSnapshotV1Entity } from '../deadlock-live/entities/recommendation-economy-rules-snapshot-v1.entity';
@@ -21,12 +23,22 @@ import { AdaptiveEvidenceScorerV1Service } from './adaptive-evidence-scorer-v1.s
 import { AdaptivePhaseEligibilityV1Service } from './adaptive-phase-eligibility-v1.service';
 import { AdaptivePlannerServingRouterV1Service } from './adaptive-planner-serving-router-v1.service';
 import { AdaptiveRecommendationObservabilityV1Service } from './adaptive-recommendation-observability-v1.service';
-import { AdaptiveRecommendationV1Controller } from './adaptive-recommendation-v1.controller';
-import { AdaptiveRecommendationV1Service } from './adaptive-recommendation-v1.service';
+import { AdaptiveRecommendationV2Controller } from './adaptive-recommendation-v2.controller';
+import { AdaptiveRecommendationV2Service } from './adaptive-recommendation-v2.service';
 import { AdaptiveReplayV1Service } from './adaptive-replay-v1.service';
+import { AdaptiveStatusCompatibilityV1Controller } from './adaptive-status-compatibility-v1.controller';
+import { BuildArchetypeCompilerV2Service } from './build-archetype-compiler-v2.service';
 import { BuildArchetypeMinerV1Service } from './build-archetype-miner-v1.service';
+import { BuildArchetypeMinerV2Service } from './build-archetype-miner-v2.service';
+import { BuildArchetypeQualityGateV2Service } from './build-archetype-quality-gate-v2.service';
+import { BuildArchetypeRefreshV2Service } from './build-archetype-refresh-v2.service';
+import { BuildArchetypeSelectorV2Service } from './build-archetype-selector-v2.service';
+import { BuildArchetypeSessionV2Service } from './build-archetype-session-v2.service';
+import { BuildArchetypeSnapshotStoreV2Service } from './build-archetype-snapshot-store-v2.service';
 import { BuildContractV1Service } from './build-contract-v1.service';
+import { BuildDebugTraceStoreV2Service } from './build-debug-trace-store-v2.service';
 import { BuildInvestmentPolicyV1Service } from './build-investment-policy-v1.service';
+import { BuildItemUtilityV2Service } from './build-item-utility-v2.service';
 import { BuildSituationalResolverV1Service } from './build-situational-resolver-v1.service';
 import { BuildSkeletonService } from './build-skeleton.service';
 import { BuildSlotPlannerV1Service } from './build-slot-planner-v1.service';
@@ -42,8 +54,11 @@ import { ConsensusStrategyFallbackV1Service } from './consensus-strategy-fallbac
 import { DraftMatchupEvidenceV1Service } from './draft-matchup-evidence-v1.service';
 import { EnemyThreatHistoryV1Service } from './enemy-threat-history-v1.service';
 import { EnemyThreatV1Service } from './enemy-threat-v1.service';
+import { FamilyFirstFullBuildResolverV2Service } from './family-first-full-build-resolver-v2.service';
+import { FullBuildResolverV2Service } from './full-build-resolver-v2.service';
 import { HistoricalBuildTrajectorySourceV2Service } from './historical-build-trajectory-source-v2.service';
 import { HistoricalPlannerTrajectoryExtractorV2Service } from './historical-planner-trajectory-extractor-v2.service';
+import { MatchupCandidateDiscoveryV2Service } from './matchup-candidate-discovery-v2.service';
 import { PlannerTrajectoryBuilderV2Service } from './planner-trajectory-builder-v2.service';
 import { RecommendationEconomyRulesStoreV1Service } from './recommendation-economy-rules-store-v1.service';
 import {
@@ -83,11 +98,13 @@ import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-
       StatlockerVsHeroWpaRawSnapshotV1Entity,
       StatlockerVsHeroWpaRowV1Entity,
       AdaptiveRecommendationDecisionV1Entity,
+      BuildArchetypeSnapshotV2Entity,
+      BuildArchetypeMatchLockV2Entity,
       BuildStrategySnapshotV1Entity,
       MatchPlayer,
     ]),
   ],
-  controllers: [AdaptiveRecommendationV1Controller],
+  controllers: [AdaptiveRecommendationV2Controller, AdaptiveStatusCompatibilityV1Controller],
   providers: [
     {
       provide: STATLOCKER_BROWSER_LAUNCHER_V1,
@@ -100,9 +117,25 @@ import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-
     StatlockerVsHeroWpaPublisherV1Service,
     StatlockerVsHeroWpaRepositoryV1Service,
     StatlockerVsHeroWpaRowNormalizerV1Service,
-    StatlockerRefreshService,
     StatlockerEvidenceService,
     BuildSkeletonService,
+    BuildArchetypeMinerV2Service,
+    BuildArchetypeCompilerV2Service,
+    BuildArchetypeQualityGateV2Service,
+    BuildArchetypeSnapshotStoreV2Service,
+    BuildArchetypeRefreshV2Service,
+    BuildArchetypeSelectorV2Service,
+    BuildArchetypeSessionV2Service,
+    BuildDebugTraceStoreV2Service,
+    BuildItemUtilityV2Service,
+    MatchupCandidateDiscoveryV2Service,
+    FamilyFirstFullBuildResolverV2Service,
+    {
+      provide: FullBuildResolverV2Service,
+      useExisting: FamilyFirstFullBuildResolverV2Service,
+    },
+    AdaptiveRecommendationV2Service,
+    StatlockerRefreshService,
     RecommendationEconomyRulesStoreV1Service,
     AdaptiveDecisionStateV1Service,
     EnemyThreatV1Service,
@@ -147,14 +180,18 @@ import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-
       useExisting: AdaptivePlannerServingRouterV1Service,
     },
     AdaptiveReplayV1Service,
-    AdaptiveRecommendationV1Service,
   ],
   exports: [
-    AdaptiveRecommendationV1Service,
+    AdaptiveRecommendationV2Service,
     AdaptiveRecommendationObservabilityV1Service,
+    BuildDebugTraceStoreV2Service,
     StatlockerRefreshService,
     StatlockerEvidenceService,
     RecommendationEconomyRulesStoreV1Service,
+    BuildArchetypeRefreshV2Service,
+    BuildArchetypeSnapshotStoreV2Service,
+    BuildArchetypeSelectorV2Service,
+    BuildArchetypeSessionV2Service,
     BuildStrategyRegistryV1Service,
     BuildStrategySnapshotStoreV1Service,
     BuildStrategyMiningPipelineV1Service,
