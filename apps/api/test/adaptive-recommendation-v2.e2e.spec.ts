@@ -115,6 +115,20 @@ function archetype(
           },
         },
       ],
+      progressionEdges: [{
+        fromItemId: family.componentItemId,
+        toItemId: family.targetItemId,
+        sourceProfileCount: 10,
+        orderedProfileCount: 10,
+        orderConfidence: 1,
+        timing: {
+          fromMedianBuyTimeS: 120 + index * 120,
+          toMedianBuyTimeS: 180 + index * 120,
+          fromSpreadS: 60,
+          toSpreadS: 60,
+        },
+        evidence: 'STATLOCKER_SAME_PROFILE',
+      }],
       terminalCandidates: [{
         itemId: family.targetItemId,
         kind: 'DEFAULT_TERMINAL',
