@@ -199,9 +199,11 @@ export class StatlockerNormalizerService {
     heroId: number,
   ): StatlockerNormalizedDatasetV1<StatlockerWpaFilteredItemsV1> {
     const root = requireRecord(raw, 'WPA_FILTERED_ITEMS', 'root');
+    // An empty items list is valid "no lifecycle evidence for this hero"
+    // (small hero pools on a fresh patch), not a corrupt payload: fail-closed
+    // consumers treat an empty snapshot as no evidence.
     const items = requireArray(root.items, 'WPA_FILTERED_ITEMS', 'items')
       .map((row) => parseHeroItemLifecycle(row, heroId));
-    if (items.length === 0) throw new StatlockerDatasetValidationError('WPA_FILTERED_ITEMS', 'items must not be empty');
     items.sort((a, b) => a.itemId - b.itemId);
     return wrap('WPA_FILTERED_ITEMS', `hero:${heroId}`, statlockerPatchId, { heroId, items });
   }

@@ -55,6 +55,18 @@ describe('Statlocker Item Meta Model lifecycle normalization', () => {
     ));
   });
 
+  it('accepts an empty lifecycle items list as valid no-evidence data', () => {
+    const normalized = new StatlockerNormalizerService().normalizeWpaFilteredItems(
+      { items: [] },
+      'patch_1',
+      25,
+    );
+
+    expect(normalized.dataset).toBe('WPA_FILTERED_ITEMS');
+    expect(normalized.scopeKey).toBe('hero:25');
+    expect(normalized.payload.items).toEqual([]);
+  });
+
   it('does not derive lifecycle evidence from dormant phase-WPA or median-purchase fields', () => {
     const raw = loadJson('billy.raw.json') as { items: Record<string, unknown>[] };
     const expected = loadExpected();
