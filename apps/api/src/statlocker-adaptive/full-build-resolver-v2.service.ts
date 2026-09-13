@@ -9,12 +9,16 @@ import {
 } from './build-archetype-v2';
 import type { BuildDecisionTraceSinkV2 } from './build-decision-trace-v2';
 import {
-  BuildItemUtilityV2,
   BuildItemUtilityV2Service,
   BuildTransitionCostV2,
 } from './build-item-utility-v2.service';
 import { EnemyThreatScoreV1 } from './enemy-threat-v1.service';
 import type { ResolvedFullBuildPlanV2 } from './full-build-plan-v2';
+import {
+  FullBuildInventoryUtilityV2,
+  FullBuildTransitionValueV2Service,
+  replacementImprovementThreshold,
+} from './full-build-transition-value-v2.service';
 import type { MatchupCandidateV2 } from './matchup-candidate-discovery-v2.service';
 import {
   StatlockerT4ChainsV1,
@@ -22,6 +26,8 @@ import {
 } from './statlocker-adaptive.types';
 import { STATLOCKER_BUILD_V2_CONFIG } from './statlocker-build-v2.config';
 import { StatlockerVsHeroWpaAggregateSourceV1 } from './statlocker-vs-hero-wpa-repository-v1.service';
+
+export type { FullBuildInventoryUtilityV2 } from './full-build-transition-value-v2.service';
 
 export interface FullBuildRecentPurchaseV2 {
   itemId: number;
@@ -66,12 +72,6 @@ export interface FullBuildLifetimeResolverV2Input {
   trace?: BuildDecisionTraceSinkV2;
 }
 
-export interface FullBuildInventoryUtilityV2 {
-  total: number;
-  confidence: number;
-  itemUtilities: readonly BuildItemUtilityV2[];
-}
-
 export interface FullBuildTransitionEvaluationV2 {
   actionId: string;
   candidate: RecommendationCandidate;
@@ -94,7 +94,10 @@ export interface FullBuildResolutionV2 {
 
 @Injectable()
 export class FullBuildResolverV2Service {
-  constructor(private readonly itemUtility: BuildItemUtilityV2Service) {}
+  constructor(
+    itemUtility: BuildItemUtilityV2Service,
+    private readonly transitionValue: FullBuildTransitionValueV2Service = new FullBuildTransitionValueV2Service(itemUtility),
+  ) {}
 
   resolve(input: FullBuildLifetimeResolverV2Input): ResolvedFullBuildPlanV2;
   resolve(input: FullBuildResolverV2Input): FullBuildResolutionV2;
@@ -109,7 +112,18 @@ export class FullBuildResolverV2Service {
 
   evaluateTransitions(input: FullBuildResolverV2Input): FullBuildResolutionV2 {
     validateTransitionInput(input);
-    const currentState = this.scoreInventory(input.currentInventoryItemIds, input);
+    const currentState = this.transitionValue.scoreCurrentInventory({
+      heroId: input.heroId,
+      archetype: input.archetype,
+      itemGraph: input.itemGraph,
+      gameTimeSec: input.gameTimeSec,
+      currentInventoryItemIds: input.currentInventoryItemIds,
+      enemyHeroIds: input.enemyHeroIds,
+      enemyThreats: input.enemyThreats,
+      vsHeroRows: input.vsHeroRows,
+      wpaPatchData: input.wpaPatchData,
+      t4Chains: input.t4Chains,
+    });
     const evaluations = dedupeCandidates(input.candidates)
       .map((candidate) => this.evaluateCandidate(candidate, currentState, input))
       .sort(compareEvaluations);
@@ -166,7 +180,21 @@ export class FullBuildResolverV2Service {
     const transition = input.transitionCostsByActionId?.get(candidate.actionId);
     const resultingState = targetItemId === undefined
       ? currentState
-      : this.scoreInventory(candidate.resultingItemIds, input, targetItemId, transition);
+      : this.transitionValue.scoreResultingInventory({
+          heroId: input.heroId,
+          archetype: input.archetype,
+          itemGraph: input.itemGraph,
+          gameTimeSec: input.gameTimeSec,
+          currentInventoryItemIds: input.currentInventoryItemIds,
+          resultingInventoryItemIds: candidate.resultingItemIds,
+          targetItemId,
+          enemyHeroIds: input.enemyHeroIds,
+          enemyThreats: input.enemyThreats,
+          vsHeroRows: input.vsHeroRows,
+          wpaPatchData: input.wpaPatchData,
+          t4Chains: input.t4Chains,
+          transition,
+        });
     const marginalGain = roundUtility(resultingState.total - currentState.total);
     const soldRole = action.type === 'REPLACE_ITEM'
       ? archetypeRoleForItem(action.sellItemId, input.archetype, input.itemGraph)
@@ -196,46 +224,6 @@ export class FullBuildResolverV2Service {
       resultingState,
     };
   }
-
-  private scoreInventory(
-    itemIds: readonly number[],
-    input: FullBuildResolverV2Input,
-    transitionTargetItemId?: number,
-    transition?: Partial<BuildTransitionCostV2>,
-  ): FullBuildInventoryUtilityV2 {
-    const normalizedItemIds = [...itemIds].sort((a, b) => a - b);
-    const itemUtilities: BuildItemUtilityV2[] = [];
-    let transitionApplied = false;
-    for (const itemId of normalizedItemIds) {
-      const applyTransition = !transitionApplied && itemId === transitionTargetItemId;
-      const utility = this.itemUtility.scoreItem({
-        heroId: input.heroId,
-        itemId,
-        archetype: input.archetype,
-        gameTimeSec: input.gameTimeSec,
-        ownedItemIds: normalizedItemIds,
-        projectedItemIds: [],
-        enemyHeroIds: input.enemyHeroIds,
-        enemyThreats: input.enemyThreats,
-        vsHeroRows: input.vsHeroRows,
-        wpaPatchData: input.wpaPatchData,
-        t4Chains: input.t4Chains,
-        ...(applyTransition && transition ? { transition } : {}),
-      });
-      if (applyTransition) transitionApplied = true;
-      itemUtilities.push(utility);
-    }
-
-    return {
-      total: roundUtility(itemUtilities.reduce((sum, utility) => sum + utility.total, 0)),
-      confidence: itemUtilities.length === 0
-        ? 0
-        : roundUtility(
-            itemUtilities.reduce((sum, utility) => sum + utility.confidence, 0) / itemUtilities.length,
-          ),
-      itemUtilities,
-    };
-  }
 }
 
 function isLifetimeInput(
@@ -257,8 +245,15 @@ function requiredImprovementFor(
 ): number {
   const config = STATLOCKER_BUILD_V2_CONFIG.fullBuildResolver;
   if (candidate.action.type !== 'REPLACE_ITEM') return config.buyMinImprovement;
-  if (soldRole === 'CORE') return config.coreReplacementMinImprovement;
-  return config.replacementMinImprovement;
+  return replacementImprovementThreshold(soldRole);
+}
+
+export function archetypeRoleForFullBuildItemV2(
+  itemId: number,
+  archetype: BuildArchetypeV2,
+  itemGraph: RecommendationItemGraph,
+): BuildArchetypeRoleV2 | undefined {
+  return archetypeRoleForItem(itemId, archetype, itemGraph);
 }
 
 function archetypeRoleForItem(

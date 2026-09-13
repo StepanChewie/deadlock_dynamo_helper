@@ -59,28 +59,30 @@ function archetype(families: readonly BuildArchetypeFamilyV2[]): BuildArchetypeV
 }
 
 describe('BuildDesiredStateV2Service evidence ranking', () => {
-  it('prefers an evidenced situational family over an unsupported neutral score when capacity is limited', () => {
+  it('includes only the matchup-supported situational goal without a capacity competition', () => {
     const evidencedFamily = situationalFamily(1001, 101);
     const unsupportedFamily = situationalFamily(1002, 102);
     const rows: StatlockerVsHeroWpaAggregateSourceV1[] = [{
       heroId: 72,
       enemyHeroId: 6,
       itemId: 101,
-      deltaWpa: -0.05,
+      deltaWpa: 0.05,
       count: 10_000,
     }];
 
     const result = new BuildDesiredStateV2Service(new ThreatWeightedMatchupV1Service()).resolve({
       heroId: 72,
       archetype: archetype([evidencedFamily, unsupportedFamily]),
-      totalCapacity: 1,
       enemyHeroIds: [6],
       enemyThreats: [],
       vsHeroRows: rows,
     });
 
     expect(result.families).toHaveLength(1);
-    expect(result.families[0].familyId).toBe(1001);
+    expect(result.families[0]).toMatchObject({
+      familyId: 1001,
+      goalKind: 'SITUATIONAL_MATCHUP_SELECTED',
+    });
     expect(result.families[0].confidence).toBeGreaterThan(0);
   });
 });

@@ -46,6 +46,14 @@ export interface StatlockerWpaPatchDataV1 {
   items: readonly StatlockerWpaItemV1[];
 }
 
+export interface StatlockerHeroItemLifecycleV1 {
+  heroId: number;
+  itemId: number;
+  generalWpa: number;
+  averagePurchaseTimeS: number;
+  sampleSize?: number;
+}
+
 export interface StatlockerVsHeroItemV1 {
   itemId: number;
   deltaWpa: number;
@@ -119,7 +127,7 @@ export interface StatlockerProBuildAnalysisV1 {
 
 export interface StatlockerWpaFilteredItemsV1 {
   heroId: number;
-  items: readonly StatlockerWpaItemV1[];
+  items: readonly StatlockerHeroItemLifecycleV1[];
 }
 
 export interface ConsensusSkeletonComponentV1 {

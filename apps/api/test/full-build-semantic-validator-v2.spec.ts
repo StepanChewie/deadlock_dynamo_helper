@@ -89,6 +89,7 @@ function desired(families: readonly BuildArchetypeFamilyV2[]): DesiredBuildState
     families: families.map((entry) => ({
       familyId: entry.familyId,
       requirement: 'REQUIRED' as const,
+      goalKind: 'REQUIRED' as const,
       selectedTerminalItemId: entry.terminalCandidates[0].itemId,
       selectedTerminalKind: 'DEFAULT_TERMINAL' as const,
       score: 0,

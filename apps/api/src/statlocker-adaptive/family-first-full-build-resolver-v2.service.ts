@@ -1,5 +1,7 @@
 import { createHash } from 'crypto';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
+import { RecommendationItemGraph } from '@deadlock-live-probe/build-domain';
+import { investmentItemValueV1 } from './adaptive-economy-v1';
 import {
   BuildDesiredStateV2Service,
   DesiredBuildStateV2,
@@ -22,10 +24,18 @@ import { FullBuildSemanticValidatorV2Service } from './full-build-semantic-valid
 import { FullBuildTransactionPlannerV2Service } from './full-build-transaction-planner-v2.service';
 import type { MatchupCandidateV2 } from './matchup-candidate-discovery-v2.service';
 import { STATLOCKER_BUILD_V2_CONFIG } from './statlocker-build-v2.config';
+import { StatlockerHeroItemLifecycleV1 } from './statlocker-adaptive.types';
 import { ThreatWeightedMatchupV1Service } from './threat-weighted-matchup-v1.service';
 
 export interface FamilyFirstFullBuildLifetimeResolverV2Input extends FullBuildLifetimeResolverV2Input {
   previousPlan?: ResolvedFullBuildPlanV2;
+  /**
+   * Verified current-patch Statlocker lifecycle rows for the hero. Loaded by
+   * the async caller (like vsHeroRows) and forwarded to the transaction
+   * planner's replacement context; the resolver and planner never query
+   * repositories themselves.
+   */
+  lifecycleEvidence?: readonly StatlockerHeroItemLifecycleV1[];
 }
 
 interface OutsideCompetitionV2 {
@@ -37,12 +47,16 @@ interface OutsideCompetitionV2 {
 @Injectable()
 export class FamilyFirstFullBuildResolverV2Service extends FullBuildResolverV2Service {
   private readonly desiredState = new BuildDesiredStateV2Service(new ThreatWeightedMatchupV1Service());
-  private readonly transactionPlanner = new FullBuildTransactionPlannerV2Service();
+  private readonly transactionPlanner: FullBuildTransactionPlannerV2Service;
   private readonly semanticValidator = new FullBuildSemanticValidatorV2Service();
   private readonly hysteresis = new FullBuildHysteresisV2Service();
 
-  constructor(itemUtility: BuildItemUtilityV2Service) {
+  constructor(
+    itemUtility: BuildItemUtilityV2Service,
+    @Optional() transactionPlanner?: FullBuildTransactionPlannerV2Service,
+  ) {
     super(itemUtility);
+    this.transactionPlanner = transactionPlanner ?? new FullBuildTransactionPlannerV2Service();
   }
 
   override resolve(input: FamilyFirstFullBuildLifetimeResolverV2Input): ResolvedFullBuildPlanV2;
@@ -81,13 +95,14 @@ export class FamilyFirstFullBuildResolverV2Service extends FullBuildResolverV2Se
     const baseDesiredState = this.desiredState.resolve({
       heroId: input.heroId,
       archetype: input.archetype,
-      totalCapacity: input.capacity,
       enemyHeroIds: input.enemyHeroIds,
       enemyThreats: input.enemyThreats.map((enemy) => ({
         heroId: enemy.heroId,
         threatMultiplier: enemy.threatMultiplier,
       })),
       vsHeroRows: input.vsHeroRows,
+      flexGoalCapacity: input.capacity,
+      flexInvestment: buildFlexInvestmentContext(input.itemGraph, input.currentInventoryItemIds),
     });
     const outsideCompetition = resolveOutsideCompetition(
       baseDesiredState,
@@ -135,6 +150,16 @@ export class FamilyFirstFullBuildResolverV2Service extends FullBuildResolverV2Se
       rulesetId: input.rulesetId,
       capacity: input.capacity,
       currentInventoryItemIds: input.currentInventoryItemIds,
+      replacementContext: {
+        heroId: input.heroId,
+        gameTimeSec: input.gameTimeSec,
+        enemyHeroIds: input.enemyHeroIds,
+        enemyThreats: input.enemyThreats,
+        vsHeroRows: input.vsHeroRows,
+        ...(input.wpaPatchData === undefined ? {} : { wpaPatchData: input.wpaPatchData }),
+        ...(input.t4Chains === undefined ? {} : { t4Chains: input.t4Chains }),
+        lifecycleEvidence: input.lifecycleEvidence ?? [],
+      },
     });
     for (const reasonCode of transactionPlan.reasonCodes) degradedReasons.add(reasonCode);
 
@@ -422,4 +447,33 @@ function hasProtectedRecentPurchase(input: FullBuildLifetimeResolverV2Input): bo
 
 function uniqueStrings(values: readonly string[]): string[] {
   return [...new Set(values)];
+}
+
+/**
+ * Current per-track invested souls for flex invest-closing ranking. Values use
+ * the shared investment item value (cheapest verified acquisition path), the
+ * same semantics as sell protection.
+ */
+function buildFlexInvestmentContext(
+  itemGraph: RecommendationItemGraph,
+  currentInventoryItemIds: readonly number[],
+): {
+  slotTypeByItemId: (itemId: number) => 'weapon' | 'vitality' | 'spirit' | undefined;
+  costByItemId: (itemId: number) => number | undefined;
+  currentValueByType: Readonly<Record<'weapon' | 'vitality' | 'spirit', number>>;
+} {
+  const currentValueByType: Record<'weapon' | 'vitality' | 'spirit', number> = { weapon: 0, vitality: 0, spirit: 0 };
+  for (const itemId of currentInventoryItemIds) {
+    const item = itemGraph.getItem(itemId);
+    if (!item) continue;
+    currentValueByType[item.slotType] += investmentItemValueV1(itemId, itemGraph);
+  }
+  return {
+    slotTypeByItemId: (itemId) => itemGraph.getItem(itemId)?.slotType,
+    costByItemId: (itemId) => {
+      const item = itemGraph.getItem(itemId);
+      return item === undefined ? undefined : investmentItemValueV1(itemId, itemGraph);
+    },
+    currentValueByType,
+  };
 }

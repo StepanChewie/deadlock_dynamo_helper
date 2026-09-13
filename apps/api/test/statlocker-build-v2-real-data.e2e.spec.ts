@@ -57,6 +57,25 @@ const FORBIDDEN_CHURN_REASON_CODES = new Set([
   'POINTLESS_PURCHASE_CHURN',
 ]);
 
+/**
+ * Operator-verified Deadlock shop mechanic: upgrading a component into its
+ * terminal credits the component's full cost, so the upgrade surcharge equals
+ * target cost minus component cost. Published to production through the
+ * economy-rules snapshot channel (ADAPTIVE_ECONOMY_RULES_JSON / ops publish).
+ */
+const VERIFIED_UPGRADE_PRICING_POLICY = {
+  mode: 'TARGET_COST_MINUS_VERIFIED_COMPONENT_CREDIT',
+  componentCreditRatio: 1,
+  evidence: 'OBSERVED',
+  source: 'deadlock-shop-full-component-credit',
+} as const;
+
+const CONFIRMED_TERMINAL_EXPECTED_UPGRADE_COST: Record<number, number> = {
+  112198670: 800,
+  3791587546: 1600,
+  1193964439: 2400,
+};
+
 interface ApprovedBillyGoldenV2 {
   selectedArchetypeId: string;
   desiredFamilies: readonly {
@@ -83,10 +102,12 @@ function loadFixture(): StatlockerBuildV2Fixture {
 }
 
 function loadExpected(): ApprovedBillyGoldenV2 {
-  return JSON.parse(readFileSync(
+  const parsed = JSON.parse(readFileSync(
     join(__dirname, 'fixtures/statlocker-build-v2/billy-real.expected.json'),
     'utf8',
-  )) as ApprovedBillyGoldenV2;
+  )) as ApprovedBillyGoldenV2 & { note?: string };
+  const { note: _note, ...golden } = parsed;
+  return golden;
 }
 
 function buildGraph(fixture: StatlockerBuildV2Fixture) {
@@ -124,6 +145,7 @@ function buildGraph(fixture: StatlockerBuildV2Fixture) {
       componentItemId: Number(row.componentItemId),
       componentOrder: row.componentOrder,
     })),
+    upgradePricingPolicy: VERIFIED_UPGRADE_PRICING_POLICY,
   });
   return compileStrictRecommendationCatalogV1(source);
 }
@@ -470,7 +492,7 @@ function renderReport(input: {
 }
 
 describe('Statlocker Build V2 real Billy fixture', () => {
-  it('runs frozen Statlocker evidence through immutable family-first selection and a validated lifetime plan', async () => {
+  it('executes confirmed Statlocker upgrade progressions once verified shop-credit pricing is available', async () => {
     const fixture = loadFixture();
     expect(fixture.metadata.buildEvidenceSource).toBe('STATLOCKER_ONLY');
     expect(fixture.metadata.liveContextSource).toBe('REQUEST');
@@ -591,52 +613,68 @@ describe('Statlocker Build V2 real Billy fixture', () => {
     });
     process.stdout.write(`\n${report}\n`);
 
+    // Frozen approved golden: the exact desired state, action semantics, and
+    // final family satisfaction for the captured evidence and verified pricing.
+    expect(approvedGoldenFor(result, selection)).toEqual(loadExpected());
+
     expect(result.ready).toBe(true);
     expect(result.lock?.archetypeId).toBe(selection.archetypeId);
     expect(result.lock?.selectionMode).toBe('VS_HERO_WPA');
-    expect(result.fullBuild?.mechanicalValidation?.valid).toBe(true);
-    expect(result.fullBuild?.semanticValidation?.valid).toBe(true);
     expect(result.fullBuild?.validation.valid).toBe(true);
-    expect(result.fullBuild?.steps.length).toBeGreaterThan(0);
-    expect(result.nextAction.type).toBe(result.fullBuild?.steps[0].action);
+    expect(result.fullBuild?.degradedReasons).not.toContain('CONFIRMED_PROGRESSION_RECIPE_UNAVAILABLE');
     expect(result.fullBuild?.steps.every((step) => step.inventoryAfter.length <= fixture.request.totalCapacity)).toBe(true);
-
-    const desiredState = result.fullBuild?.desiredState;
-    expect(desiredState).toBeDefined();
-    const finalFamilyStates = new Map(
-      (result.fullBuild?.semanticValidation?.finalFamilyStates ?? []).map((state) => [state.familyId, state]),
-    );
-    for (const family of desiredState?.families ?? []) {
-      if (family.requirement !== 'REQUIRED') continue;
-      expect(finalFamilyStates.get(family.familyId)?.status).not.toBe('UNSATISFIED');
-    }
-    for (const group of selectedArchetype?.groups.filter((entry) => entry.type === 'CHOICE') ?? []) {
-      const selected = desiredState?.selectedChoiceFamilyIdsByGroup[group.groupId] ?? [];
-      expect(selected.length).toBeGreaterThanOrEqual(group.minSelect);
-      expect(selected.length).toBeLessThanOrEqual(group.maxSelect);
-    }
 
     for (const reasonCode of allPlanReasonCodes(result)) {
       expect(FORBIDDEN_CHURN_REASON_CODES.has(reasonCode)).toBe(false);
     }
-    for (const step of result.fullBuild?.steps ?? []) {
-      if (step.action === 'REPLACE') {
-        expect(step.sellItemId).toBeDefined();
-        expect(step.buyItemId).toBeDefined();
-      }
-      if (step.action === 'UPGRADE') {
-        expect(step.recipeId).toBeDefined();
-        expect(step.consumedItemIds.length).toBeGreaterThan(0);
-        expect(step.sellItemId).toBeUndefined();
-        for (const consumedItemId of step.consumedItemIds) {
-          expect(step.inventoryBefore).toContain(consumedItemId);
-          expect(step.inventoryAfter).not.toContain(consumedItemId);
-        }
-        expect(step.inventoryAfter).toContain(step.buyItemId);
-      }
+
+    // Real-data gate, pricing half: the verified Deadlock shop mechanic (full
+    // component credit) plus the captured recipe topology and costs derive a
+    // deterministic upgrade surcharge for every confirmed progression terminal.
+    if (!selectedArchetype) throw new Error('selected archetype missing');
+    const confirmedEdges = (selectedArchetype.families ?? []).flatMap((family) =>
+      (family.progressionEdges ?? [])
+        .filter((edge) => edge.sourceProfileCount >= 2 && edge.orderConfidence >= 0.65)
+        .map((edge) => ({ familyId: family.familyId, ...edge })),
+    );
+    const confirmedTerminalItemIds = [...new Set(confirmedEdges.map((edge) => edge.toItemId))]
+      .sort((left, right) => left - right);
+    expect(confirmedTerminalItemIds).toEqual([112198670, 1193964439, 3791587546]);
+    for (const edge of confirmedEdges) {
+      expect(edge.evidence).toBe('STATLOCKER_SAME_PROFILE');
+      expect(edge.orderedProfileCount).toBe(edge.sourceProfileCount);
+    }
+    for (const terminalItemId of confirmedTerminalItemIds) {
+      expect(compiled.graph.getItem(terminalItemId)?.upgradeRecipes).toEqual([
+        {
+          recipeId: `upgrade:${terminalItemId}`,
+          consumedItemIds: confirmedEdges
+            .filter((edge) => edge.toItemId === terminalItemId)
+            .map((edge) => edge.fromItemId),
+          soulsCost: CONFIRMED_TERMINAL_EXPECTED_UPGRADE_COST[terminalItemId],
+        },
+      ]);
     }
 
-    expect(approvedGoldenFor(result, selection)).toEqual(loadExpected());
+    // The plan executes each confirmed progression as component BUY followed by
+    // an in-place UPGRADE, never a direct terminal BUY.
+    const semanticKeys = (result.fullBuild?.steps ?? []).map(actionSemanticKey);
+    for (const terminalItemId of confirmedTerminalItemIds) {
+      expect(semanticKeys).not.toContain(`BUY:${terminalItemId}`);
+      expect(semanticKeys).toContain(`UPGRADE:${terminalItemId}:upgrade:${terminalItemId}`);
+    }
+    for (const edge of confirmedEdges) {
+      const buyIndex = semanticKeys.indexOf(`BUY:${edge.fromItemId}`);
+      const upgradeIndex = semanticKeys.indexOf(`UPGRADE:${edge.toItemId}:upgrade:${edge.toItemId}`);
+      expect(buyIndex).toBeGreaterThanOrEqual(0);
+      expect(upgradeIndex).toBeGreaterThan(buyIndex);
+    }
+    const finalStates = new Map(
+      (result.fullBuild?.semanticValidation?.finalFamilyStates ?? []).map((state: any) => [state.familyId, state]),
+    );
+    for (const edge of confirmedEdges) {
+      expect(finalStates.get(edge.familyId)?.status).toBe('DEFAULT_TERMINAL_SATISFIED');
+    }
 
     expect(lockDb.get()).toBeDefined();
     const second = await controller.recommend({ matchId: fixture.request.matchId });

@@ -1,0 +1,3197 @@
+{
+  "metadata": {
+    "description": "Current-patch captured Statlocker VS_HERO_WPA aggregate rows used to calibrate full-build sell matchup protection. Aggregates only: per (heroId, enemyHeroId, itemId) count-weighted merges of the captured per-rank rows. No account, player, or match identifiers are present.",
+    "statlockerPatchId": "676255623445218601",
+    "sources": [
+      "apps/api/test/fixtures/statlocker-vs-hero-wpa-v1.json (by_patch.patch_676255623445218601, ranks rank_8 and rank_9, hero Abrams)",
+      "apps/api/test/fixtures/statlocker-build-v2/billy-real.fixture.json (vsHeroWpaRows, hero Billy id 72)"
+    ],
+    "rowSchema": "StatlockerVsHeroWpaAggregateSourceV1"
+  },
+  "rows": [
+    {
+      "heroId": 6,
+      "enemyHeroId": 11,
+      "itemId": 754480263,
+      "count": 2450,
+      "deltaWpa": 0.006510204081632652,
+      "meanWpa": 0.008020408163265305
+    },
+    {
+      "heroId": 6,
+      "enemyHeroId": 11,
+      "itemId": 1150006784,
+      "count": 2100,
+      "deltaWpa": 0.010428571428571428,
+      "meanWpa": 0.008952380952380953
+    },
+    {
+      "heroId": 6,
+      "enemyHeroId": 11,
+      "itemId": 1342610602,
+      "count": 2700,
+      "deltaWpa": 0.007962962962962963,
+      "meanWpa": 0.011481481481481481
+    },
+    {
+      "heroId": 6,
+      "enemyHeroId": 72,
+      "itemId": 754480263,
+      "count": 1450,
+      "deltaWpa": -0.004482758620689655,
+      "meanWpa": -0.002965517241379311
+    },
+    {
+      "heroId": 6,
+      "enemyHeroId": 72,
+      "itemId": 1150006784,
+      "count": 1100,
+      "deltaWpa": -0.006363636363636364,
+      "meanWpa": -0.007818181818181818
+    },
+    {
+      "heroId": 6,
+      "enemyHeroId": 72,
+      "itemId": 1342610602,
+      "count": 1650,
+      "deltaWpa": -0.002,
+      "meanWpa": 0.0015151515151515152
+    },
+    {
+      "heroId": 6,
+      "enemyHeroId": 77,
+      "itemId": 754480263,
+      "count": 1250,
+      "deltaWpa": 0.006959999999999999,
+      "meanWpa": 0.00848
+    },
+    {
+      "heroId": 6,
+      "enemyHeroId": 77,
+      "itemId": 1150006784,
+      "count": 100,
+      "deltaWpa": 0.006999999999999999,
+      "meanWpa": 0.0059
+    },
+    {
+      "heroId": 6,
+      "enemyHeroId": 77,
+      "itemId": 1342610602,
+      "count": 1850,
+      "deltaWpa": 0.004513513513513513,
+      "meanWpa": 0.008027027027027026
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 7409189,
+      "count": 35,
+      "deltaWpa": -0.037196,
+      "meanWpa": -0.026941
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 26002154,
+      "count": 565,
+      "deltaWpa": -0.003023976991150442,
+      "meanWpa": 0.0037539911504424774
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 98582110,
+      "count": 1859,
+      "deltaWpa": -0.0005794082840236685,
+      "meanWpa": 0.0011116546530392686
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 112198670,
+      "count": 1327,
+      "deltaWpa": 0.003252177844762622,
+      "meanWpa": 0.00686315975885456
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 339443430,
+      "count": 29,
+      "deltaWpa": -0.0032679999999999996,
+      "meanWpa": 0.027584
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 393974127,
+      "count": 143,
+      "deltaWpa": -0.005605678321678321,
+      "meanWpa": -0.004978083916083916
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 395944548,
+      "count": 116,
+      "deltaWpa": 0.007115344827586206,
+      "meanWpa": 0.02582851724137931
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 465043967,
+      "count": 805,
+      "deltaWpa": 0.0002625739130434783,
+      "meanWpa": -0.0006617863354037266
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 709540378,
+      "count": 1045,
+      "deltaWpa": 0.002943065071770335,
+      "meanWpa": 0.012826934928229663
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 754480263,
+      "count": 143,
+      "deltaWpa": -0.02772397202797203,
+      "meanWpa": -0.01365574825174825
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 787198704,
+      "count": 320,
+      "deltaWpa": -0.015037662499999998,
+      "meanWpa": 0.0050705624999999995
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 800008313,
+      "count": 567,
+      "deltaWpa": -0.012188105820105821,
+      "meanWpa": 0.025538918871252203
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 805079544,
+      "count": 85,
+      "deltaWpa": 0.012241682352941173,
+      "meanWpa": 0.027702294117647058
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 951866250,
+      "count": 97,
+      "deltaWpa": -0.0014559896907216493,
+      "meanWpa": 0.033596474226804125
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 968099481,
+      "count": 13,
+      "deltaWpa": 0.014241,
+      "meanWpa": 0.024066
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 1009965641,
+      "count": 969,
+      "deltaWpa": 8.741692466460269e-05,
+      "meanWpa": -0.0006735634674922601
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 1047818222,
+      "count": 219,
+      "deltaWpa": 0.0004124840182648402,
+      "meanWpa": -0.010088520547945205
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 1113837674,
+      "count": 35,
+      "deltaWpa": -0.034921,
+      "meanWpa": 0.005313
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 1152158042,
+      "count": 11,
+      "deltaWpa": -0.056508,
+      "meanWpa": -0.026707
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 1193964439,
+      "count": 772,
+      "deltaWpa": 5.064766839378241e-05,
+      "meanWpa": 0.026304051813471504
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 1235347618,
+      "count": 1151,
+      "deltaWpa": 1.9746307558644558e-05,
+      "meanWpa": 0.009481424847958298
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 1250307611,
+      "count": 267,
+      "deltaWpa": -0.008841243445692884,
+      "meanWpa": 0.03057905617977528
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 1252627263,
+      "count": 146,
+      "deltaWpa": -0.012253410958904108,
+      "meanWpa": -0.0009288904109589042
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 1282141666,
+      "count": 10,
+      "deltaWpa": 0.012919999999999997,
+      "meanWpa": 0.064749
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 1342610602,
+      "count": 1033,
+      "deltaWpa": -0.0038803514036786055,
+      "meanWpa": -0.005527806389157793
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 1371725689,
+      "count": 164,
+      "deltaWpa": 0.005842176829268293,
+      "meanWpa": 0.042140432926829265
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 1378931225,
+      "count": 89,
+      "deltaWpa": -0.028729426966292132,
+      "meanWpa": -0.04612108988764045
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 1414025773,
+      "count": 455,
+      "deltaWpa": -0.009101804395604395,
+      "meanWpa": 0.004366006593406593
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 1414319208,
+      "count": 461,
+      "deltaWpa": 0.0006029718004338401,
+      "meanWpa": 0.02483652928416486
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 1437614329,
+      "count": 401,
+      "deltaWpa": -0.00018420947630922696,
+      "meanWpa": 0.0012066857855361597
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 1548066885,
+      "count": 187,
+      "deltaWpa": 0.01371570588235294,
+      "meanWpa": 0.01916635294117647
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 1644605047,
+      "count": 292,
+      "deltaWpa": -8.472602739725946e-06,
+      "meanWpa": 0.004190760273972602
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 1672893796,
+      "count": 794,
+      "deltaWpa": -0.003667362720403023,
+      "meanWpa": -0.0030352581863979846
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 1770441818,
+      "count": 608,
+      "deltaWpa": -0.005458439144736842,
+      "meanWpa": 0.004124976973684211
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 1813726886,
+      "count": 1163,
+      "deltaWpa": -0.002262546861564918,
+      "meanWpa": 0.010443542562338778
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 1955841979,
+      "count": 87,
+      "deltaWpa": 0.01348871264367816,
+      "meanWpa": 0.04848742528735632
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 2059712766,
+      "count": 12,
+      "deltaWpa": -0.058977,
+      "meanWpa": -0.055541
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 2095565695,
+      "count": 1344,
+      "deltaWpa": -0.005058178571428571,
+      "meanWpa": 0.007980397321428571
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 2108215830,
+      "count": 49,
+      "deltaWpa": 0.009861183673469389,
+      "meanWpa": 0.019669428571428574
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 2121044373,
+      "count": 69,
+      "deltaWpa": 0.0021597391304347823,
+      "meanWpa": 0.020527695652173914
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 2163598980,
+      "count": 1190,
+      "deltaWpa": 0.0003012949579831933,
+      "meanWpa": 0.011788394957983193
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 2407781327,
+      "count": 795,
+      "deltaWpa": 0.003844661635220126,
+      "meanWpa": 0.04183416100628931
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 2417568017,
+      "count": 434,
+      "deltaWpa": -0.007325069124423963,
+      "meanWpa": 0.029211260368663592
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 2447176615,
+      "count": 364,
+      "deltaWpa": 0.0018232637362637363,
+      "meanWpa": 0.005126021978021978
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 2463960640,
+      "count": 595,
+      "deltaWpa": -0.004688179831932773,
+      "meanWpa": 0.008408366386554622
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 2481177645,
+      "count": 128,
+      "deltaWpa": -0.016584703125000003,
+      "meanWpa": -0.0064618125
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 2533252781,
+      "count": 18,
+      "deltaWpa": -0.029732999999999996,
+      "meanWpa": 0.016788
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 2603935618,
+      "count": 176,
+      "deltaWpa": 0.0072460113636363625,
+      "meanWpa": -0.00548225
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 2717651715,
+      "count": 17,
+      "deltaWpa": -0.03112,
+      "meanWpa": -0.019856
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 2829638276,
+      "count": 131,
+      "deltaWpa": 0.0029891068702290074,
+      "meanWpa": 0.003762358778625954
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 2971868509,
+      "count": 1176,
+      "deltaWpa": 0.0026014753401360545,
+      "meanWpa": 0.011908091836734695
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 3028234315,
+      "count": 25,
+      "deltaWpa": -0.084349,
+      "meanWpa": -0.057067
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 3074274290,
+      "count": 40,
+      "deltaWpa": 0.021834,
+      "meanWpa": 0.03296
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 3140772621,
+      "count": 75,
+      "deltaWpa": 0.0054773999999999995,
+      "meanWpa": 0.02564376
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 3190916303,
+      "count": 2039,
+      "deltaWpa": 0.001662693967631192,
+      "meanWpa": 0.011798112309955863
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 3261353684,
+      "count": 12,
+      "deltaWpa": -0.047877,
+      "meanWpa": -0.07226
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 3270001687,
+      "count": 89,
+      "deltaWpa": 0.017457157303370788,
+      "meanWpa": 0.04503232584269663
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 3357231760,
+      "count": 162,
+      "deltaWpa": 0.027608543209876546,
+      "meanWpa": 0.060437685185185185
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 3361075077,
+      "count": 87,
+      "deltaWpa": 0.008601011494252875,
+      "meanWpa": -0.005237367816091954
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 3399065363,
+      "count": 111,
+      "deltaWpa": -0.004122027027027027,
+      "meanWpa": -0.001463486486486486
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 3403085434,
+      "count": 72,
+      "deltaWpa": 0.013390944444444445,
+      "meanWpa": 0.02477427777777778
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 3491236900,
+      "count": 200,
+      "deltaWpa": -0.00735097,
+      "meanWpa": 0.027646349999999997
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 3585132399,
+      "count": 93,
+      "deltaWpa": 0.009494290322580645,
+      "meanWpa": 0.028319731182795696
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 3633614685,
+      "count": 500,
+      "deltaWpa": -0.005502278,
+      "meanWpa": 0.0002695299999999998
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 3731635960,
+      "count": 610,
+      "deltaWpa": -0.003146980327868852,
+      "meanWpa": 0.0043302
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 3776945997,
+      "count": 148,
+      "deltaWpa": 0.005160972972972974,
+      "meanWpa": 0.003173675675675675
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 3791587546,
+      "count": 469,
+      "deltaWpa": -0.00348508315565032,
+      "meanWpa": 0.003980614072494669
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 3884003354,
+      "count": 174,
+      "deltaWpa": -0.021014793103448275,
+      "meanWpa": 0.015403120689655173
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 3970837787,
+      "count": 967,
+      "deltaWpa": 0.0013200258531540848,
+      "meanWpa": 0.009645252326783867
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 6,
+      "itemId": 4204808176,
+      "count": 136,
+      "deltaWpa": 0.005414573529411765,
+      "meanWpa": 0.0018653823529411768
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 7409189,
+      "count": 12,
+      "deltaWpa": -0.018583,
+      "meanWpa": -0.008328
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 26002154,
+      "count": 469,
+      "deltaWpa": 0.0014302558635394455,
+      "meanWpa": 0.008377204690831556
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 98582110,
+      "count": 1539,
+      "deltaWpa": 0.006034797270955165,
+      "meanWpa": 0.008156169590643275
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 112198670,
+      "count": 1131,
+      "deltaWpa": 0.000970817860300619,
+      "meanWpa": 0.0043084350132626
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 339443430,
+      "count": 15,
+      "deltaWpa": -0.02974,
+      "meanWpa": 0.001112
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 393974127,
+      "count": 112,
+      "deltaWpa": 0.0034919642857142857,
+      "meanWpa": 0.004173821428571429
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 395944548,
+      "count": 73,
+      "deltaWpa": 0.005742958904109589,
+      "meanWpa": 0.024341150684931506
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 465043967,
+      "count": 675,
+      "deltaWpa": 0.006094626666666667,
+      "meanWpa": 0.004975462222222222
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 709540378,
+      "count": 874,
+      "deltaWpa": -0.0031349542334096108,
+      "meanWpa": 0.0072419176201373005
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 754480263,
+      "count": 125,
+      "deltaWpa": -0.0023306,
+      "meanWpa": 0.009031327999999998
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 787198704,
+      "count": 263,
+      "deltaWpa": 0.012570053231939163,
+      "meanWpa": 0.03277254372623574
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 800008313,
+      "count": 474,
+      "deltaWpa": -0.002835360759493671,
+      "meanWpa": 0.03489512447257384
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 805079544,
+      "count": 96,
+      "deltaWpa": -0.012176770833333336,
+      "meanWpa": 0.0029966041666666665
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 951866250,
+      "count": 71,
+      "deltaWpa": -0.021485197183098593,
+      "meanWpa": 0.014622845070422535
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 1009965641,
+      "count": 823,
+      "deltaWpa": 0.00539493681652491,
+      "meanWpa": 0.004387113001215067
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 1047818222,
+      "count": 159,
+      "deltaWpa": -0.012937138364779876,
+      "meanWpa": -0.02349580503144654
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 1113837674,
+      "count": 24,
+      "deltaWpa": -0.014240999999999998,
+      "meanWpa": 0.025993
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 1193964439,
+      "count": 632,
+      "deltaWpa": -0.0017518243670886073,
+      "meanWpa": 0.024118205696202533
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 1235347618,
+      "count": 948,
+      "deltaWpa": 0.003563909282700422,
+      "meanWpa": 0.013125854430379747
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 1250307611,
+      "count": 181,
+      "deltaWpa": -0.00786267955801105,
+      "meanWpa": 0.03144582320441989
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 1252627263,
+      "count": 110,
+      "deltaWpa": -0.014644381818181817,
+      "meanWpa": -0.0032667272727272723
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 1342610602,
+      "count": 901,
+      "deltaWpa": 0.005082443951165372,
+      "meanWpa": 0.003680694783573807
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 1371725689,
+      "count": 90,
+      "deltaWpa": -0.003481766666666666,
+      "meanWpa": 0.03214601111111111
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 1378931225,
+      "count": 64,
+      "deltaWpa": -0.02231725,
+      "meanWpa": -0.0344055
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 1414025773,
+      "count": 289,
+      "deltaWpa": 0.0011638027681660902,
+      "meanWpa": 0.014587207612456746
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 1414319208,
+      "count": 362,
+      "deltaWpa": -0.003849861878453039,
+      "meanWpa": 0.020547430939226518
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 1437614329,
+      "count": 323,
+      "deltaWpa": -0.0028374613003095974,
+      "meanWpa": -0.0018215634674922602
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 1548066885,
+      "count": 154,
+      "deltaWpa": 0.004427948051948053,
+      "meanWpa": 0.009222558441558441
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 1644605047,
+      "count": 197,
+      "deltaWpa": 0.005793370558375635,
+      "meanWpa": 0.009985593908629442
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 1672893796,
+      "count": 658,
+      "deltaWpa": -0.00024017629179331283,
+      "meanWpa": 0.0004719118541033432
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 1770441818,
+      "count": 529,
+      "deltaWpa": -0.003483177693761815,
+      "meanWpa": 0.006226361058601134
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 1813726886,
+      "count": 897,
+      "deltaWpa": -0.005970434782608696,
+      "meanWpa": 0.007155929765886287
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 1955841979,
+      "count": 144,
+      "deltaWpa": -0.0034324444444444446,
+      "meanWpa": 0.032935736111111114
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 2059712766,
+      "count": 13,
+      "deltaWpa": 0.007817,
+      "meanWpa": 0.011253
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 2095565695,
+      "count": 1111,
+      "deltaWpa": 0.0015013132313231325,
+      "meanWpa": 0.014772510351035103
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 2108215830,
+      "count": 57,
+      "deltaWpa": 0.010957947368421053,
+      "meanWpa": 0.038272
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 2121044373,
+      "count": 63,
+      "deltaWpa": -0.018579714285714283,
+      "meanWpa": 0.0017705714285714282
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 2163598980,
+      "count": 1056,
+      "deltaWpa": -0.01161657196969697,
+      "meanWpa": -0.00029075378787878775
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 2407781327,
+      "count": 720,
+      "deltaWpa": 0.0021603138888888884,
+      "meanWpa": 0.040673544444444446
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 2417568017,
+      "count": 351,
+      "deltaWpa": 0.0017205185185185184,
+      "meanWpa": 0.037841207977207976
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 2447176615,
+      "count": 252,
+      "deltaWpa": 0.024637174603174605,
+      "meanWpa": 0.027897206349206352
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 2463960640,
+      "count": 527,
+      "deltaWpa": 0.007206819734345351,
+      "meanWpa": 0.020882776091081596
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 2481177645,
+      "count": 103,
+      "deltaWpa": 0.005624650485436894,
+      "meanWpa": 0.016519747572815536
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 2603935618,
+      "count": 128,
+      "deltaWpa": -0.006764968750000001,
+      "meanWpa": -0.019733242187500003
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 2829638276,
+      "count": 107,
+      "deltaWpa": 0.0027976542056074773,
+      "meanWpa": 0.0026766822429906546
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 2971868509,
+      "count": 999,
+      "deltaWpa": 0.00029073873873873877,
+      "meanWpa": 0.009260914914914913
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 3028234315,
+      "count": 34,
+      "deltaWpa": -0.013727,
+      "meanWpa": 0.013555
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 3074274290,
+      "count": 45,
+      "deltaWpa": 0.002192066666666666,
+      "meanWpa": 0.011920733333333334
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 3140772621,
+      "count": 58,
+      "deltaWpa": -0.004650982758620689,
+      "meanWpa": 0.015216948275862069
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 3190916303,
+      "count": 1682,
+      "deltaWpa": -0.001572222354340071,
+      "meanWpa": 0.008830279429250893
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 3270001687,
+      "count": 65,
+      "deltaWpa": 0.016726200000000004,
+      "meanWpa": 0.044333000000000004
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 3357231760,
+      "count": 89,
+      "deltaWpa": -0.010156112359550561,
+      "meanWpa": 0.018667662921348315
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 3361075077,
+      "count": 82,
+      "deltaWpa": -0.028436560975609756,
+      "meanWpa": -0.040408621951219505
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 3399065363,
+      "count": 84,
+      "deltaWpa": -0.022561488095238096,
+      "meanWpa": -0.019826071428571432
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 3403085434,
+      "count": 51,
+      "deltaWpa": 0.013553960784313725,
+      "meanWpa": 0.024911901960784313
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 3491236900,
+      "count": 141,
+      "deltaWpa": 0.011197035460992906,
+      "meanWpa": 0.04622756028368794
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 3585132399,
+      "count": 95,
+      "deltaWpa": 0.004072326315789473,
+      "meanWpa": 0.023417463157894735
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 3633614685,
+      "count": 395,
+      "deltaWpa": 0.006201696202531646,
+      "meanWpa": 0.012638660759493672
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 3731635960,
+      "count": 627,
+      "deltaWpa": -0.0020213987240829353,
+      "meanWpa": 0.00547515470494418
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 3776945997,
+      "count": 98,
+      "deltaWpa": 0.019016316326530613,
+      "meanWpa": 0.01640435714285714
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 3791587546,
+      "count": 389,
+      "deltaWpa": 0.0007135115681233937,
+      "meanWpa": 0.007293388174807199
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 3884003354,
+      "count": 161,
+      "deltaWpa": -0.003547130434782609,
+      "meanWpa": 0.03479882608695652
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 3970837787,
+      "count": 793,
+      "deltaWpa": 0.002248614123581337,
+      "meanWpa": 0.010595751576292558
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 10,
+      "itemId": 4204808176,
+      "count": 45,
+      "deltaWpa": 0.03996977777777778,
+      "meanWpa": 0.042755555555555554
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 7409189,
+      "count": 14,
+      "deltaWpa": 0.002579,
+      "meanWpa": 0.012834
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 26002154,
+      "count": 450,
+      "deltaWpa": -0.002722746666666667,
+      "meanWpa": 0.003915688888888889
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 98582110,
+      "count": 1186,
+      "deltaWpa": 0.005134387015177066,
+      "meanWpa": 0.0062396585160202364
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 112198670,
+      "count": 813,
+      "deltaWpa": -0.0018895387453874537,
+      "meanWpa": 0.0019871340713407135
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 339443430,
+      "count": 14,
+      "deltaWpa": 0.06606,
+      "meanWpa": 0.096912
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 393974127,
+      "count": 79,
+      "deltaWpa": 0.015929759493670887,
+      "meanWpa": 0.017976569620253166
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 395944548,
+      "count": 73,
+      "deltaWpa": 0.01714568493150685,
+      "meanWpa": 0.035743876712328766
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 465043967,
+      "count": 527,
+      "deltaWpa": 0.005932918406072107,
+      "meanWpa": 0.0053768956356736244
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 709540378,
+      "count": 628,
+      "deltaWpa": 0.005295810509554141,
+      "meanWpa": 0.0143832898089172
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 754480263,
+      "count": 109,
+      "deltaWpa": -0.004208330275229358,
+      "meanWpa": 0.010330743119266054
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 787198704,
+      "count": 216,
+      "deltaWpa": -0.008610666666666668,
+      "meanWpa": 0.011061000000000001
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 800008313,
+      "count": 400,
+      "deltaWpa": 0.000654125000000001,
+      "meanWpa": 0.03835295
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 805079544,
+      "count": 46,
+      "deltaWpa": -0.0008579999999999999,
+      "meanWpa": 0.019592000000000002
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 951866250,
+      "count": 85,
+      "deltaWpa": -0.00012784705882352894,
+      "meanWpa": 0.03512389411764706
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 1009965641,
+      "count": 635,
+      "deltaWpa": 0.00700295748031496,
+      "meanWpa": 0.006640488188976378
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 1047818222,
+      "count": 115,
+      "deltaWpa": 0.0005061304347826087,
+      "meanWpa": -0.010780026086956522
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 1113837674,
+      "count": 17,
+      "deltaWpa": -0.08958,
+      "meanWpa": -0.049346
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 1193964439,
+      "count": 411,
+      "deltaWpa": 0.0009571216545012163,
+      "meanWpa": 0.02783730656934306
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 1235347618,
+      "count": 754,
+      "deltaWpa": -0.004407395225464191,
+      "meanWpa": 0.005030875331564987
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 1250307611,
+      "count": 167,
+      "deltaWpa": 0.00035298203592814387,
+      "meanWpa": 0.037796604790419165
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 1252627263,
+      "count": 120,
+      "deltaWpa": -0.006084475,
+      "meanWpa": 0.005304075
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 1342610602,
+      "count": 717,
+      "deltaWpa": 0.005900832635983264,
+      "meanWpa": 0.003971061366806136
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 1371725689,
+      "count": 55,
+      "deltaWpa": -0.041008199999999995,
+      "meanWpa": -0.00043319999999999925
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 1378931225,
+      "count": 175,
+      "deltaWpa": -0.003608142857142858,
+      "meanWpa": -0.015822428571428574
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 1414025773,
+      "count": 183,
+      "deltaWpa": -0.008938497267759563,
+      "meanWpa": 0.0043002677595628406
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 1414319208,
+      "count": 343,
+      "deltaWpa": -0.01986150437317784,
+      "meanWpa": 0.0034121807580174924
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 1437614329,
+      "count": 251,
+      "deltaWpa": -0.0034103585657370514,
+      "meanWpa": -0.0015255179282868524
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 1548066885,
+      "count": 122,
+      "deltaWpa": 0.0022441967213114758,
+      "meanWpa": 0.007985319672131149
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 1644605047,
+      "count": 191,
+      "deltaWpa": -7.03612565445028e-05,
+      "meanWpa": 0.0037295759162303665
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 1672893796,
+      "count": 482,
+      "deltaWpa": 0.0004659460580912862,
+      "meanWpa": 0.0008173941908713693
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 1770441818,
+      "count": 407,
+      "deltaWpa": 0.009602864864864865,
+      "meanWpa": 0.018867896805896803
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 1813726886,
+      "count": 668,
+      "deltaWpa": 0.0007765074850299403,
+      "meanWpa": 0.012821865269461078
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 1955841979,
+      "count": 68,
+      "deltaWpa": -0.016510176470588236,
+      "meanWpa": 0.01834998529411765
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 2059712766,
+      "count": 10,
+      "deltaWpa": -0.002004,
+      "meanWpa": 0.001432
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 2095565695,
+      "count": 881,
+      "deltaWpa": -0.0028243371169126,
+      "meanWpa": 0.009960145289443813
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 2108215830,
+      "count": 23,
+      "deltaWpa": -0.012476,
+      "meanWpa": -0.018432
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 2121044373,
+      "count": 45,
+      "deltaWpa": 0.0071064888888888855,
+      "meanWpa": 0.021445177777777782
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 2163598980,
+      "count": 736,
+      "deltaWpa": -0.006582084239130434,
+      "meanWpa": 0.00509138722826087
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 2356412290,
+      "count": 10,
+      "deltaWpa": -0.032891,
+      "meanWpa": -0.020578
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 2407781327,
+      "count": 521,
+      "deltaWpa": 0.001153545105566219,
+      "meanWpa": 0.038149560460652585
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 2417568017,
+      "count": 226,
+      "deltaWpa": -0.014282097345132744,
+      "meanWpa": 0.024138840707964605
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 2447176615,
+      "count": 282,
+      "deltaWpa": 0.012608400709219859,
+      "meanWpa": 0.01586927659574468
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 2463960640,
+      "count": 400,
+      "deltaWpa": 0.012575047499999999,
+      "meanWpa": 0.025659372499999996
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 2481177645,
+      "count": 71,
+      "deltaWpa": -0.020480647887323945,
+      "meanWpa": -0.011086267605633804
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 2533252781,
+      "count": 10,
+      "deltaWpa": 0.105658,
+      "meanWpa": 0.152179
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 2603935618,
+      "count": 113,
+      "deltaWpa": -0.003630539823008849,
+      "meanWpa": -0.016702592920353983
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 2717651715,
+      "count": 12,
+      "deltaWpa": -0.0009590000000000001,
+      "meanWpa": 0.010305
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 2829638276,
+      "count": 62,
+      "deltaWpa": 0.0048432258064516134,
+      "meanWpa": 0.007810967741935485
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 2971868509,
+      "count": 785,
+      "deltaWpa": 0.004264220382165606,
+      "meanWpa": 0.0142819949044586
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 3074274290,
+      "count": 25,
+      "deltaWpa": -0.023045,
+      "meanWpa": -0.011919000000000003
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 3140772621,
+      "count": 49,
+      "deltaWpa": -0.0028608571428571433,
+      "meanWpa": 0.01778161224489796
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 3190916303,
+      "count": 1304,
+      "deltaWpa": 0.002247662576687117,
+      "meanWpa": 0.01205632208588957
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 3270001687,
+      "count": 44,
+      "deltaWpa": -0.07566554545454544,
+      "meanWpa": -0.048164454545454545
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 3357231760,
+      "count": 84,
+      "deltaWpa": 0.011183416666666668,
+      "meanWpa": 0.036103142857142854
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 3361075077,
+      "count": 63,
+      "deltaWpa": -0.0016545555555555578,
+      "meanWpa": -0.024509666666666666
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 3399065363,
+      "count": 47,
+      "deltaWpa": 0.027572,
+      "meanWpa": 0.02436
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 3403085434,
+      "count": 74,
+      "deltaWpa": 0.011633351351351351,
+      "meanWpa": 0.02302335135135135
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 3491236900,
+      "count": 162,
+      "deltaWpa": 0.006808407407407407,
+      "meanWpa": 0.04186591358024691
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 3585132399,
+      "count": 51,
+      "deltaWpa": -0.007486,
+      "meanWpa": 0.008648
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 3633614685,
+      "count": 297,
+      "deltaWpa": -0.007660350168350168,
+      "meanWpa": -0.003277619528619529
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 3731635960,
+      "count": 457,
+      "deltaWpa": -0.001064288840262582,
+      "meanWpa": 0.006267035010940919
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 3776945997,
+      "count": 82,
+      "deltaWpa": -0.02436913414634146,
+      "meanWpa": -0.02807259756097561
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 3791587546,
+      "count": 287,
+      "deltaWpa": -0.0042207630662020905,
+      "meanWpa": 0.007544449477351917
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 3884003354,
+      "count": 132,
+      "deltaWpa": -0.02460690909090909,
+      "meanWpa": 0.012736090909090909
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 3970837787,
+      "count": 555,
+      "deltaWpa": 0.012507025225225225,
+      "meanWpa": 0.020830517117117118
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 13,
+      "itemId": 4204808176,
+      "count": 60,
+      "deltaWpa": 0.011492499999999998,
+      "meanWpa": 0.0106065
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 7409189,
+      "count": 10,
+      "deltaWpa": 0.064221,
+      "meanWpa": 0.074476
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 26002154,
+      "count": 311,
+      "deltaWpa": 0.0010555434083601286,
+      "meanWpa": 0.007720209003215435
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 98582110,
+      "count": 928,
+      "deltaWpa": 0.007157487068965517,
+      "meanWpa": 0.008841956896551723
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 112198670,
+      "count": 688,
+      "deltaWpa": 0.005010780523255814,
+      "meanWpa": 0.008765797965116279
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 339443430,
+      "count": 14,
+      "deltaWpa": -0.003074,
+      "meanWpa": 0.027778
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 393974127,
+      "count": 71,
+      "deltaWpa": 0.007698140845070423,
+      "meanWpa": 0.009205323943661973
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 395944548,
+      "count": 30,
+      "deltaWpa": -0.030593,
+      "meanWpa": -0.001621
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 465043967,
+      "count": 413,
+      "deltaWpa": -0.0014790435835351093,
+      "meanWpa": -0.002412554479418886
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 709540378,
+      "count": 535,
+      "deltaWpa": 0.00020173271028037424,
+      "meanWpa": 0.0101229738317757
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 754480263,
+      "count": 66,
+      "deltaWpa": -0.025024666666666667,
+      "meanWpa": -0.010997136363636363
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 787198704,
+      "count": 168,
+      "deltaWpa": -0.0042867857142857135,
+      "meanWpa": 0.015409892857142856
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 800008313,
+      "count": 329,
+      "deltaWpa": -0.0011909756838905773,
+      "meanWpa": 0.03667436474164133
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 805079544,
+      "count": 12,
+      "deltaWpa": -0.018171,
+      "meanWpa": 0.0008480000000000001
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 951866250,
+      "count": 28,
+      "deltaWpa": 0.025902,
+      "meanWpa": 0.058778
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 1009965641,
+      "count": 459,
+      "deltaWpa": -0.009056281045751636,
+      "meanWpa": -0.009863331154684097
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 1047818222,
+      "count": 73,
+      "deltaWpa": 0.018386493150684934,
+      "meanWpa": 0.0072335342465753415
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 1113837674,
+      "count": 27,
+      "deltaWpa": 0.015165,
+      "meanWpa": 0.055399000000000004
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 1193964439,
+      "count": 382,
+      "deltaWpa": 0.004070882198952879,
+      "meanWpa": 0.030270895287958115
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 1235347618,
+      "count": 584,
+      "deltaWpa": -0.001415280821917808,
+      "meanWpa": 0.008145984589041096
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 1250307611,
+      "count": 90,
+      "deltaWpa": 0.05298509999999999,
+      "meanWpa": 0.089174
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 1252627263,
+      "count": 96,
+      "deltaWpa": 0.009022520833333334,
+      "meanWpa": 0.020284562500000002
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 1342610602,
+      "count": 584,
+      "deltaWpa": 0.0004905873287671233,
+      "meanWpa": -0.0010849811643835617
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 1371725689,
+      "count": 66,
+      "deltaWpa": 0.02657380303030303,
+      "meanWpa": 0.06396459090909092
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 1378931225,
+      "count": 42,
+      "deltaWpa": -0.04499430952380952,
+      "meanWpa": -0.05939321428571428
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 1414025773,
+      "count": 182,
+      "deltaWpa": -0.0051431208791208795,
+      "meanWpa": 0.007947972527472529
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 1414319208,
+      "count": 220,
+      "deltaWpa": 0.00016679545454545368,
+      "meanWpa": 0.023181713636363635
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 1437614329,
+      "count": 198,
+      "deltaWpa": 0.0014948636363636358,
+      "meanWpa": 0.0028938030303030313
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 1548066885,
+      "count": 68,
+      "deltaWpa": 0.028308794117647057,
+      "meanWpa": 0.03496364705882353
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 1644605047,
+      "count": 110,
+      "deltaWpa": -0.000606327272727273,
+      "meanWpa": 0.0035547636363636365
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 1672893796,
+      "count": 388,
+      "deltaWpa": -0.004208984536082474,
+      "meanWpa": -0.0036594561855670103
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 1770441818,
+      "count": 279,
+      "deltaWpa": 0.0020873154121863794,
+      "meanWpa": 0.011535232974910393
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 1813726886,
+      "count": 530,
+      "deltaWpa": 0.0004083547169811322,
+      "meanWpa": 0.012984981132075472
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 1955841979,
+      "count": 57,
+      "deltaWpa": -0.01747654385964912,
+      "meanWpa": 0.01790826315789474
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 2095565695,
+      "count": 687,
+      "deltaWpa": -0.005891666666666667,
+      "meanWpa": 0.0071086826783115
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 2121044373,
+      "count": 12,
+      "deltaWpa": -0.022761,
+      "meanWpa": -0.014569
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 2163598980,
+      "count": 661,
+      "deltaWpa": -0.010766550680786687,
+      "meanWpa": 0.0007254674735249617
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 2407781327,
+      "count": 408,
+      "deltaWpa": 0.0010253210784313732,
+      "meanWpa": 0.0387688725490196
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 2417568017,
+      "count": 211,
+      "deltaWpa": 0.026067616113744075,
+      "meanWpa": 0.06382168720379147
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 2447176615,
+      "count": 180,
+      "deltaWpa": 0.007787344444444444,
+      "meanWpa": 0.011194172222222222
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 2463960640,
+      "count": 277,
+      "deltaWpa": -0.011153505415162454,
+      "meanWpa": 0.0013608267148014436
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 2481177645,
+      "count": 42,
+      "deltaWpa": 0.017401857142857143,
+      "meanWpa": 0.027453285714285715
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 2603935618,
+      "count": 80,
+      "deltaWpa": -0.011445624999999997,
+      "meanWpa": -0.0243525
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 2829638276,
+      "count": 49,
+      "deltaWpa": -0.020424469387755106,
+      "meanWpa": -0.01838577551020408
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 2971868509,
+      "count": 612,
+      "deltaWpa": -0.005725513071895426,
+      "meanWpa": 0.0037695473856209144
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 3028234315,
+      "count": 20,
+      "deltaWpa": -0.008216,
+      "meanWpa": 0.019066
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 3074274290,
+      "count": 10,
+      "deltaWpa": -0.006371,
+      "meanWpa": 0.004755
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 3140772621,
+      "count": 12,
+      "deltaWpa": -0.034801,
+      "meanWpa": -0.01915
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 3190916303,
+      "count": 1049,
+      "deltaWpa": -0.0013647387988560532,
+      "meanWpa": 0.008768585319351764
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 3270001687,
+      "count": 31,
+      "deltaWpa": -0.008422,
+      "meanWpa": 0.01894
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 3357231760,
+      "count": 66,
+      "deltaWpa": -0.0019670909090909092,
+      "meanWpa": 0.027024590909090908
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 3361075077,
+      "count": 11,
+      "deltaWpa": 0.058776,
+      "meanWpa": 0.025488
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 3399065363,
+      "count": 33,
+      "deltaWpa": 0.010791,
+      "meanWpa": 0.007578999999999999
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 3403085434,
+      "count": 36,
+      "deltaWpa": 0.006505611111111111,
+      "meanWpa": 0.01788277777777778
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 3491236900,
+      "count": 69,
+      "deltaWpa": -0.003686695652173913,
+      "meanWpa": 0.03144530434782609
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 3585132399,
+      "count": 40,
+      "deltaWpa": 0.00434275,
+      "meanWpa": 0.022432249999999997
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 3633614685,
+      "count": 217,
+      "deltaWpa": -0.017360663594470045,
+      "meanWpa": -0.013333608294930877
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 3731635960,
+      "count": 288,
+      "deltaWpa": 0.007513968749999998,
+      "meanWpa": 0.015209729166666667
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 3776945997,
+      "count": 68,
+      "deltaWpa": -0.012109911764705881,
+      "meanWpa": -0.01569685294117647
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 3791587546,
+      "count": 209,
+      "deltaWpa": -0.004152349282296651,
+      "meanWpa": 0.007680722488038278
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 3884003354,
+      "count": 99,
+      "deltaWpa": 0.015029828282828284,
+      "meanWpa": 0.05203216161616162
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 3970837787,
+      "count": 515,
+      "deltaWpa": 0.004606679611650485,
+      "meanWpa": 0.012914943689320389
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 27,
+      "itemId": 4204808176,
+      "count": 25,
+      "deltaWpa": 0.011934400000000001,
+      "meanWpa": 0.011854399999999998
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 7409189,
+      "count": 20,
+      "deltaWpa": 0.009709,
+      "meanWpa": 0.019964
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 26002154,
+      "count": 651,
+      "deltaWpa": -0.005878451612903225,
+      "meanWpa": 0.0010441505376344088
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 98582110,
+      "count": 2117,
+      "deltaWpa": -0.0030851010864430795,
+      "meanWpa": -0.0014832843646669818
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 112198670,
+      "count": 1597,
+      "deltaWpa": -0.0018471258609893551,
+      "meanWpa": 0.0017352204132748902
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 339443430,
+      "count": 33,
+      "deltaWpa": 0.021373,
+      "meanWpa": 0.052225
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 393974127,
+      "count": 167,
+      "deltaWpa": 0.009323173652694609,
+      "meanWpa": 0.01017005988023952
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 395944548,
+      "count": 109,
+      "deltaWpa": 0.001987477064220183,
+      "meanWpa": 0.021778724770642202
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 465043967,
+      "count": 882,
+      "deltaWpa": -0.0014072040816326531,
+      "meanWpa": -0.0023655034013605443
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 677738769,
+      "count": 10,
+      "deltaWpa": 0.028151,
+      "meanWpa": 0.001727
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 709540378,
+      "count": 1184,
+      "deltaWpa": -0.0007511283783783783,
+      "meanWpa": 0.00890004391891892
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 754480263,
+      "count": 164,
+      "deltaWpa": -0.007421878048780487,
+      "meanWpa": 0.006569524390243903
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 787198704,
+      "count": 372,
+      "deltaWpa": -0.006450854838709676,
+      "meanWpa": 0.013630274193548387
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 800008313,
+      "count": 619,
+      "deltaWpa": -0.0024369854604200324,
+      "meanWpa": 0.035307135702746364
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 805079544,
+      "count": 111,
+      "deltaWpa": -0.0012164234234234234,
+      "meanWpa": 0.014642603603603603
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 951866250,
+      "count": 110,
+      "deltaWpa": -0.004357672727272727,
+      "meanWpa": 0.030687909090909092
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 1009965641,
+      "count": 1115,
+      "deltaWpa": 0.00047702062780269046,
+      "meanWpa": -0.00028673901345291504
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 1047818222,
+      "count": 184,
+      "deltaWpa": 6.392391304347853e-05,
+      "meanWpa": -0.010013510869565215
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 1113837674,
+      "count": 54,
+      "deltaWpa": -0.03542992592592593,
+      "meanWpa": 0.003527870370370371
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 1193964439,
+      "count": 867,
+      "deltaWpa": 0.0058467393310265275,
+      "meanWpa": 0.03209961014994232
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 1235347618,
+      "count": 1283,
+      "deltaWpa": 0.00047328994544037416,
+      "meanWpa": 0.010015633671083398
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 1250307611,
+      "count": 267,
+      "deltaWpa": -0.005153303370786517,
+      "meanWpa": 0.03489988014981273
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 1252627263,
+      "count": 143,
+      "deltaWpa": -0.0008674335664335664,
+      "meanWpa": 0.010513573426573426
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 1282141666,
+      "count": 20,
+      "deltaWpa": -0.0125665,
+      "meanWpa": 0.027688499999999998
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 1342610602,
+      "count": 1283,
+      "deltaWpa": 0.0037643826968043652,
+      "meanWpa": 0.002132070148090413
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 1371725689,
+      "count": 208,
+      "deltaWpa": -0.0025349711538461533,
+      "meanWpa": 0.03447536538461538
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 1378931225,
+      "count": 75,
+      "deltaWpa": -0.023410333333333335,
+      "meanWpa": -0.0355574
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 1414025773,
+      "count": 602,
+      "deltaWpa": 0.005607642857142858,
+      "meanWpa": 0.018945591362126247
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 1414319208,
+      "count": 528,
+      "deltaWpa": 0.0002547518939393948,
+      "meanWpa": 0.024093787878787878
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 1437614329,
+      "count": 458,
+      "deltaWpa": 0.0014825131004366804,
+      "meanWpa": 0.002789382096069868
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 1548066885,
+      "count": 191,
+      "deltaWpa": -0.0071956596858638745,
+      "meanWpa": -0.0018242722513089004
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 1644605047,
+      "count": 250,
+      "deltaWpa": 0.007009679999999999,
+      "meanWpa": 0.011156399999999999
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 1672893796,
+      "count": 842,
+      "deltaWpa": 0.002782782660332542,
+      "meanWpa": 0.0032904845605700715
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 1770441818,
+      "count": 706,
+      "deltaWpa": -0.00045300566572237927,
+      "meanWpa": 0.009157970254957508
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 1813726886,
+      "count": 1338,
+      "deltaWpa": 0.0006718856502242153,
+      "meanWpa": 0.013296941704035874
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 1955841979,
+      "count": 122,
+      "deltaWpa": -0.008078081967213114,
+      "meanWpa": 0.02746238524590164
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 2059712766,
+      "count": 28,
+      "deltaWpa": -0.018350071428571427,
+      "meanWpa": -0.02219264285714286
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 2095565695,
+      "count": 1528,
+      "deltaWpa": 0.004264812172774869,
+      "meanWpa": 0.017275454188481674
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 2108215830,
+      "count": 81,
+      "deltaWpa": 0.013190222222222223,
+      "meanWpa": 0.026360037037037043
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 2121044373,
+      "count": 64,
+      "deltaWpa": 0.0007528437499999996,
+      "meanWpa": 0.017588624999999997
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 2163598980,
+      "count": 1448,
+      "deltaWpa": -0.0020295932320441986,
+      "meanWpa": 0.009491917127071823
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 2407781327,
+      "count": 909,
+      "deltaWpa": 0.005088167216721673,
+      "meanWpa": 0.04301826072607261
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 2417568017,
+      "count": 493,
+      "deltaWpa": 0.0018839168356997971,
+      "meanWpa": 0.03862103448275863
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 2447176615,
+      "count": 361,
+      "deltaWpa": -0.0032738144044321326,
+      "meanWpa": 0.0001275512465373959
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 2463960640,
+      "count": 686,
+      "deltaWpa": -0.003720262390670554,
+      "meanWpa": 0.009282906705539357
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 2481177645,
+      "count": 119,
+      "deltaWpa": -0.006268117647058823,
+      "meanWpa": 0.004590411764705881
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 2533252781,
+      "count": 20,
+      "deltaWpa": -0.017463,
+      "meanWpa": 0.029058
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 2603935618,
+      "count": 172,
+      "deltaWpa": 0.02489234302325581,
+      "meanWpa": 0.0123738488372093
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 2717651715,
+      "count": 12,
+      "deltaWpa": -0.057249,
+      "meanWpa": -0.045985
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 2829638276,
+      "count": 143,
+      "deltaWpa": -0.003583972027972028,
+      "meanWpa": -0.002476167832167832
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 2971868509,
+      "count": 1337,
+      "deltaWpa": -0.001429451009723261,
+      "meanWpa": 0.008012948391922214
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 3028234315,
+      "count": 35,
+      "deltaWpa": 0.042911,
+      "meanWpa": 0.070193
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 3074274290,
+      "count": 59,
+      "deltaWpa": -0.006765271186440679,
+      "meanWpa": 0.003294966101694915
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 3140772621,
+      "count": 78,
+      "deltaWpa": -0.02203303846153846,
+      "meanWpa": 0.0020601410256410255
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 3190916303,
+      "count": 2317,
+      "deltaWpa": 0.001744905049633146,
+      "meanWpa": 0.01185165386275356
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 3270001687,
+      "count": 97,
+      "deltaWpa": -0.017222546391752577,
+      "meanWpa": 0.010328731958762886
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 3357231760,
+      "count": 126,
+      "deltaWpa": -0.0036440476190476192,
+      "meanWpa": 0.02316011111111111
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 3361075077,
+      "count": 109,
+      "deltaWpa": -0.009853422018348624,
+      "meanWpa": -0.021349651376146785
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 3399065363,
+      "count": 97,
+      "deltaWpa": -0.000974391752577319,
+      "meanWpa": 0.002307515463917526
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 3403085434,
+      "count": 114,
+      "deltaWpa": -0.0002815789473684212,
+      "meanWpa": 0.011114736842105262
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 3491236900,
+      "count": 221,
+      "deltaWpa": 0.0020710950226244334,
+      "meanWpa": 0.037091348416289596
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 3585132399,
+      "count": 102,
+      "deltaWpa": 0.012896441176470588,
+      "meanWpa": 0.03186783333333333
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 3633614685,
+      "count": 553,
+      "deltaWpa": 0.0026008969258589517,
+      "meanWpa": 0.008279354430379747
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 3731635960,
+      "count": 745,
+      "deltaWpa": 0.001014879194630872,
+      "meanWpa": 0.008424528859060403
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 3776945997,
+      "count": 157,
+      "deltaWpa": 0.008374738853503184,
+      "meanWpa": 0.006736968152866241
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 3791587546,
+      "count": 513,
+      "deltaWpa": -0.0036111345029239766,
+      "meanWpa": 0.0041295555555555565
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 3862866912,
+      "count": 10,
+      "deltaWpa": 0.024953,
+      "meanWpa": 0.011058
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 3884003354,
+      "count": 230,
+      "deltaWpa": -0.008626765217391304,
+      "meanWpa": 0.02823189565217391
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 3970837787,
+      "count": 1145,
+      "deltaWpa": -0.0009228122270742357,
+      "meanWpa": 0.007468758078602621
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 31,
+      "itemId": 4204808176,
+      "count": 87,
+      "deltaWpa": 0.0021745977011494257,
+      "meanWpa": 8.772413793103544e-05
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 26002154,
+      "count": 221,
+      "deltaWpa": -0.007349606334841628,
+      "meanWpa": -0.0007878778280542985
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 98582110,
+      "count": 768,
+      "deltaWpa": 0.002759828125,
+      "meanWpa": 0.004275268229166667
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 112198670,
+      "count": 574,
+      "deltaWpa": -0.005535721254355401,
+      "meanWpa": -0.001993641114982578
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 339443430,
+      "count": 10,
+      "deltaWpa": -0.040376,
+      "meanWpa": -0.009524
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 393974127,
+      "count": 59,
+      "deltaWpa": -0.00997442372881356,
+      "meanWpa": -0.008154254237288133
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 395944548,
+      "count": 33,
+      "deltaWpa": 0.01953966666666667,
+      "meanWpa": 0.039496333333333335
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 465043967,
+      "count": 327,
+      "deltaWpa": 0.00517285626911315,
+      "meanWpa": 0.00451633639143731
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 709540378,
+      "count": 441,
+      "deltaWpa": -0.00017734467120181411,
+      "meanWpa": 0.009488020408163263
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 754480263,
+      "count": 41,
+      "deltaWpa": -0.059694,
+      "meanWpa": -0.043233
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 787198704,
+      "count": 120,
+      "deltaWpa": 0.012947825,
+      "meanWpa": 0.032584474999999995
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 800008313,
+      "count": 248,
+      "deltaWpa": -0.005946056451612903,
+      "meanWpa": 0.0319121935483871
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 805079544,
+      "count": 10,
+      "deltaWpa": -0.02496,
+      "meanWpa": -0.003079
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 951866250,
+      "count": 37,
+      "deltaWpa": 0.016218,
+      "meanWpa": 0.049094
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 1009965641,
+      "count": 378,
+      "deltaWpa": -0.0036143968253968253,
+      "meanWpa": -0.004285833333333333
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 1047818222,
+      "count": 38,
+      "deltaWpa": -0.020287236842105264,
+      "meanWpa": -0.03212336842105263
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 1113837674,
+      "count": 10,
+      "deltaWpa": -0.045846,
+      "meanWpa": -0.005612
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 1193964439,
+      "count": 350,
+      "deltaWpa": -0.01341198,
+      "meanWpa": 0.013010014285714284
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 1235347618,
+      "count": 469,
+      "deltaWpa": 0.0014210042643923245,
+      "meanWpa": 0.010748164179104477
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 1250307611,
+      "count": 108,
+      "deltaWpa": -0.010874703703703704,
+      "meanWpa": 0.027475731481481483
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 1252627263,
+      "count": 44,
+      "deltaWpa": -0.042041,
+      "meanWpa": -0.030213
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 1342610602,
+      "count": 470,
+      "deltaWpa": 0.001739706382978723,
+      "meanWpa": -0.00014736595744680855
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 1371725689,
+      "count": 18,
+      "deltaWpa": 0.028479,
+      "meanWpa": 0.072616
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 1378931225,
+      "count": 39,
+      "deltaWpa": 0.02412523076923077,
+      "meanWpa": 0.009661692307692303
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 1414025773,
+      "count": 145,
+      "deltaWpa": -0.011658496551724138,
+      "meanWpa": 0.0017766482758620706
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 1414319208,
+      "count": 168,
+      "deltaWpa": 0.0007257321428571425,
+      "meanWpa": 0.023230589285714285
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 1437614329,
+      "count": 138,
+      "deltaWpa": -0.0027190362318840577,
+      "meanWpa": -0.0008746159420289854
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 1548066885,
+      "count": 70,
+      "deltaWpa": -0.03157445714285714,
+      "meanWpa": -0.026064828571428573
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 1644605047,
+      "count": 92,
+      "deltaWpa": -0.006661391304347826,
+      "meanWpa": -0.0029064347826086964
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 1672893796,
+      "count": 297,
+      "deltaWpa": 0.0025396868686868687,
+      "meanWpa": 0.0030335454545454546
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 1770441818,
+      "count": 247,
+      "deltaWpa": 0.00036847368421052593,
+      "meanWpa": 0.009833044534412956
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 1813726886,
+      "count": 439,
+      "deltaWpa": 0.006145537585421412,
+      "meanWpa": 0.018813
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 1955841979,
+      "count": 32,
+      "deltaWpa": -0.019213,
+      "meanWpa": 0.014635
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 2095565695,
+      "count": 540,
+      "deltaWpa": 0.008318057407407408,
+      "meanWpa": 0.02137294074074074
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 2121044373,
+      "count": 28,
+      "deltaWpa": -0.036445,
+      "meanWpa": -0.028253
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 2163598980,
+      "count": 526,
+      "deltaWpa": -0.00832982319391635,
+      "meanWpa": 0.0031848079847908747
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 2407781327,
+      "count": 320,
+      "deltaWpa": -0.0070857875,
+      "meanWpa": 0.030034818749999997
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 2417568017,
+      "count": 161,
+      "deltaWpa": -0.010327298136645962,
+      "meanWpa": 0.02825014906832298
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 2447176615,
+      "count": 152,
+      "deltaWpa": -0.012045289473684212,
+      "meanWpa": -0.008834328947368422
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 2463960640,
+      "count": 226,
+      "deltaWpa": -0.003441513274336283,
+      "meanWpa": 0.00908432743362832
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 2481177645,
+      "count": 38,
+      "deltaWpa": -0.038944,
+      "meanWpa": -0.030722
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 2603935618,
+      "count": 55,
+      "deltaWpa": -0.003854890909090908,
+      "meanWpa": -0.017422636363636362
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 2829638276,
+      "count": 36,
+      "deltaWpa": -0.013952,
+      "meanWpa": -0.009192
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 2971868509,
+      "count": 468,
+      "deltaWpa": -0.0025154914529914533,
+      "meanWpa": 0.0068035149572649575
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 3140772621,
+      "count": 30,
+      "deltaWpa": -0.046975,
+      "meanWpa": -0.031324
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 3190916303,
+      "count": 844,
+      "deltaWpa": -0.0013935059241706163,
+      "meanWpa": 0.008638612559241705
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 3270001687,
+      "count": 23,
+      "deltaWpa": -0.001181,
+      "meanWpa": 0.026181
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 3357231760,
+      "count": 10,
+      "deltaWpa": 0.0807,
+      "meanWpa": 0.094748
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 3399065363,
+      "count": 18,
+      "deltaWpa": -0.023927,
+      "meanWpa": -0.027139
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 3403085434,
+      "count": 31,
+      "deltaWpa": -0.000556,
+      "meanWpa": 0.010741
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 3491236900,
+      "count": 81,
+      "deltaWpa": -0.03962734567901234,
+      "meanWpa": -0.004605617283950618
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 3585132399,
+      "count": 29,
+      "deltaWpa": 0.002258,
+      "meanWpa": 0.018392
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 3633614685,
+      "count": 173,
+      "deltaWpa": -0.004152184971098267,
+      "meanWpa": -0.0002035202312138731
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 3731635960,
+      "count": 250,
+      "deltaWpa": 0.0049666680000000005,
+      "meanWpa": 0.012609952000000002
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 3776945997,
+      "count": 40,
+      "deltaWpa": -0.006321,
+      "meanWpa": -0.011235
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 3791587546,
+      "count": 163,
+      "deltaWpa": -0.025140828220858894,
+      "meanWpa": -0.013404730061349693
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 3884003354,
+      "count": 97,
+      "deltaWpa": 0.00857438144329897,
+      "meanWpa": 0.04674973195876289
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 3970837787,
+      "count": 431,
+      "deltaWpa": 0.0007654988399071927,
+      "meanWpa": 0.008886524361948957
+    },
+    {
+      "heroId": 72,
+      "enemyHeroId": 35,
+      "itemId": 4204808176,
+      "count": 56,
+      "deltaWpa": -0.026089392857142853,
+      "meanWpa": -0.030659964285714287
+    }
+  ]
+}

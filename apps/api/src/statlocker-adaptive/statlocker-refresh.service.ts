@@ -234,6 +234,14 @@ export class StatlockerRefreshService {
           }
         }
 
+        const lifecycleResult = await this.collector.collectBatch([
+          { dataset: 'WPA_FILTERED_ITEMS', scopeKey: `hero:${heroId}`, heroId },
+        ]);
+        for (const dataset of lifecycleResult.datasets) {
+          const normalized = this.normalizeCollected(dataset, lifecycleResult.statlockerPatchId);
+          await this.publishObservation(normalized, identity, dataset);
+        }
+
         await this.archetypeRefreshV2?.refreshHero(heroId, {
           rulesetVersion: identity.rulesetVersion,
           catalogSha256: identity.catalogSha256,

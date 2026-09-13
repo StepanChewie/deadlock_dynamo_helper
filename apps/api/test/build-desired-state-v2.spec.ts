@@ -11,6 +11,7 @@ function family(
   defaultItemId: number,
   optionalItemId?: number,
   requirement: BuildArchetypeFamilyV2['requirement'] = 'REQUIRED',
+  medianBuyTimeS = 900,
 ): BuildArchetypeFamilyV2 {
   return {
     familyId,
@@ -28,7 +29,7 @@ function family(
         sourceProfileCount: 10,
         profileCoverage: requirement === 'REQUIRED' ? 1 : 0.7,
         purchaseRate: requirement === 'REQUIRED' ? 0.95 : 0.65,
-        timing: { medianBuyTimeS: 900, spreadS: 60, phase: 'MID' },
+        timing: { medianBuyTimeS, spreadS: 60, phase: 'MID' },
       },
       ...(optionalItemId === undefined ? [] : [{
         itemId: optionalItemId,
@@ -97,15 +98,21 @@ function wpa(itemId: number, deltaWpa: number, count = 10_000): StatlockerVsHero
 function resolve(
   value: BuildArchetypeV2,
   rows: readonly StatlockerVsHeroWpaAggregateSourceV1[],
-  totalCapacity = 12,
+  flexGoalCapacity?: number,
+  flexInvestment?: {
+    slotTypeByItemId: (itemId: number) => 'weapon' | 'vitality' | 'spirit' | undefined;
+    costByItemId: (itemId: number) => number | undefined;
+    currentValueByType: Readonly<Record<'weapon' | 'vitality' | 'spirit', number>>;
+  },
 ) {
   return new BuildDesiredStateV2Service(new ThreatWeightedMatchupV1Service()).resolve({
     heroId: 72,
     archetype: value,
-    totalCapacity,
     enemyHeroIds: [6],
     enemyThreats: [],
     vsHeroRows: rows,
+    ...(flexGoalCapacity === undefined ? {} : { flexGoalCapacity }),
+    ...(flexInvestment === undefined ? {} : { flexInvestment }),
   });
 }
 
@@ -118,6 +125,7 @@ describe('BuildDesiredStateV2Service', () => {
     expect(result.families).toHaveLength(1);
     expect(result.families[0]).toMatchObject({
       familyId: 1000,
+      goalKind: 'REQUIRED',
       selectedTerminalItemId: 101,
       selectedTerminalKind: 'DEFAULT_TERMINAL',
     });
@@ -131,6 +139,7 @@ describe('BuildDesiredStateV2Service', () => {
 
     expect(result.families[0]).toMatchObject({
       familyId: 1000,
+      goalKind: 'REQUIRED',
       selectedTerminalItemId: 102,
       selectedTerminalKind: 'OPTIONAL_TERMINAL',
     });
@@ -158,12 +167,13 @@ describe('BuildDesiredStateV2Service', () => {
     expect(result.families[0]).toMatchObject({
       familyId: 2001,
       requirement: 'CHOICE',
+      goalKind: 'CHOICE_SELECTED',
       groupId: 'choice:defense',
       selectedTerminalItemId: 202,
     });
   });
 
-  it('fills remaining capacity with Statlocker-backed optional families even when WPA is below the buy-improvement floor', () => {
+  it('keeps all OPTIONAL goals and only matchup-supported SITUATIONAL goals', () => {
     const required = Array.from({ length: 8 }, (_, index) => family(3000 + index, 4000 + index));
     const choiceLeft = family(3100, 4100, undefined, 'OPTIONAL');
     const choiceRight = family(3101, 4101, undefined, 'OPTIONAL');
@@ -192,7 +202,7 @@ describe('BuildDesiredStateV2Service', () => {
       wpa(4203, -0.05),
     ];
 
-    const result = resolve(value, rows, 12);
+    const result = resolve(value, rows);
     const selectedFamilyIds = new Set(result.families.map((entry) => entry.familyId));
 
     for (const entry of required) expect(selectedFamilyIds.has(entry.familyId)).toBe(true);
@@ -202,6 +212,217 @@ describe('BuildDesiredStateV2Service', () => {
     expect(selectedFamilyIds.has(3202)).toBe(true);
     expect(selectedFamilyIds.has(3203)).toBe(false);
     expect(result.families).toHaveLength(12);
-    expect(result.reasonCodes).not.toContain('DESIRED_STATE_UNDER_CAPACITY');
+  });
+
+  it('keeps more than 12 eligible lifetime goals instead of truncating them to inventory capacity', () => {
+    const required = Array.from({ length: 10 }, (_, index) => family(5000 + index, 6000 + index));
+    const optional = Array.from({ length: 4 }, (_, index) => family(5100 + index, 6100 + index, undefined, 'OPTIONAL'));
+
+    const result = resolve(archetype([...required, ...optional]), []);
+
+    expect(result.families).toHaveLength(14);
+    expect(result.families.map((entry) => entry.familyId)).toEqual([
+      ...required.map((entry) => entry.familyId),
+      ...optional.map((entry) => entry.familyId),
+    ]);
+    expect(result.reasonCodes).not.toContain('DESIRED_STATE_CAPACITY_LIMITED');
+  });
+
+  it('excludes a SITUATIONAL goal when configured matchup confidence is insufficient', () => {
+    const situational = family(7000, 7100, undefined, 'SITUATIONAL');
+
+    const result = resolve(archetype([situational]), []);
+
+    expect(result.families).toEqual([]);
+  });
+
+  it('includes a SITUATIONAL goal with sufficient configured matchup evidence', () => {
+    const situational = family(7200, 7300, undefined, 'SITUATIONAL');
+
+    const result = resolve(archetype([situational]), [wpa(7300, 0.1)]);
+
+    expect(result.families).toHaveLength(1);
+    expect(result.families[0]).toMatchObject({
+      familyId: 7200,
+      requirement: 'SITUATIONAL',
+      goalKind: 'SITUATIONAL_MATCHUP_SELECTED',
+    });
+  });
+
+  it('appends provisional flex goals up to the requested visible capacity without displacing primary goals', () => {
+    const required = family(6000, 6001);
+    const passing = family(6100, 6101, undefined, 'SITUATIONAL');
+    const weakEvidence = family(6200, 6201, undefined, 'SITUATIONAL', 2_200);
+    const negativeWpa = family(6300, 6301, undefined, 'SITUATIONAL', 1_500);
+    const value = archetype([required, passing, weakEvidence, negativeWpa]);
+
+    // weakEvidence has no rows (confidence 0); negativeWpa has confident rows
+    // but negative matchup WPA, so both fail the SITUATIONAL gate yet remain
+    // real captured families eligible for the provisional flex fill. Flex
+    // order follows purchase time: 6300 (1500s) before 6200 (2200s).
+    const result = resolve(
+      value,
+      [wpa(6101, 0.1), wpa(6301, -0.05)],
+      4,
+    );
+
+    expect(result.families).toHaveLength(4);
+    expect(result.families.slice(0, 2).map((entry) => entry.goalKind)).toEqual([
+      'REQUIRED',
+      'SITUATIONAL_MATCHUP_SELECTED',
+    ]);
+    const flex = result.families.slice(2);
+    expect(flex.map((entry) => entry.familyId)).toEqual([6300, 6200]);
+    expect(flex.map((entry) => entry.goalKind)).toEqual(['FLEX_PROVISIONAL', 'FLEX_PROVISIONAL']);
+    expect(flex.map((entry) => entry.selectedTerminalKind)).toEqual(['DEFAULT_TERMINAL', 'DEFAULT_TERMINAL']);
+    for (const entry of flex) {
+      expect(entry.reasonCodes).toContain('FLEX_PROVISIONAL_FILL');
+    }
+  });
+
+  it('never appends flex goals when primary goals already cover the visible capacity', () => {
+    const required = [1, 2, 3].map((index) => family(6500 + index, 6600 + index));
+    const value = archetype(required);
+
+    const result = resolve(value, [], 2);
+
+    expect(result.families).toHaveLength(3);
+    expect(result.families.every((entry) => entry.goalKind === 'REQUIRED')).toBe(true);
+  });
+
+  it('treats the flex capacity as a floor target only and never truncates primary goals', () => {
+    const required = [1, 2, 3, 4, 5].map((index) => family(6700 + index, 6800 + index));
+    const value = archetype(required);
+
+    const result = resolve(value, [], 3);
+
+    expect(result.families).toHaveLength(5);
+    expect(result.families.every((entry) => entry.goalKind === 'REQUIRED')).toBe(true);
+  });
+
+  it('appends no flex goals when no flex capacity is requested', () => {
+    const required = family(6900, 6901);
+    const weakEvidence = family(7000, 7001, undefined, 'SITUATIONAL');
+    const value = archetype([required, weakEvidence]);
+
+    const result = resolve(value, []);
+
+    expect(result.families).toHaveLength(1);
+    expect(result.families[0].goalKind).toBe('REQUIRED');
+  });
+
+  it('ranks an invest-closing flex item first even with worse WPA and later purchase timing', () => {
+    const required = family(7400, 7401);
+    // closer: later timing (2200s), more-negative WPA, but its 3000 souls
+    // close the spirit invest track (1800 held + 3000 >= 4800).
+    const closer = family(7500, 7501, undefined, 'SITUATIONAL', 2_200);
+    const weaker = family(7600, 7601, undefined, 'SITUATIONAL', 1_000);
+    const value = archetype([required, closer, weaker]);
+    const flexInvestment = {
+      slotTypeByItemId: (itemId: number) => itemId === 7501 ? 'spirit' as const : 'vitality' as const,
+      costByItemId: (itemId: number) => itemId === 7501 ? 3000 : 100,
+      currentValueByType: { weapon: 0, vitality: 1800, spirit: 1800 },
+    };
+
+    const result = resolve(
+      value,
+      [wpa(7501, -0.06), wpa(7601, -0.02)],
+      3,
+      flexInvestment,
+    );
+
+    expect(result.families).toHaveLength(3);
+    expect(result.families.slice(0, 1).map((entry) => entry.goalKind)).toEqual(['REQUIRED']);
+    const flex = result.families.slice(1);
+    expect(flex.map((entry) => entry.familyId)).toEqual([7500, 7600]);
+    for (const entry of flex) {
+      expect(entry.reasonCodes).toContain('FLEX_PROVISIONAL_FILL');
+    }
+  });
+
+  it('ranks non-closing flex items best-of-worst by matchup WPA instead of purchase timing', () => {
+    const required = family(7700, 7701);
+    // worse WPA has the earlier purchase timing, so a timing-first order would
+    // pick it first; best-of-worst must invert that.
+    const worseWpaEarlier = family(7800, 7801, undefined, 'SITUATIONAL', 1_000);
+    const betterWpaLater = family(7900, 7901, undefined, 'SITUATIONAL', 2_200);
+    const value = archetype([required, worseWpaEarlier, betterWpaLater]);
+    const flexInvestment = {
+      slotTypeByItemId: () => 'weapon' as const,
+      costByItemId: () => 100,
+      currentValueByType: { weapon: 0, vitality: 0, spirit: 0 },
+    };
+
+    const result = resolve(
+      value,
+      [wpa(7801, -0.06), wpa(7901, -0.02)],
+      3,
+      flexInvestment,
+    );
+
+    const flex = result.families.slice(1);
+    expect(flex.map((entry) => entry.familyId)).toEqual([7900, 7800]);
+  });
+
+  it('never lets a zero-evidence flex item outrank an evidenced-but-negative one', () => {
+    const required = family(8300, 8301);
+    const noRows = family(8400, 8401, undefined, 'SITUATIONAL', 1_000);
+    const measuredNegative = family(8500, 8501, undefined, 'SITUATIONAL', 2_200);
+    const value = archetype([required, noRows, measuredNegative]);
+    const flexInvestment = {
+      slotTypeByItemId: () => 'weapon' as const,
+      costByItemId: () => 100,
+      currentValueByType: { weapon: 0, vitality: 0, spirit: 0 },
+    };
+
+    const result = resolve(
+      value,
+      [wpa(8501, -0.02)],
+      3,
+      flexInvestment,
+    );
+
+    const flex = result.families.slice(1);
+    expect(flex.map((entry) => entry.familyId)).toEqual([8500, 8400]);
+  });
+
+  it('treats only exact top-up purchases as invest closers and never a big overshooting item', () => {
+    const required = family(8600, 8601);
+    // bigExpensive crosses the 4800 breakpoint from an empty track by itself,
+    // but overshoots it: closing with a big item is never a flex priority.
+    const bigExpensive = family(8700, 8701, undefined, 'SITUATIONAL', 1_000);
+    const measuredCheap = family(8800, 8801, undefined, 'SITUATIONAL', 2_200);
+    const value = archetype([required, bigExpensive, measuredCheap]);
+    const flexInvestment = {
+      slotTypeByItemId: (itemId: number) => itemId === 8701 ? 'spirit' as const : 'weapon' as const,
+      costByItemId: (itemId: number) => itemId === 8701 ? 6400 : 1600,
+      currentValueByType: { weapon: 0, vitality: 0, spirit: 0 },
+    };
+
+    const result = resolve(
+      value,
+      [wpa(8701, -0.06), wpa(8801, -0.02)],
+      3,
+      flexInvestment,
+    );
+
+    const flex = result.families.slice(1);
+    expect(flex.map((entry) => entry.familyId)).toEqual([8800, 8700]);
+  });
+
+  it('still ranks flex by purchase timing when no investment context is supplied', () => {
+    const required = family(8000, 8001);
+    const laterTiming = family(8100, 8101, undefined, 'SITUATIONAL', 2_200);
+    const earlierTiming = family(8200, 8201, undefined, 'SITUATIONAL', 1_000);
+    const value = archetype([required, laterTiming, earlierTiming]);
+
+    const result = resolve(
+      value,
+      [wpa(8101, -0.06), wpa(8201, -0.02)],
+      3,
+    );
+
+    const flex = result.families.slice(1);
+    expect(flex.map((entry) => entry.familyId)).toEqual([8200, 8100]);
   });
 });

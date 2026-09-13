@@ -53,6 +53,34 @@ describe('recommendation economy rules store v1', () => {
     expect(repo.rows[0].contentSha256).toMatch(/^[a-f0-9]{64}$/);
   });
 
+  it('preserves verified upgrade pricing policy and rules source through persistence', async () => {
+    const repo = repository();
+    const store = new RecommendationEconomyRulesStoreV1Service(repo);
+    const rulesWithUpgradePricing = {
+      ...rules,
+      source: 'verified-ruleset-snapshot',
+      upgradePricingPolicy: {
+        mode: 'TARGET_COST_MINUS_VERIFIED_COMPONENT_CREDIT' as const,
+        componentCreditRatio: 1,
+        evidence: 'RECONSTRUCTED' as const,
+        source: 'verified-item-recipe-pricing',
+      },
+    };
+
+    await store.publish({
+      snapshotId: 'economy-r1-upgrade-pricing',
+      source: 'manual-verified-game-rules',
+      verifiedAt: new Date('2026-09-05T00:00:00.000Z'),
+      rules: rulesWithUpgradePricing,
+    });
+
+    expect(repo.rows[0].payload).toMatchObject({
+      source: 'verified-ruleset-snapshot',
+      upgradePricingPolicy: rulesWithUpgradePricing.upgradePricingPolicy,
+    });
+    await expect(store.resolveExact('r1', catalogSha256)).resolves.toEqual(rulesWithUpgradePricing);
+  });
+
   it('fails closed on malformed or identity-mismatched persisted rules', async () => {
     const repo = repository([{
       snapshotId: 'bad',

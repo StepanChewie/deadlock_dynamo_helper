@@ -62,6 +62,13 @@ function createHarness(options: {
       contentSha256: `${heroId}${accountId}`.padStart(64, '0').slice(-64),
       payload: { accountId, heroId, items: [] },
     })),
+    normalizeWpaFilteredItems: jest.fn((_: unknown, __: string, heroId: number) => ({
+      dataset: 'WPA_FILTERED_ITEMS',
+      scopeKey: `hero:${heroId}`,
+      statlockerPatchId: '15-1',
+      contentSha256: `life${heroId}`.padEnd(64, '0').slice(-64),
+      payload: { heroId, items: [] },
+    })),
   };
   const active = new Map<string, any>();
   const publish = jest.fn(async (input: any): Promise<any> => {

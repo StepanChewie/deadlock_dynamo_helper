@@ -18,9 +18,17 @@ export interface DesiredFamilySourceProfileV2 {
   playerName?: string;
 }
 
+export type DesiredFamilyGoalKindV2 =
+  | 'REQUIRED'
+  | 'CHOICE_SELECTED'
+  | 'OPTIONAL'
+  | 'SITUATIONAL_MATCHUP_SELECTED'
+  | 'FLEX_PROVISIONAL';
+
 export interface DesiredFamilyStateV2 {
   familyId: number;
   requirement: BuildFamilyRequirementV2 | 'CHOICE';
+  goalKind: DesiredFamilyGoalKindV2;
   selectedTerminalItemId: number;
   selectedTerminalKind: 'DEFAULT_TERMINAL' | 'OPTIONAL_TERMINAL';
   groupId?: string;
@@ -39,10 +47,28 @@ export interface DesiredBuildStateV2 {
 export interface ResolveDesiredBuildStateV2Input {
   heroId: number;
   archetype: BuildArchetypeV2;
-  totalCapacity: number;
   enemyHeroIds: readonly number[];
   enemyThreats: readonly EnemyThreatWeightV1[];
   vsHeroRows: readonly StatlockerVsHeroWpaAggregateSourceV1[];
+  /**
+   * Minimum number of visible goals the full build should present. When the
+   * evidence-backed primary goals fall short, unselected SITUATIONAL families
+   * (real captured evidence, no matchup advantage on this roster) are appended
+   * as FLEX_PROVISIONAL goals in archetype purchase-time order. Never a cap:
+   * primary goals are never truncated.
+   */
+  flexGoalCapacity?: number;
+  /**
+   * Current inventory investment context for flex ranking. When supplied,
+   * flex items whose purchase crosses the invest breakpoint on their track
+   * rank first regardless of matchup WPA; the rest rank best-of-worst by
+   * matchup WPA. Without it, flex ranks by purchase time.
+   */
+  flexInvestment?: {
+    slotTypeByItemId: (itemId: number) => 'weapon' | 'vitality' | 'spirit' | undefined;
+    costByItemId: (itemId: number) => number | undefined;
+    currentValueByType: Readonly<Record<'weapon' | 'vitality' | 'spirit', number>>;
+  };
 }
 
 interface FamilyEvaluationV2 {
@@ -69,11 +95,13 @@ export class BuildDesiredStateV2Service {
     const choiceFamilyIds = new Set(choiceGroups.flatMap((group) => resolveGroupFamilyIds(group, itemToFamily)));
     const selected: FamilyEvaluationV2[] = [];
     const selectedChoiceFamilyIdsByGroup: Record<string, readonly number[]> = {};
-    const reasonCodes = new Set<string>();
 
     for (const { family, index } of familyById.values()) {
       if (family.requirement !== 'REQUIRED' || choiceFamilyIds.has(family.familyId)) continue;
-      selected.push({ state: this.evaluateFamily(input, family, family.requirement), familyOrder: index });
+      selected.push({
+        state: this.evaluateFamily(input, family, family.requirement, 'REQUIRED'),
+        familyOrder: index,
+      });
     }
 
     for (const group of choiceGroups) {
@@ -82,7 +110,7 @@ export class BuildDesiredStateV2Service {
         .map((familyId) => familyById.get(familyId))
         .filter((entry): entry is { family: BuildArchetypeFamilyV2; index: number } => entry !== undefined)
         .map(({ family, index }) => ({
-          state: this.evaluateFamily(input, family, 'CHOICE', group.groupId),
+          state: this.evaluateFamily(input, family, 'CHOICE', 'CHOICE_SELECTED', group.groupId),
           familyOrder: index,
         }))
         .sort(compareFamilyEvaluation);
@@ -97,45 +125,77 @@ export class BuildDesiredStateV2Service {
         .sort((a, b) => a - b);
     }
 
-    if (selected.length > input.totalCapacity) {
-      throw new Error('Build desired state v2: mandatory family occupancy exceeds capacity');
-    }
-
     const alreadySelected = new Set(selected.map((entry) => entry.state.familyId));
-    const optionalCandidates = families
-      .map((family, index) => ({ family, index }))
-      .filter(({ family }) => !alreadySelected.has(family.familyId))
-      .filter(({ family }) => !choiceFamilyIds.has(family.familyId))
-      .filter(({ family }) => family.requirement === 'OPTIONAL' || family.requirement === 'SITUATIONAL')
-      .map(({ family, index }) => ({
-        state: this.evaluateFamily(input, family, family.requirement),
-        familyOrder: index,
-      }))
-      .sort(compareFamilyEvaluation);
+    for (const [index, family] of families.entries()) {
+      if (alreadySelected.has(family.familyId) || choiceFamilyIds.has(family.familyId)) continue;
 
-    const remainingCapacity = Math.max(0, input.totalCapacity - selected.length);
-    const acceptedOptional = optionalCandidates.slice(0, remainingCapacity).map((entry) => ({
-      ...entry,
-      state: {
-        ...entry.state,
-        reasonCodes: [...new Set([...entry.state.reasonCodes, 'OPTIONAL_FAMILY_CAPACITY_SELECTED'])].sort(),
-      },
-    }));
-    selected.push(...acceptedOptional);
+      if (family.requirement === 'OPTIONAL') {
+        selected.push({
+          state: this.evaluateFamily(input, family, 'OPTIONAL', 'OPTIONAL'),
+          familyOrder: index,
+        });
+        continue;
+      }
 
-    if (optionalCandidates.length > acceptedOptional.length) {
-      reasonCodes.add('DESIRED_STATE_CAPACITY_LIMITED');
+      if (family.requirement !== 'SITUATIONAL') continue;
+      const evaluation = this.evaluateFamily(
+        input,
+        family,
+        'SITUATIONAL',
+        'SITUATIONAL_MATCHUP_SELECTED',
+      );
+      const config = STATLOCKER_BUILD_V2_CONFIG.outsideMatchupDiscovery;
+      if (
+        evaluation.confidence < config.minConfidence ||
+        evaluation.score < config.minNormalizedSupport
+      ) {
+        continue;
+      }
+      selected.push({ state: evaluation, familyOrder: index });
     }
-    if (selected.length < input.totalCapacity) {
-      reasonCodes.add('DESIRED_STATE_UNDER_CAPACITY');
+
+    const flexStates: DesiredFamilyStateV2[] = [];
+    const flexGoalCapacity = input.flexGoalCapacity;
+    if (flexGoalCapacity !== undefined && selected.length < flexGoalCapacity) {
+      const primaryFamilyIds = new Set(selected.map((entry) => entry.state.familyId));
+      const flexPool = families
+        .map((family, index) => ({ family, index }))
+        .filter(({ family }) =>
+          !primaryFamilyIds.has(family.familyId) &&
+          !choiceFamilyIds.has(family.familyId) &&
+          family.requirement === 'SITUATIONAL',
+        )
+        .map(({ family, index }) => ({
+          family,
+          index,
+          evaluation: this.evaluateFamily(input, family, 'SITUATIONAL', 'FLEX_PROVISIONAL'),
+          defaultTerminalItemId: family.terminalCandidates.find(
+            (candidate) => candidate.kind === 'DEFAULT_TERMINAL',
+          )!.itemId,
+        }))
+        .sort(compareFlexPoolEntries(input.flexInvestment));
+      for (const { family, evaluation, defaultTerminalItemId } of flexPool) {
+        if (selected.length + flexStates.length >= flexGoalCapacity) break;
+        flexStates.push({
+          ...evaluation,
+          selectedTerminalItemId: evaluation.selectedTerminalKind === 'DEFAULT_TERMINAL'
+            ? evaluation.selectedTerminalItemId
+            : defaultTerminalItemId,
+          selectedTerminalKind: 'DEFAULT_TERMINAL',
+          reasonCodes: ['FLEX_PROVISIONAL_FILL'],
+        });
+      }
     }
 
     return {
-      families: selected
-        .sort((left, right) => left.familyOrder - right.familyOrder || left.state.familyId - right.state.familyId)
-        .map((entry) => entry.state),
+      families: [
+        ...selected
+          .sort((left, right) => left.familyOrder - right.familyOrder || left.state.familyId - right.state.familyId)
+          .map((entry) => entry.state),
+        ...flexStates,
+      ],
       selectedChoiceFamilyIdsByGroup,
-      reasonCodes: [...reasonCodes].sort(),
+      reasonCodes: [],
     };
   }
 
@@ -143,6 +203,7 @@ export class BuildDesiredStateV2Service {
     input: ResolveDesiredBuildStateV2Input,
     family: BuildArchetypeFamilyV2,
     requirement: BuildFamilyRequirementV2 | 'CHOICE',
+    goalKind: DesiredFamilyGoalKindV2,
     groupId?: string,
   ): DesiredFamilyStateV2 {
     const defaultTerminal = family.terminalCandidates.find((candidate) => candidate.kind === 'DEFAULT_TERMINAL');
@@ -177,6 +238,7 @@ export class BuildDesiredStateV2Service {
       return {
         familyId: family.familyId,
         requirement,
+        goalKind,
         selectedTerminalItemId: promoted.candidate.itemId,
         selectedTerminalKind: 'OPTIONAL_TERMINAL',
         ...(groupId === undefined ? {} : { groupId }),
@@ -193,6 +255,7 @@ export class BuildDesiredStateV2Service {
     return {
       familyId: family.familyId,
       requirement,
+      goalKind,
       selectedTerminalItemId: defaultTerminal.itemId,
       selectedTerminalKind: 'DEFAULT_TERMINAL',
       ...(groupId === undefined ? {} : { groupId }),
@@ -256,12 +319,64 @@ function compareFamilyEvaluation(left: FamilyEvaluationV2, right: FamilyEvaluati
     left.state.familyId - right.state.familyId;
 }
 
+function firstFamilyTiming(family: BuildArchetypeFamilyV2): number {
+  return family.progressionNodes[0]?.timing.medianBuyTimeS ?? 0;
+}
+
+interface FlexPoolEntryV2 {
+  family: BuildArchetypeFamilyV2;
+  index: number;
+  evaluation: DesiredFamilyStateV2;
+  defaultTerminalItemId: number;
+}
+
+function compareFlexPoolEntries(
+  investment: ResolveDesiredBuildStateV2Input['flexInvestment'],
+): (left: FlexPoolEntryV2, right: FlexPoolEntryV2) => number {
+  return (left, right) => {
+    if (investment) {
+      const leftCloses = closesInvestBreakpoint(left.defaultTerminalItemId, investment);
+      const rightCloses = closesInvestBreakpoint(right.defaultTerminalItemId, investment);
+      if (leftCloses !== rightCloses) return leftCloses ? -1 : 1;
+      if (!leftCloses) {
+        // Best of the worst: items with measured matchup evidence rank before
+        // zero-evidence ones (no data is not "least bad"), then the
+        // least-negative matchup WPA fills the next flex slot; purchase
+        // timing only breaks full ties.
+        const leftHasEvidence = left.evaluation.confidence > 0;
+        const rightHasEvidence = right.evaluation.confidence > 0;
+        if (leftHasEvidence !== rightHasEvidence) return leftHasEvidence ? -1 : 1;
+        return right.evaluation.score - left.evaluation.score ||
+          right.evaluation.confidence - left.evaluation.confidence ||
+          firstFamilyTiming(left.family) - firstFamilyTiming(right.family) ||
+          left.family.familyId - right.family.familyId;
+      }
+    }
+    return firstFamilyTiming(left.family) - firstFamilyTiming(right.family) ||
+      left.family.familyId - right.family.familyId;
+  };
+}
+
+/**
+ * A flex item closes the invest only as an exact top-up: its cost fills the
+ * remaining gap on its track without overshoot. Big items that cross the
+ * breakpoint on their own are never closers — closing with an expensive
+ * purchase is not a flex priority.
+ */
+function closesInvestBreakpoint(
+  itemId: number,
+  investment: NonNullable<ResolveDesiredBuildStateV2Input['flexInvestment']>,
+): boolean {
+  const slotType = investment.slotTypeByItemId(itemId);
+  const cost = investment.costByItemId(itemId);
+  if (!slotType || cost === undefined) return false;
+  const remaining = STATLOCKER_BUILD_V2_CONFIG.investBreakpointSouls - investment.currentValueByType[slotType];
+  return remaining > 0 && cost === remaining;
+}
+
 function validateInput(input: ResolveDesiredBuildStateV2Input): void {
   if (!Number.isInteger(input.heroId) || input.heroId <= 0 || input.archetype.heroId !== input.heroId) {
     throw new Error('Build desired state v2: hero identity is invalid');
-  }
-  if (!Number.isInteger(input.totalCapacity) || input.totalCapacity <= 0) {
-    throw new Error('Build desired state v2: totalCapacity must be a positive integer');
   }
   if (input.enemyHeroIds.some((heroId) => !Number.isInteger(heroId) || heroId <= 0)) {
     throw new Error('Build desired state v2: enemyHeroIds are invalid');

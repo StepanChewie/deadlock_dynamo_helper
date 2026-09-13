@@ -97,6 +97,21 @@ function validateRules(rules: RecommendationEconomyRulesV1): void {
       throw new Error(`Recommendation economy rules investment breakpoints are invalid: ${type}`);
     }
   }
+
+  const policy = rules.upgradePricingPolicy;
+  if (!policy) return;
+  if (policy.mode !== 'TARGET_COST_MINUS_VERIFIED_COMPONENT_CREDIT') {
+    throw new Error('Recommendation economy rules upgrade pricing mode is invalid');
+  }
+  if (!Number.isFinite(policy.componentCreditRatio) || policy.componentCreditRatio < 0 || policy.componentCreditRatio > 1) {
+    throw new Error('Recommendation economy rules upgrade pricing component credit ratio is invalid');
+  }
+  if (policy.evidence !== 'OBSERVED' && policy.evidence !== 'RECONSTRUCTED') {
+    throw new Error('Recommendation economy rules upgrade pricing evidence is invalid');
+  }
+  if (!policy.source?.trim()) {
+    throw new Error('Recommendation economy rules upgrade pricing source is invalid');
+  }
 }
 
 function normalizeRules(rules: RecommendationEconomyRulesV1): RecommendationEconomyRulesV1 {
@@ -116,6 +131,13 @@ function normalizeRules(rules: RecommendationEconomyRulesV1): RecommendationEcon
       vitality: normalizeBreakpoints(rules.investmentBreakpoints.vitality),
       spirit: normalizeBreakpoints(rules.investmentBreakpoints.spirit),
     },
+    ...(rules.upgradePricingPolicy ? {
+      upgradePricingPolicy: {
+        ...rules.upgradePricingPolicy,
+        source: rules.upgradePricingPolicy.source.trim(),
+      },
+    } : {}),
+    ...(rules.source?.trim() ? { source: rules.source.trim() } : {}),
   };
 }
 

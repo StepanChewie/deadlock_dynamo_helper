@@ -37,6 +37,23 @@ const itemGraph = createRecommendationItemGraph([
   item(D, { recipeId: 'A-to-D', consumedItemIds: [A] }),
 ]);
 
+function progressionEdge(fromItemId: number, toItemId: number, fromTime: number, toTime: number) {
+  return {
+    fromItemId,
+    toItemId,
+    sourceProfileCount: 2,
+    orderedProfileCount: 2,
+    orderConfidence: 1,
+    timing: {
+      fromMedianBuyTimeS: fromTime,
+      toMedianBuyTimeS: toTime,
+      fromSpreadS: 30,
+      toSpreadS: 30,
+    },
+    evidence: 'STATLOCKER_SAME_PROFILE' as const,
+  };
+}
+
 function archetype(): BuildArchetypeV2 {
   return {
     archetypeId: 'archetype:family-first',
@@ -58,6 +75,11 @@ function archetype(): BuildArchetypeV2 {
         { itemId: B, rawFrequencyTier: 'CORE', progressionRole: 'INTERMEDIATE', sourceProfileCount: 2, profileCoverage: 1, purchaseRate: 1, timing: { medianBuyTimeS: 700, spreadS: 30, phase: 'MID' } },
         { itemId: C, rawFrequencyTier: 'FREQUENT', progressionRole: 'DEFAULT_TERMINAL', sourceProfileCount: 2, profileCoverage: 1, purchaseRate: 0.9, timing: { medianBuyTimeS: 1_200, spreadS: 60, phase: 'MID' } },
         { itemId: D, rawFrequencyTier: 'SOMETIMES', progressionRole: 'OPTIONAL_TERMINAL', sourceProfileCount: 1, profileCoverage: 0.5, purchaseRate: 0.4, timing: { medianBuyTimeS: 1_800, spreadS: 90, phase: 'LATE' } },
+      ],
+      progressionEdges: [
+        progressionEdge(A, B, 300, 700),
+        progressionEdge(B, C, 700, 1_200),
+        progressionEdge(A, D, 300, 1_800),
       ],
       terminalCandidates: [
         { itemId: C, kind: 'DEFAULT_TERMINAL', sourceProfileCount: 2, profileCoverage: 1, purchaseRate: 0.9, rawFrequencyTier: 'FREQUENT' },

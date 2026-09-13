@@ -83,6 +83,18 @@ export interface OptionalTerminalV2Config {
   minConfidence: number;
 }
 
+export type SellMatchupProtectionV1Config =
+  | {
+      enabled: false;
+      shrinkK: number;
+    }
+  | {
+      enabled: true;
+      shrinkK: number;
+      minTeamWpaPct: number;
+      minConfidence: number;
+    };
+
 export interface StatlockerBuildV2Config {
   profileLinkSimilarity: number;
   minClusterSize: number;
@@ -106,7 +118,11 @@ export interface StatlockerBuildV2Config {
   optionalTerminal: OptionalTerminalV2Config;
   itemUtility: BuildItemUtilityV2Config;
   outsideMatchupDiscovery: OutsideMatchupDiscoveryV2Config;
+  sellMatchupProtection: SellMatchupProtectionV1Config;
   fullBuildResolver: FullBuildResolverV2Config;
+  /** Souls per investment track (weapon/vitality/spirit) that a single flex
+   * item's purchase must reach to count as closing the invest. */
+  investBreakpointSouls: number;
 }
 
 export const STATLOCKER_BUILD_V2_CONFIG: Readonly<StatlockerBuildV2Config> = Object.freeze({
@@ -200,6 +216,19 @@ export const STATLOCKER_BUILD_V2_CONFIG: Readonly<StatlockerBuildV2Config> = Obj
     replacementMinImprovement: 0.30,
     coreReplacementMinImprovement: 0.45,
   }),
+  sellMatchupProtection: Object.freeze<SellMatchupProtectionV1Config>({
+    enabled: true,
+    shrinkK: 500,
+    // Calibrated from captured current-patch VS_HERO_WPA aggregates
+    // (test/fixtures/statlocker-vs-hero-wpa/sell-protection-calibration.json;
+    // see full-build-matchup-protection-calibration.spec.ts): minTeamWpaPct
+    // sits between the mixed-sign full-roster noise cluster (max 0.001105)
+    // and the consistently positive cluster (min 0.001847); minConfidence
+    // sits between the two weakest full-roster evidence rows (0.417) and the
+    // next weakest (0.509).
+    minTeamWpaPct: 0.0015,
+    minConfidence: 0.45,
+  }),
   fullBuildResolver: Object.freeze({
     buyMinImprovement: 0.08,
     replacementMinImprovement: 0.30,
@@ -209,4 +238,5 @@ export const STATLOCKER_BUILD_V2_CONFIG: Readonly<StatlockerBuildV2Config> = Obj
     nearTermProtectedStepCount: 2,
     nearTermPlanSwitchMinImprovement: 0.16,
   }),
+  investBreakpointSouls: 4800,
 });

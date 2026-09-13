@@ -55,7 +55,12 @@ import { DraftMatchupEvidenceV1Service } from './draft-matchup-evidence-v1.servi
 import { EnemyThreatHistoryV1Service } from './enemy-threat-history-v1.service';
 import { EnemyThreatV1Service } from './enemy-threat-v1.service';
 import { FamilyFirstFullBuildResolverV2Service } from './family-first-full-build-resolver-v2.service';
+import { FullBuildMatchupProtectionV1Service } from './full-build-matchup-protection-v1.service';
+import { FullBuildReplacementV2Service } from './full-build-replacement-v2.service';
 import { FullBuildResolverV2Service } from './full-build-resolver-v2.service';
+import { FullBuildSellRankerV1Service } from './full-build-sell-ranker-v1.service';
+import { FullBuildTransactionPlannerV2Service } from './full-build-transaction-planner-v2.service';
+import { FullBuildTransitionValueV2Service } from './full-build-transition-value-v2.service';
 import { HistoricalBuildTrajectorySourceV2Service } from './historical-build-trajectory-source-v2.service';
 import { HistoricalPlannerTrajectoryExtractorV2Service } from './historical-planner-trajectory-extractor-v2.service';
 import { MatchupCandidateDiscoveryV2Service } from './matchup-candidate-discovery-v2.service';
@@ -66,6 +71,7 @@ import {
   StatlockerBrowserCollectorService,
 } from './statlocker-browser-collector.service';
 import { StatlockerEvidenceService } from './statlocker-evidence.service';
+import { StatlockerItemLifecycleRepositoryV1Service } from './statlocker-item-lifecycle-repository-v1.service';
 import { StatlockerNormalizerService } from './statlocker-normalizer.service';
 import { StatlockerRefreshService } from './statlocker-refresh.service';
 import { StatlockerSnapshotStoreService } from './statlocker-snapshot-store.service';
@@ -118,6 +124,7 @@ import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-
     StatlockerVsHeroWpaRepositoryV1Service,
     StatlockerVsHeroWpaRowNormalizerV1Service,
     StatlockerEvidenceService,
+    StatlockerItemLifecycleRepositoryV1Service,
     BuildSkeletonService,
     BuildArchetypeMinerV2Service,
     BuildArchetypeCompilerV2Service,
@@ -128,6 +135,11 @@ import { TransactionPlanValidatorV1Service } from './transaction-plan-validator-
     BuildArchetypeSessionV2Service,
     BuildDebugTraceStoreV2Service,
     BuildItemUtilityV2Service,
+    FullBuildMatchupProtectionV1Service,
+    FullBuildSellRankerV1Service,
+    FullBuildReplacementV2Service,
+    FullBuildTransactionPlannerV2Service,
+    FullBuildTransitionValueV2Service,
     MatchupCandidateDiscoveryV2Service,
     FamilyFirstFullBuildResolverV2Service,
     {

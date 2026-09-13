@@ -52,6 +52,22 @@ describe('recommendation ruleset catalog', () => {
     expect(compiled.graph.getItem(1)?.availableRulesetIds).toEqual(['ruleset-1']);
   });
 
+  it('treats direct purchase as legal only for verified shopable enabled items with known cost', () => {
+    const input = baseInput();
+    const verified = compileStrictRecommendationCatalogV1(buildRecommendationRulesetCatalogV1(input));
+    const blocked = compileStrictRecommendationCatalogV1(buildRecommendationRulesetCatalogV1({
+      ...input,
+      items: [
+        { ...input.items[0], shopable: false },
+        { ...input.items[1], disabled: true },
+      ],
+    }));
+
+    expect(verified.graph.getItem(1)?.directPurchaseCost).toBe(800);
+    expect(blocked.graph.getItem(1)?.directPurchaseCost).toBeUndefined();
+    expect(blocked.graph.getItem(2)?.directPurchaseCost).toBeUndefined();
+  });
+
   it('does not confuse catalog availability with active-item behavior', () => {
     const input = baseInput();
     const catalog = buildRecommendationRulesetCatalogV1({

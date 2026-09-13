@@ -1,0 +1,2321 @@
+{
+  "items": [
+    {
+      "item": "Crippling Headshot",
+      "heroName": "Billy",
+      "category": "Damage",
+      "cost": 6400,
+      "wpaValue": 0.05869257232212666,
+      "sampleSize": 1279,
+      "costRelativeWpa": 0.05869257232212666,
+      "mean_purchase_time_min": 32.11064894448789,
+      "mean_prob_before": 0.5542953870211103,
+      "aheadWpa": 0.04033446215139442,
+      "behindWpa": 0.07243438485804417,
+      "aheadBehindDiff": -0.03209992270664975,
+      "best_purchase_time": {
+        "time_min": 27.342051683633517
+      },
+      "mean_net_worth_before": 31709.121203362
+    },
+    {
+      "item": "Indomitable",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 6400,
+      "wpaValue": 0.052879573712255774,
+      "sampleSize": 563,
+      "costRelativeWpa": 0.052879573712255774,
+      "mean_purchase_time_min": 32.95225577264653,
+      "mean_prob_before": 0.5688234458259324,
+      "aheadWpa": 0.03556776859504132,
+      "behindWpa": 0.0600362962962963,
+      "aheadBehindDiff": -0.02446852770125498,
+      "best_purchase_time": {
+        "time_min": 22.050793650793647
+      },
+      "mean_net_worth_before": 32688.817044227348
+    },
+    {
+      "item": "Weapon Shielding",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 1600,
+      "wpaValue": 0.04934861681731036,
+      "sampleSize": 3651,
+      "costRelativeWpa": 0.19739446726924145,
+      "mean_purchase_time_min": 12.241265406737883,
+      "mean_prob_before": 0.4107876198301833,
+      "aheadWpa": 0.016369134078212288,
+      "behindWpa": 0.058628263473053895,
+      "aheadBehindDiff": -0.04225912939484161,
+      "best_purchase_time": {
+        "time_min": 10.714023555190359
+      },
+      "mean_net_worth_before": 7973.912380909342
+    },
+    {
+      "item": "Unstoppable",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 6400,
+      "wpaValue": 0.04202004555808656,
+      "sampleSize": 878,
+      "costRelativeWpa": 0.04202004555808656,
+      "mean_purchase_time_min": 32.076936218678824,
+      "mean_prob_before": 0.49404157175398633,
+      "aheadWpa": 0.02569174917491748,
+      "behindWpa": 0.046258870967741936,
+      "aheadBehindDiff": -0.020567121792824456,
+      "best_purchase_time": {
+        "time_min": 30.470581527936144
+      },
+      "mean_net_worth_before": 31181.444185079723
+    },
+    {
+      "item": "Juggernaut",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 6400,
+      "wpaValue": 0.04189961656441718,
+      "sampleSize": 7824,
+      "costRelativeWpa": 0.04189961656441718,
+      "mean_purchase_time_min": 31.056738241308814,
+      "mean_prob_before": 0.520561733128834,
+      "aheadWpa": 0.02913078268473985,
+      "behindWpa": 0.03750542168674697,
+      "aheadBehindDiff": -0.00837463900200712,
+      "best_purchase_time": {
+        "time_min": 31.19529652351738
+      },
+      "mean_net_worth_before": 30792.094492484688
+    },
+    {
+      "item": "Plated Armor",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 6400,
+      "wpaValue": 0.041824032921810694,
+      "sampleSize": 1215,
+      "costRelativeWpa": 0.041824032921810694,
+      "mean_purchase_time_min": 32.88894650205763,
+      "mean_prob_before": 0.5217598353909465,
+      "aheadWpa": 0.019640685224839402,
+      "behindWpa": 0.05705404530744335,
+      "aheadBehindDiff": -0.03741336008260395,
+      "best_purchase_time": {
+        "time_min": 27.213909465020578
+      },
+      "mean_net_worth_before": 32599.910261234567
+    },
+    {
+      "item": "Phantom Strike",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 6400,
+      "wpaValue": 0.037131469260159825,
+      "sampleSize": 5758,
+      "costRelativeWpa": 0.037131469260159825,
+      "mean_purchase_time_min": 28.9622559916638,
+      "mean_prob_before": 0.5213374261896493,
+      "aheadWpa": 0.017585981308411214,
+      "behindWpa": 0.05623798076923082,
+      "aheadBehindDiff": -0.038651999460819604,
+      "best_purchase_time": {
+        "time_min": 19.81882598124349
+      },
+      "mean_net_worth_before": 27307.76413773884
+    },
+    {
+      "item": "Spellbreaker",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 6400,
+      "wpaValue": 0.036217994858611824,
+      "sampleSize": 778,
+      "costRelativeWpa": 0.036217994858611824,
+      "mean_purchase_time_min": 33.69224935732648,
+      "mean_prob_before": 0.536975706940874,
+      "aheadWpa": 0.031429109589041104,
+      "behindWpa": 0.03319289340101523,
+      "aheadBehindDiff": -0.0017637838119741248,
+      "best_purchase_time": {
+        "time_min": 26.37814910025707
+      },
+      "mean_net_worth_before": 33861.54756028278
+    },
+    {
+      "item": "Warp Stone",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 3200,
+      "wpaValue": 0.03609849315068493,
+      "sampleSize": 730,
+      "costRelativeWpa": 0.07219698630136986,
+      "mean_purchase_time_min": 23.46893150684931,
+      "mean_prob_before": 0.5279153424657534,
+      "aheadWpa": 0.007019424460431656,
+      "behindWpa": 0.03932196531791908,
+      "aheadBehindDiff": -0.032302540857487426,
+      "best_purchase_time": {
+        "time_min": 17.21232876712329
+      },
+      "mean_net_worth_before": 19565.99728191781
+    },
+    {
+      "item": "Crushing Fists",
+      "heroName": "Billy",
+      "category": "Damage",
+      "cost": 6400,
+      "wpaValue": 0.035014136273678255,
+      "sampleSize": 3537,
+      "costRelativeWpa": 0.035014136273678255,
+      "mean_purchase_time_min": 29.52429459994346,
+      "mean_prob_before": 0.5506932711337292,
+      "aheadWpa": 0.012804385334291873,
+      "behindWpa": 0.06650155038759689,
+      "aheadBehindDiff": -0.05369716505330502,
+      "best_purchase_time": {
+        "time_min": 24.539609838846477
+      },
+      "mean_net_worth_before": 28621.901611393838
+    },
+    {
+      "item": "Berserker",
+      "heroName": "Billy",
+      "category": "Damage",
+      "cost": 3200,
+      "wpaValue": 0.02847626768867925,
+      "sampleSize": 3392,
+      "costRelativeWpa": 0.0569525353773585,
+      "mean_purchase_time_min": 26.668806014150945,
+      "mean_prob_before": 0.5368382075471699,
+      "aheadWpa": 0.0165334431630972,
+      "behindWpa": 0.03519510309278351,
+      "aheadBehindDiff": -0.018661659929686308,
+      "best_purchase_time": {
+        "time_min": 20.321645532291363
+      },
+      "mean_net_worth_before": 24457.48615353774
+    },
+    {
+      "item": "Colossus",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 6400,
+      "wpaValue": 0.027469500091631693,
+      "sampleSize": 594769,
+      "costRelativeWpa": 0.027469500091631693,
+      "mean_purchase_time_min": 29.580497251873926,
+      "mean_prob_before": 0.5058218044316356,
+      "aheadWpa": 0.016281652529325504,
+      "behindWpa": 0.02380907559570371,
+      "aheadBehindDiff": -0.007527423066378207,
+      "best_purchase_time": {
+        "time_min": 20.23407345385091
+      },
+      "mean_net_worth_before": 27808.34717030223
+    },
+    {
+      "item": "Scourge",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 6400,
+      "wpaValue": 0.025464717198922664,
+      "sampleSize": 2599,
+      "costRelativeWpa": 0.025464717198922664,
+      "mean_purchase_time_min": 30.632547133512887,
+      "mean_prob_before": 0.5173223547518276,
+      "aheadWpa": 0.014855882352941177,
+      "behindWpa": 0.035564064602960965,
+      "aheadBehindDiff": -0.020708182250019788,
+      "best_purchase_time": {
+        "time_min": 29.593112735667564
+      },
+      "mean_net_worth_before": 29506.053898768758
+    },
+    {
+      "item": "Rapid Recharge",
+      "heroName": "Billy",
+      "category": "Damage",
+      "cost": 3200,
+      "wpaValue": 0.024995915390226133,
+      "sampleSize": 9597,
+      "costRelativeWpa": 0.049991830780452266,
+      "mean_purchase_time_min": 26.54408565176618,
+      "mean_prob_before": 0.5227840366781287,
+      "aheadWpa": 0.02296504957507084,
+      "behindWpa": 0.02766010461245841,
+      "aheadBehindDiff": -0.004695055037387572,
+      "best_purchase_time": {
+        "time_min": 20.163238512035008
+      },
+      "mean_net_worth_before": 24311.10194152341
+    },
+    {
+      "item": "Greater Expansion",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 3200,
+      "wpaValue": 0.024336773255813952,
+      "sampleSize": 4816,
+      "costRelativeWpa": 0.048673546511627905,
+      "mean_purchase_time_min": 26.432331810631226,
+      "mean_prob_before": 0.5399006021594683,
+      "aheadWpa": 0.014997351694915255,
+      "behindWpa": 0.032707769423558894,
+      "aheadBehindDiff": -0.017710417728643638,
+      "best_purchase_time": {
+        "time_min": 19.67497403946002
+      },
+      "mean_net_worth_before": 24159.012075519102
+    },
+    {
+      "item": "Bullet Resilience",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 3200,
+      "wpaValue": 0.024319626168224296,
+      "sampleSize": 642,
+      "costRelativeWpa": 0.04863925233644859,
+      "mean_purchase_time_min": 28.495264797507794,
+      "mean_prob_before": 0.44160716510903425,
+      "aheadWpa": 0.01376685393258427,
+      "behindWpa": 0.020895631067961162,
+      "aheadBehindDiff": -0.007128777135376893,
+      "best_purchase_time": {
+        "time_min": 30.37663551401869
+      },
+      "mean_net_worth_before": 26334.263245794395
+    },
+    {
+      "item": "Fortitude",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 3200,
+      "wpaValue": 0.023514692482915715,
+      "sampleSize": 878,
+      "costRelativeWpa": 0.04702938496583143,
+      "mean_purchase_time_min": 17.21657175398633,
+      "mean_prob_before": 0.49116958997722093,
+      "aheadWpa": 0.009583387622149837,
+      "behindWpa": 0.015049735449735447,
+      "aheadBehindDiff": -0.005466347827585609,
+      "best_purchase_time": {
+        "time_min": 12.084584980237155
+      },
+      "mean_net_worth_before": 13354.247165831439
+    },
+    {
+      "item": "Hunter's Aura",
+      "heroName": "Billy",
+      "category": "Damage",
+      "cost": 3200,
+      "wpaValue": 0.021329813664596277,
+      "sampleSize": 805,
+      "costRelativeWpa": 0.042659627329192554,
+      "mean_purchase_time_min": 21.80499378881987,
+      "mean_prob_before": 0.5136057142857142,
+      "aheadWpa": 0.009431347962382444,
+      "behindWpa": 0.03235618556701031,
+      "aheadBehindDiff": -0.022924837604627865,
+      "best_purchase_time": {
+        "time_min": 16.754409937888198
+      },
+      "mean_net_worth_before": 18454.571418012423
+    },
+    {
+      "item": "Counterspell",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 3200,
+      "wpaValue": 0.019649172385950743,
+      "sampleSize": 2477,
+      "costRelativeWpa": 0.039298344771901486,
+      "mean_purchase_time_min": 24.27742026645135,
+      "mean_prob_before": 0.49492406136455386,
+      "aheadWpa": 0.017045272525027806,
+      "behindWpa": 0.02271973094170404,
+      "aheadBehindDiff": -0.0056744584166762355,
+      "best_purchase_time": {
+        "time_min": 20.578643520387566
+      },
+      "mean_net_worth_before": 21251.00001441259
+    },
+    {
+      "item": "Heroic Aura",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 3200,
+      "wpaValue": 0.01963250345781466,
+      "sampleSize": 723,
+      "costRelativeWpa": 0.03926500691562932,
+      "mean_purchase_time_min": 22.357842323651454,
+      "mean_prob_before": 0.5134372060857539,
+      "aheadWpa": 0.013736614173228344,
+      "behindWpa": 0.026004069767441858,
+      "aheadBehindDiff": -0.012267455594213513,
+      "best_purchase_time": {
+        "time_min": 18.012863070539417
+      },
+      "mean_net_worth_before": 19190.39970829876
+    },
+    {
+      "item": "Escalating Resilience",
+      "heroName": "Billy",
+      "category": "Damage",
+      "cost": 3200,
+      "wpaValue": 0.017484140233722877,
+      "sampleSize": 3594,
+      "costRelativeWpa": 0.03496828046744575,
+      "mean_purchase_time_min": 24.214810795770727,
+      "mean_prob_before": 0.4961580690038954,
+      "aheadWpa": 0.01050979020979021,
+      "behindWpa": 0.0248115625,
+      "aheadBehindDiff": -0.01430177229020979,
+      "best_purchase_time": {
+        "time_min": 19.800000000000004
+      },
+      "mean_net_worth_before": 20935.96353881469
+    },
+    {
+      "item": "Lifestrike",
+      "heroName": "Billy",
+      "category": "Bruiser",
+      "cost": 3200,
+      "wpaValue": 0.015949941656942822,
+      "sampleSize": 857,
+      "costRelativeWpa": 0.031899883313885644,
+      "mean_purchase_time_min": 20.853208868144694,
+      "mean_prob_before": 0.4923617269544923,
+      "aheadWpa": 0.013794498381877024,
+      "behindWpa": 0.019892116182572615,
+      "aheadBehindDiff": -0.006097617800695591,
+      "best_purchase_time": {
+        "time_min": 22.465060240963854
+      },
+      "mean_net_worth_before": 17224.452773278877
+    },
+    {
+      "item": "Sprint Boots",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 800,
+      "wpaValue": 0.01571945773524721,
+      "sampleSize": 627,
+      "costRelativeWpa": 0.12575566188197768,
+      "mean_purchase_time_min": 17.200271132376397,
+      "mean_prob_before": 0.4630419457735247,
+      "aheadWpa": -0.014024770642201832,
+      "behindWpa": 0.04046301369863014,
+      "aheadBehindDiff": -0.05448778434083197,
+      "best_purchase_time": {
+        "time_min": 10.5
+      },
+      "mean_net_worth_before": 8065.126016746412
+    },
+    {
+      "item": "Enduring Speed",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 1600,
+      "wpaValue": 0.015473900841908328,
+      "sampleSize": 2138,
+      "costRelativeWpa": 0.06189560336763331,
+      "mean_purchase_time_min": 20.526641721234807,
+      "mean_prob_before": 0.4942986435921422,
+      "aheadWpa": 0.009795522388059703,
+      "behindWpa": 0.011089349112426036,
+      "aheadBehindDiff": -0.0012938267243663322,
+      "best_purchase_time": {
+        "time_min": 15.283863423760524
+      },
+      "mean_net_worth_before": 15301.157645977548
+    },
+    {
+      "item": "Fleetfoot",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 1600,
+      "wpaValue": 0.01343634232121923,
+      "sampleSize": 853,
+      "costRelativeWpa": 0.05374536928487692,
+      "mean_purchase_time_min": 12.52862837045721,
+      "mean_prob_before": 0.49476072684642436,
+      "aheadWpa": 0.00449607843137255,
+      "behindWpa": 0.0072944444444444445,
+      "aheadBehindDiff": -0.0027983660130718943,
+      "best_purchase_time": {
+        "time_min": 9.695896834701056
+      },
+      "mean_net_worth_before": 8296.52985627198
+    },
+    {
+      "item": "Spirit Resilience",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 3200,
+      "wpaValue": 0.012469323290001217,
+      "sampleSize": 8231,
+      "costRelativeWpa": 0.024938646580002433,
+      "mean_purchase_time_min": 23.902099380391206,
+      "mean_prob_before": 0.47487027092698336,
+      "aheadWpa": 0.007642862345229425,
+      "behindWpa": 0.011838920330866348,
+      "aheadBehindDiff": -0.004196057985636922,
+      "best_purchase_time": {
+        "time_min": 19.21838396111786
+      },
+      "mean_net_worth_before": 20374.79429128903
+    },
+    {
+      "item": "Slowing Hex",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 1600,
+      "wpaValue": 0.011856924315619966,
+      "sampleSize": 7452,
+      "costRelativeWpa": 0.04742769726247986,
+      "mean_purchase_time_min": 15.466065485775632,
+      "mean_prob_before": 0.47474499463231346,
+      "aheadWpa": 0.0030503179947624394,
+      "behindWpa": 0.02299883720930233,
+      "aheadBehindDiff": -0.01994851921453989,
+      "best_purchase_time": {
+        "time_min": 14.664689303449201
+      },
+      "mean_net_worth_before": 11186.691899409556
+    },
+    {
+      "item": "Weakening Headshot",
+      "heroName": "Billy",
+      "category": "Damage",
+      "cost": 1600,
+      "wpaValue": 0.011365468113975577,
+      "sampleSize": 4422,
+      "costRelativeWpa": 0.04546187245590231,
+      "mean_purchase_time_min": 11.51332881049299,
+      "mean_prob_before": 0.47690167345092715,
+      "aheadWpa": -0.0018309877340219496,
+      "behindWpa": 0.015782213029989656,
+      "aheadBehindDiff": -0.017613200764011606,
+      "best_purchase_time": {
+        "time_min": 8.1429540827867
+      },
+      "mean_net_worth_before": 6800.20894450475
+    },
+    {
+      "item": "Spirit Snatch",
+      "heroName": "Billy",
+      "category": "Damage",
+      "cost": 3200,
+      "wpaValue": 0.010976776894905903,
+      "sampleSize": 1419358,
+      "costRelativeWpa": 0.021953553789811807,
+      "mean_purchase_time_min": 17.07077111623674,
+      "mean_prob_before": 0.4697956679710117,
+      "aheadWpa": -0.001861820608563928,
+      "behindWpa": 0.018075181757237845,
+      "aheadBehindDiff": -0.019937002365801773,
+      "best_purchase_time": {
+        "time_min": 13.700143586246154
+      },
+      "mean_net_worth_before": 12682.462925580268
+    },
+    {
+      "item": "Mystic Expansion",
+      "heroName": "Billy",
+      "category": "Damage",
+      "cost": 800,
+      "wpaValue": 0.010947853881278542,
+      "sampleSize": 1095,
+      "costRelativeWpa": 0.08758283105022834,
+      "mean_purchase_time_min": 23.96904109589041,
+      "mean_prob_before": 0.5125153424657535,
+      "aheadWpa": 0.019220143884892085,
+      "behindWpa": -0.004499283154121864,
+      "aheadBehindDiff": 0.02371942703901395,
+      "best_purchase_time": {
+        "time_min": 20.74958904109589
+      },
+      "mean_net_worth_before": 17673.525122648403
+    },
+    {
+      "item": "Point Blank",
+      "heroName": "Billy",
+      "category": "Damage",
+      "cost": 3200,
+      "wpaValue": 0.010438708994210939,
+      "sampleSize": 42494,
+      "costRelativeWpa": 0.020877417988421878,
+      "mean_purchase_time_min": 21.005045653504013,
+      "mean_prob_before": 0.477757852873347,
+      "aheadWpa": 0.009572184520230214,
+      "behindWpa": 0.008103628852166145,
+      "aheadBehindDiff": 0.0014685556680640692,
+      "best_purchase_time": {
+        "time_min": 16.702496881839362
+      },
+      "mean_net_worth_before": 16978.66809638537
+    },
+    {
+      "item": "Reactive Barrier",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 1600,
+      "wpaValue": 0.010138786764705884,
+      "sampleSize": 1632,
+      "costRelativeWpa": 0.040555147058823536,
+      "mean_purchase_time_min": 16.29954656862745,
+      "mean_prob_before": 0.47920526960784315,
+      "aheadWpa": 0.0035227739726027382,
+      "behindWpa": 0.005885496183206107,
+      "aheadBehindDiff": -0.0023627222106033688,
+      "best_purchase_time": {
+        "time_min": 14.01029411764706
+      },
+      "mean_net_worth_before": 11510.579022610294
+    },
+    {
+      "item": "Weighted Shots",
+      "heroName": "Billy",
+      "category": "Damage",
+      "cost": 3200,
+      "wpaValue": 0.008929915433403806,
+      "sampleSize": 2838,
+      "costRelativeWpa": 0.017859830866807612,
+      "mean_purchase_time_min": 22.013826638477806,
+      "mean_prob_before": 0.4793125440451022,
+      "aheadWpa": 0.007337093495934961,
+      "behindWpa": 0.005283098591549296,
+      "aheadBehindDiff": 0.0020539949043856653,
+      "best_purchase_time": {
+        "time_min": 18.949154334038056
+      },
+      "mean_net_worth_before": 18503.581733756168
+    },
+    {
+      "item": "Cultist Sacrifice",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 3200,
+      "wpaValue": 0.008858905967450271,
+      "sampleSize": 6636,
+      "costRelativeWpa": 0.017717811934900542,
+      "mean_purchase_time_min": 9.793563893911998,
+      "mean_prob_before": 0.4762419379144062,
+      "aheadWpa": -0.0017267894516534116,
+      "behindWpa": 0.01659897260273973,
+      "aheadBehindDiff": -0.01832576205439314,
+      "best_purchase_time": {
+        "time_min": 9.876593820648077
+      },
+      "mean_net_worth_before": 5619.727569107896
+    },
+    {
+      "item": "Extra Health",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 800,
+      "wpaValue": 0.007906569991121633,
+      "sampleSize": 3379,
+      "costRelativeWpa": 0.06325255992897307,
+      "mean_purchase_time_min": 20.13593666765315,
+      "mean_prob_before": 0.4939105356614384,
+      "aheadWpa": -0.0049050041701417845,
+      "behindWpa": 0.01491811125485123,
+      "aheadBehindDiff": -0.019823115424993015,
+      "best_purchase_time": {
+        "time_min": 19.266794909736607
+      },
+      "mean_net_worth_before": 14425.130510506064
+    },
+    {
+      "item": "Bullet Resist Shredder",
+      "heroName": "Billy",
+      "category": "Damage",
+      "cost": 1600,
+      "wpaValue": 0.006828804071246819,
+      "sampleSize": 7860,
+      "costRelativeWpa": 0.027315216284987277,
+      "mean_purchase_time_min": 14.997493638676849,
+      "mean_prob_before": 0.4900567811704835,
+      "aheadWpa": -0.005574291784702549,
+      "behindWpa": 0.019642339832869078,
+      "aheadBehindDiff": -0.025216631617571626,
+      "best_purchase_time": {
+        "time_min": 11.56482565538305
+      },
+      "mean_net_worth_before": 10866.367564732824
+    },
+    {
+      "item": "Melee Charge",
+      "heroName": "Billy",
+      "category": "Bruiser",
+      "cost": 1600,
+      "wpaValue": 0.006801058201058201,
+      "sampleSize": 3591,
+      "costRelativeWpa": 0.027204232804232804,
+      "mean_purchase_time_min": 21.393700918964075,
+      "mean_prob_before": 0.5123221943748261,
+      "aheadWpa": 0.0009472687545520757,
+      "behindWpa": 0.01184300578034682,
+      "aheadBehindDiff": -0.010895737025794744,
+      "best_purchase_time": {
+        "time_min": 24.704260651629074
+      },
+      "mean_net_worth_before": 16498.0092027012
+    },
+    {
+      "item": "Dispel Magic",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 3200,
+      "wpaValue": 0.006752935303514377,
+      "sampleSize": 5008,
+      "costRelativeWpa": 0.013505870607028753,
+      "mean_purchase_time_min": 20.055341453674124,
+      "mean_prob_before": 0.4832196884984025,
+      "aheadWpa": -0.011078427895981086,
+      "behindWpa": 0.02459771241830065,
+      "aheadBehindDiff": -0.035676140314281735,
+      "best_purchase_time": {
+        "time_min": 16.363843387934477
+      },
+      "mean_net_worth_before": 16119.376793670126
+    },
+    {
+      "item": "Metal Skin",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 3200,
+      "wpaValue": 0.005462551834130781,
+      "sampleSize": 3135,
+      "costRelativeWpa": 0.010925103668261563,
+      "mean_purchase_time_min": 26.028360446570993,
+      "mean_prob_before": 0.3782067623604462,
+      "aheadWpa": 0.005537111517367466,
+      "behindWpa": 0.0010603097773475311,
+      "aheadBehindDiff": 0.004476801740019935,
+      "best_purchase_time": {
+        "time_min": 20.22468899521531
+      },
+      "mean_net_worth_before": 24239.50270950558
+    },
+    {
+      "item": "Enchanter's Emblem",
+      "heroName": "Billy",
+      "category": "Mixed",
+      "cost": 1600,
+      "wpaValue": 0.0036525577557755774,
+      "sampleSize": 6060,
+      "costRelativeWpa": 0.01461023102310231,
+      "mean_purchase_time_min": 13.57658910891089,
+      "mean_prob_before": 0.4873204950495049,
+      "aheadWpa": -0.008802522836015661,
+      "behindWpa": 0.01994206231454006,
+      "aheadBehindDiff": -0.028744585150555724,
+      "best_purchase_time": {
+        "time_min": 11.37408813335534
+      },
+      "mean_net_worth_before": 9471.19371881188
+    },
+    {
+      "item": "Battle Vest",
+      "heroName": "Billy",
+      "category": "Mixed",
+      "cost": 1600,
+      "wpaValue": 0.0024998993159406546,
+      "sampleSize": 33769,
+      "costRelativeWpa": 0.009999597263762618,
+      "mean_purchase_time_min": 12.340446859545747,
+      "mean_prob_before": 0.4705234949213777,
+      "aheadWpa": -0.00951407771967599,
+      "behindWpa": 0.011679320113314448,
+      "aheadBehindDiff": -0.021193397832990436,
+      "best_purchase_time": {
+        "time_min": 10.59410092395167
+      },
+      "mean_net_worth_before": 8174.957297678337
+    },
+    {
+      "item": "Torment Pulse",
+      "heroName": "Billy",
+      "category": "Damage",
+      "cost": 3200,
+      "wpaValue": 0.00237113276492083,
+      "sampleSize": 821,
+      "costRelativeWpa": 0.00474226552984166,
+      "mean_purchase_time_min": 20.88021924482339,
+      "mean_prob_before": 0.5083929354445798,
+      "aheadWpa": 0.001974204946996468,
+      "behindWpa": 0.004997905759162304,
+      "aheadBehindDiff": -0.0030237008121658357,
+      "best_purchase_time": {
+        "time_min": 17.649208282582215
+      },
+      "mean_net_worth_before": 17153.182690255784
+    },
+    {
+      "item": "Melee Lifesteal",
+      "heroName": "Billy",
+      "category": "Bruiser",
+      "cost": 800,
+      "wpaValue": 0.001523918766453554,
+      "sampleSize": 2659,
+      "costRelativeWpa": 0.012191350131628432,
+      "mean_purchase_time_min": 3.965449417074087,
+      "mean_prob_before": 0.48134874012786766,
+      "aheadWpa": -0.00015069637883008397,
+      "behindWpa": 0.007605966587112173,
+      "aheadBehindDiff": -0.007756662965942257,
+      "best_purchase_time": {
+        "time_min": 4.565889432117338
+      },
+      "mean_net_worth_before": 2898.608491162092
+    },
+    {
+      "item": "Tankbuster",
+      "heroName": "Billy",
+      "category": "Damage",
+      "cost": 3200,
+      "wpaValue": 0.000857496194824969,
+      "sampleSize": 2628,
+      "costRelativeWpa": 0.001714992389649938,
+      "mean_purchase_time_min": 26.295403348554064,
+      "mean_prob_before": 0.5574073059360732,
+      "aheadWpa": 0.013646577017114907,
+      "behindWpa": -0.0372421686746988,
+      "aheadBehindDiff": 0.05088874569181371,
+      "best_purchase_time": {
+        "time_min": 19.919406392694064
+      },
+      "mean_net_worth_before": 23704.10577473366
+    },
+    {
+      "item": "Stalker",
+      "heroName": "Billy",
+      "category": "Damage",
+      "cost": 1600,
+      "wpaValue": 0.00034494433471773966,
+      "sampleSize": 1275391,
+      "costRelativeWpa": 0.0013797773388709586,
+      "mean_purchase_time_min": 7.226958368061317,
+      "mean_prob_before": 0.47032662830457905,
+      "aheadWpa": -0.0007982194298359885,
+      "behindWpa": 0.011484862682854187,
+      "aheadBehindDiff": -0.012283082112690176,
+      "best_purchase_time": {
+        "time_min": 5.003284331290296
+      },
+      "mean_net_worth_before": 3630.584601714001
+    },
+    {
+      "item": "Extra Charge",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 800,
+      "wpaValue": 0.00024762935700367936,
+      "sampleSize": 4619,
+      "costRelativeWpa": 0.001981034856029435,
+      "mean_purchase_time_min": 21.954299631954964,
+      "mean_prob_before": 0.5329739337518946,
+      "aheadWpa": 0.004433378287255565,
+      "behindWpa": -0.012331346841477948,
+      "aheadBehindDiff": 0.01676472512873351,
+      "best_purchase_time": {
+        "time_min": 19.593808183589523
+      },
+      "mean_net_worth_before": 16757.076854016002
+    },
+    {
+      "item": "Grit",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 800,
+      "wpaValue": 0.00012356278241366795,
+      "sampleSize": 30319,
+      "costRelativeWpa": 0.0009885022593093436,
+      "mean_purchase_time_min": 4.2528440911639525,
+      "mean_prob_before": 0.48689404993568414,
+      "aheadWpa": -0.0012204299999999998,
+      "behindWpa": 0.0017805863708399376,
+      "aheadBehindDiff": -0.0030010163708399373,
+      "best_purchase_time": {
+        "time_min": 4.296088132462563
+      },
+      "mean_net_worth_before": 2434.9331279560683
+    },
+    {
+      "item": "Extended Magazine",
+      "heroName": "Billy",
+      "category": "Damage",
+      "cost": 800,
+      "wpaValue": 0.00009127182044887771,
+      "sampleSize": 1203,
+      "costRelativeWpa": 0.0007301745635910217,
+      "mean_purchase_time_min": 17.93641729010806,
+      "mean_prob_before": 0.485837323358271,
+      "aheadWpa": -0.013308791208791209,
+      "behindWpa": 0.014290942028985508,
+      "aheadBehindDiff": -0.027599733237776716,
+      "best_purchase_time": {
+        "time_min": 5.59667497921862
+      },
+      "mean_net_worth_before": 10720.81629409809
+    },
+    {
+      "item": "Slowing Bullets",
+      "heroName": "Billy",
+      "category": "Damage",
+      "cost": 1600,
+      "wpaValue": -0.00032494226327944533,
+      "sampleSize": 866,
+      "costRelativeWpa": -0.00032494226327944533,
+      "mean_purchase_time_min": 17.003995381062357,
+      "mean_prob_before": 0.43000819861431877,
+      "aheadWpa": -0.00467422680412371,
+      "behindWpa": 0.005488796680497925,
+      "aheadBehindDiff": -0.010163023484621635,
+      "best_purchase_time": {
+        "time_min": 17.725057736720554
+      },
+      "mean_net_worth_before": 9270.190530138567
+    },
+    {
+      "item": "Spirit Shielding",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 1600,
+      "wpaValue": -0.0007264736953306575,
+      "sampleSize": 9466,
+      "costRelativeWpa": -0.0007264736953306575,
+      "mean_purchase_time_min": 12.555639129516164,
+      "mean_prob_before": 0.48479446439890134,
+      "aheadWpa": -0.015086350407450521,
+      "behindWpa": 0.012445376549094373,
+      "aheadBehindDiff": -0.027531726956544895,
+      "best_purchase_time": {
+        "time_min": 10.7
+      },
+      "mean_net_worth_before": 8500.399775723641
+    },
+    {
+      "item": "Debuff Reducer",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 1600,
+      "wpaValue": -0.003048201936376211,
+      "sampleSize": 1446,
+      "costRelativeWpa": -0.003048201936376211,
+      "mean_purchase_time_min": 26.01506915629322,
+      "mean_prob_before": 0.4938078146611341,
+      "aheadWpa": -0.024763960396039605,
+      "behindWpa": 0.03140916666666667,
+      "aheadBehindDiff": -0.056173127062706274,
+      "best_purchase_time": {
+        "time_min": 18.095435684647303
+      },
+      "mean_net_worth_before": 21428.863094674965
+    },
+    {
+      "item": "Monster Rounds",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 800,
+      "wpaValue": -0.003913498904309714,
+      "sampleSize": 6845,
+      "costRelativeWpa": -0.003913498904309714,
+      "mean_purchase_time_min": 3.979389335281227,
+      "mean_prob_before": 0.47925558802045287,
+      "aheadWpa": -0.00636831112711559,
+      "behindWpa": 0.0017430346051464066,
+      "aheadBehindDiff": -0.008111345732261997,
+      "best_purchase_time": {
+        "time_min": 4.506019871420222
+      },
+      "mean_net_worth_before": 2466.2040984806426
+    },
+    {
+      "item": "Extra Regen",
+      "heroName": "Billy",
+      "category": "Live",
+      "cost": 800,
+      "wpaValue": -0.004033187454412829,
+      "sampleSize": 4113,
+      "costRelativeWpa": -0.004033187454412829,
+      "mean_purchase_time_min": 2.3737855579868703,
+      "mean_prob_before": 0.433131363967906,
+      "aheadWpa": -0.007400399042298478,
+      "behindWpa": 0.00017315112540192923,
+      "aheadBehindDiff": -0.0075735501677004075,
+      "best_purchase_time": {
+        "time_min": 3.8
+      },
+      "mean_net_worth_before": 1880.0479252370526
+    },
+    {
+      "item": "Close Quarters",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 800,
+      "wpaValue": -0.004081938328814728,
+      "sampleSize": 780105,
+      "costRelativeWpa": -0.004081938328814728,
+      "mean_purchase_time_min": 3.956975445613128,
+      "mean_prob_before": 0.47038974612391626,
+      "aheadWpa": -0.010231037667168026,
+      "behindWpa": 0.0037778778908637246,
+      "aheadBehindDiff": -0.01400891555803175,
+      "best_purchase_time": {
+        "time_min": 4.3
+      },
+      "mean_net_worth_before": 2396.2647042024296
+    },
+    {
+      "item": "Return Fire",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 1600,
+      "wpaValue": -0.004211276190476185,
+      "sampleSize": 2625,
+      "costRelativeWpa": -0.004211276190476185,
+      "mean_purchase_time_min": 19.334529523809557,
+      "mean_prob_before": 0.5815846476190479,
+      "aheadWpa": -0.025356566820276497,
+      "behindWpa": 0.004437735849056603,
+      "aheadBehindDiff": -0.029794302669333098,
+      "best_purchase_time": {
+        "time_min": 18.894895238095238
+      },
+      "mean_net_worth_before": 15587.411808571427
+    },
+    {
+      "item": "Spirit Strike",
+      "heroName": "Billy",
+      "category": "Bruiser",
+      "cost": 800,
+      "wpaValue": -0.005021629485935984,
+      "sampleSize": 5155,
+      "costRelativeWpa": -0.005021629485935984,
+      "mean_purchase_time_min": 14.054442289039766,
+      "mean_prob_before": 0.48637555771096014,
+      "aheadWpa": -0.01927675392670157,
+      "behindWpa": 0.01481655172413793,
+      "aheadBehindDiff": -0.0340933056508395,
+      "best_purchase_time": {
+        "time_min": 12.229912706110573
+      },
+      "mean_net_worth_before": 8024.748991697382
+    },
+    {
+      "item": "Healbane",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 1600,
+      "wpaValue": -0.013328003613369464,
+      "sampleSize": 1107,
+      "costRelativeWpa": -0.013328003613369464,
+      "mean_purchase_time_min": 17.45457091237579,
+      "mean_prob_before": 0.46776576332429987,
+      "aheadWpa": -0.01082275132275132,
+      "behindWpa": -0.013233112582781455,
+      "aheadBehindDiff": 0.0024103612600301343,
+      "best_purchase_time": {
+        "time_min": 11.084462511291779
+      },
+      "mean_net_worth_before": 13061.327015085817
+    },
+    {
+      "item": "Rebuttal",
+      "heroName": "Billy",
+      "category": "Utility",
+      "cost": 800,
+      "wpaValue": -0.013874787535410762,
+      "sampleSize": 706,
+      "costRelativeWpa": -0.013874787535410762,
+      "mean_purchase_time_min": 9.375934844192635,
+      "mean_prob_before": 0.4823269121813031,
+      "aheadWpa": -0.013430970149253735,
+      "behindWpa": 0.0013661654135338345,
+      "aheadBehindDiff": -0.01479713556278757,
+      "best_purchase_time": {
+        "time_min": 6.342067988668555
+      },
+      "mean_net_worth_before": 8207.211042209632
+    }
+  ],
+  "tiers": {
+    "S": [
+      {
+        "item": "Crippling Headshot",
+        "heroName": "Billy",
+        "category": "Damage",
+        "cost": 6400,
+        "wpaValue": 0.05869257232212666,
+        "sampleSize": 1279,
+        "costRelativeWpa": 0.05869257232212666,
+        "mean_purchase_time_min": 32.11064894448789,
+        "mean_prob_before": 0.5542953870211103,
+        "aheadWpa": 0.04033446215139442,
+        "behindWpa": 0.07243438485804417,
+        "aheadBehindDiff": -0.03209992270664975,
+        "best_purchase_time": {
+          "time_min": 27.342051683633517
+        },
+        "mean_net_worth_before": 31709.121203362
+      },
+      {
+        "item": "Indomitable",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 6400,
+        "wpaValue": 0.052879573712255774,
+        "sampleSize": 563,
+        "costRelativeWpa": 0.052879573712255774,
+        "mean_purchase_time_min": 32.95225577264653,
+        "mean_prob_before": 0.5688234458259324,
+        "aheadWpa": 0.03556776859504132,
+        "behindWpa": 0.0600362962962963,
+        "aheadBehindDiff": -0.02446852770125498,
+        "best_purchase_time": {
+          "time_min": 22.050793650793647
+        },
+        "mean_net_worth_before": 32688.817044227348
+      },
+      {
+        "item": "Weapon Shielding",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 1600,
+        "wpaValue": 0.04934861681731036,
+        "sampleSize": 3651,
+        "costRelativeWpa": 0.19739446726924145,
+        "mean_purchase_time_min": 12.241265406737883,
+        "mean_prob_before": 0.4107876198301833,
+        "aheadWpa": 0.016369134078212288,
+        "behindWpa": 0.058628263473053895,
+        "aheadBehindDiff": -0.04225912939484161,
+        "best_purchase_time": {
+          "time_min": 10.714023555190359
+        },
+        "mean_net_worth_before": 7973.912380909342
+      },
+      {
+        "item": "Unstoppable",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 6400,
+        "wpaValue": 0.04202004555808656,
+        "sampleSize": 878,
+        "costRelativeWpa": 0.04202004555808656,
+        "mean_purchase_time_min": 32.076936218678824,
+        "mean_prob_before": 0.49404157175398633,
+        "aheadWpa": 0.02569174917491748,
+        "behindWpa": 0.046258870967741936,
+        "aheadBehindDiff": -0.020567121792824456,
+        "best_purchase_time": {
+          "time_min": 30.470581527936144
+        },
+        "mean_net_worth_before": 31181.444185079723
+      },
+      {
+        "item": "Juggernaut",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 6400,
+        "wpaValue": 0.04189961656441718,
+        "sampleSize": 7824,
+        "costRelativeWpa": 0.04189961656441718,
+        "mean_purchase_time_min": 31.056738241308814,
+        "mean_prob_before": 0.520561733128834,
+        "aheadWpa": 0.02913078268473985,
+        "behindWpa": 0.03750542168674697,
+        "aheadBehindDiff": -0.00837463900200712,
+        "best_purchase_time": {
+          "time_min": 31.19529652351738
+        },
+        "mean_net_worth_before": 30792.094492484688
+      },
+      {
+        "item": "Plated Armor",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 6400,
+        "wpaValue": 0.041824032921810694,
+        "sampleSize": 1215,
+        "costRelativeWpa": 0.041824032921810694,
+        "mean_purchase_time_min": 32.88894650205763,
+        "mean_prob_before": 0.5217598353909465,
+        "aheadWpa": 0.019640685224839402,
+        "behindWpa": 0.05705404530744335,
+        "aheadBehindDiff": -0.03741336008260395,
+        "best_purchase_time": {
+          "time_min": 27.213909465020578
+        },
+        "mean_net_worth_before": 32599.910261234567
+      },
+      {
+        "item": "Phantom Strike",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 6400,
+        "wpaValue": 0.037131469260159825,
+        "sampleSize": 5758,
+        "costRelativeWpa": 0.037131469260159825,
+        "mean_purchase_time_min": 28.9622559916638,
+        "mean_prob_before": 0.5213374261896493,
+        "aheadWpa": 0.017585981308411214,
+        "behindWpa": 0.05623798076923082,
+        "aheadBehindDiff": -0.038651999460819604,
+        "best_purchase_time": {
+          "time_min": 19.81882598124349
+        },
+        "mean_net_worth_before": 27307.76413773884
+      },
+      {
+        "item": "Spellbreaker",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 6400,
+        "wpaValue": 0.036217994858611824,
+        "sampleSize": 778,
+        "costRelativeWpa": 0.036217994858611824,
+        "mean_purchase_time_min": 33.69224935732648,
+        "mean_prob_before": 0.536975706940874,
+        "aheadWpa": 0.031429109589041104,
+        "behindWpa": 0.03319289340101523,
+        "aheadBehindDiff": -0.0017637838119741248,
+        "best_purchase_time": {
+          "time_min": 26.37814910025707
+        },
+        "mean_net_worth_before": 33861.54756028278
+      },
+      {
+        "item": "Warp Stone",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 3200,
+        "wpaValue": 0.03609849315068493,
+        "sampleSize": 730,
+        "costRelativeWpa": 0.07219698630136986,
+        "mean_purchase_time_min": 23.46893150684931,
+        "mean_prob_before": 0.5279153424657534,
+        "aheadWpa": 0.007019424460431656,
+        "behindWpa": 0.03932196531791908,
+        "aheadBehindDiff": -0.032302540857487426,
+        "best_purchase_time": {
+          "time_min": 17.21232876712329
+        },
+        "mean_net_worth_before": 19565.99728191781
+      },
+      {
+        "item": "Crushing Fists",
+        "heroName": "Billy",
+        "category": "Damage",
+        "cost": 6400,
+        "wpaValue": 0.035014136273678255,
+        "sampleSize": 3537,
+        "costRelativeWpa": 0.035014136273678255,
+        "mean_purchase_time_min": 29.52429459994346,
+        "mean_prob_before": 0.5506932711337292,
+        "aheadWpa": 0.012804385334291873,
+        "behindWpa": 0.06650155038759689,
+        "aheadBehindDiff": -0.05369716505330502,
+        "best_purchase_time": {
+          "time_min": 24.539609838846477
+        },
+        "mean_net_worth_before": 28621.901611393838
+      }
+    ],
+    "A": [
+      {
+        "item": "Berserker",
+        "heroName": "Billy",
+        "category": "Damage",
+        "cost": 3200,
+        "wpaValue": 0.02847626768867925,
+        "sampleSize": 3392,
+        "costRelativeWpa": 0.0569525353773585,
+        "mean_purchase_time_min": 26.668806014150945,
+        "mean_prob_before": 0.5368382075471699,
+        "aheadWpa": 0.0165334431630972,
+        "behindWpa": 0.03519510309278351,
+        "aheadBehindDiff": -0.018661659929686308,
+        "best_purchase_time": {
+          "time_min": 20.321645532291363
+        },
+        "mean_net_worth_before": 24457.48615353774
+      },
+      {
+        "item": "Colossus",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 6400,
+        "wpaValue": 0.027469500091631693,
+        "sampleSize": 594769,
+        "costRelativeWpa": 0.027469500091631693,
+        "mean_purchase_time_min": 29.580497251873926,
+        "mean_prob_before": 0.5058218044316356,
+        "aheadWpa": 0.016281652529325504,
+        "behindWpa": 0.02380907559570371,
+        "aheadBehindDiff": -0.007527423066378207,
+        "best_purchase_time": {
+          "time_min": 20.23407345385091
+        },
+        "mean_net_worth_before": 27808.34717030223
+      },
+      {
+        "item": "Scourge",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 6400,
+        "wpaValue": 0.025464717198922664,
+        "sampleSize": 2599,
+        "costRelativeWpa": 0.025464717198922664,
+        "mean_purchase_time_min": 30.632547133512887,
+        "mean_prob_before": 0.5173223547518276,
+        "aheadWpa": 0.014855882352941177,
+        "behindWpa": 0.035564064602960965,
+        "aheadBehindDiff": -0.020708182250019788,
+        "best_purchase_time": {
+          "time_min": 29.593112735667564
+        },
+        "mean_net_worth_before": 29506.053898768758
+      },
+      {
+        "item": "Rapid Recharge",
+        "heroName": "Billy",
+        "category": "Damage",
+        "cost": 3200,
+        "wpaValue": 0.024995915390226133,
+        "sampleSize": 9597,
+        "costRelativeWpa": 0.049991830780452266,
+        "mean_purchase_time_min": 26.54408565176618,
+        "mean_prob_before": 0.5227840366781287,
+        "aheadWpa": 0.02296504957507084,
+        "behindWpa": 0.02766010461245841,
+        "aheadBehindDiff": -0.004695055037387572,
+        "best_purchase_time": {
+          "time_min": 20.163238512035008
+        },
+        "mean_net_worth_before": 24311.10194152341
+      },
+      {
+        "item": "Greater Expansion",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 3200,
+        "wpaValue": 0.024336773255813952,
+        "sampleSize": 4816,
+        "costRelativeWpa": 0.048673546511627905,
+        "mean_purchase_time_min": 26.432331810631226,
+        "mean_prob_before": 0.5399006021594683,
+        "aheadWpa": 0.014997351694915255,
+        "behindWpa": 0.032707769423558894,
+        "aheadBehindDiff": -0.017710417728643638,
+        "best_purchase_time": {
+          "time_min": 19.67497403946002
+        },
+        "mean_net_worth_before": 24159.012075519102
+      },
+      {
+        "item": "Bullet Resilience",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 3200,
+        "wpaValue": 0.024319626168224296,
+        "sampleSize": 642,
+        "costRelativeWpa": 0.04863925233644859,
+        "mean_purchase_time_min": 28.495264797507794,
+        "mean_prob_before": 0.44160716510903425,
+        "aheadWpa": 0.01376685393258427,
+        "behindWpa": 0.020895631067961162,
+        "aheadBehindDiff": -0.007128777135376893,
+        "best_purchase_time": {
+          "time_min": 30.37663551401869
+        },
+        "mean_net_worth_before": 26334.263245794395
+      },
+      {
+        "item": "Fortitude",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 3200,
+        "wpaValue": 0.023514692482915715,
+        "sampleSize": 878,
+        "costRelativeWpa": 0.04702938496583143,
+        "mean_purchase_time_min": 17.21657175398633,
+        "mean_prob_before": 0.49116958997722093,
+        "aheadWpa": 0.009583387622149837,
+        "behindWpa": 0.015049735449735447,
+        "aheadBehindDiff": -0.005466347827585609,
+        "best_purchase_time": {
+          "time_min": 12.084584980237155
+        },
+        "mean_net_worth_before": 13354.247165831439
+      },
+      {
+        "item": "Hunter's Aura",
+        "heroName": "Billy",
+        "category": "Damage",
+        "cost": 3200,
+        "wpaValue": 0.021329813664596277,
+        "sampleSize": 805,
+        "costRelativeWpa": 0.042659627329192554,
+        "mean_purchase_time_min": 21.80499378881987,
+        "mean_prob_before": 0.5136057142857142,
+        "aheadWpa": 0.009431347962382444,
+        "behindWpa": 0.03235618556701031,
+        "aheadBehindDiff": -0.022924837604627865,
+        "best_purchase_time": {
+          "time_min": 16.754409937888198
+        },
+        "mean_net_worth_before": 18454.571418012423
+      },
+      {
+        "item": "Counterspell",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 3200,
+        "wpaValue": 0.019649172385950743,
+        "sampleSize": 2477,
+        "costRelativeWpa": 0.039298344771901486,
+        "mean_purchase_time_min": 24.27742026645135,
+        "mean_prob_before": 0.49492406136455386,
+        "aheadWpa": 0.017045272525027806,
+        "behindWpa": 0.02271973094170404,
+        "aheadBehindDiff": -0.0056744584166762355,
+        "best_purchase_time": {
+          "time_min": 20.578643520387566
+        },
+        "mean_net_worth_before": 21251.00001441259
+      },
+      {
+        "item": "Heroic Aura",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 3200,
+        "wpaValue": 0.01963250345781466,
+        "sampleSize": 723,
+        "costRelativeWpa": 0.03926500691562932,
+        "mean_purchase_time_min": 22.357842323651454,
+        "mean_prob_before": 0.5134372060857539,
+        "aheadWpa": 0.013736614173228344,
+        "behindWpa": 0.026004069767441858,
+        "aheadBehindDiff": -0.012267455594213513,
+        "best_purchase_time": {
+          "time_min": 18.012863070539417
+        },
+        "mean_net_worth_before": 19190.39970829876
+      },
+      {
+        "item": "Escalating Resilience",
+        "heroName": "Billy",
+        "category": "Damage",
+        "cost": 3200,
+        "wpaValue": 0.017484140233722877,
+        "sampleSize": 3594,
+        "costRelativeWpa": 0.03496828046744575,
+        "mean_purchase_time_min": 24.214810795770727,
+        "mean_prob_before": 0.4961580690038954,
+        "aheadWpa": 0.01050979020979021,
+        "behindWpa": 0.0248115625,
+        "aheadBehindDiff": -0.01430177229020979,
+        "best_purchase_time": {
+          "time_min": 19.800000000000004
+        },
+        "mean_net_worth_before": 20935.96353881469
+      },
+      {
+        "item": "Lifestrike",
+        "heroName": "Billy",
+        "category": "Bruiser",
+        "cost": 3200,
+        "wpaValue": 0.015949941656942822,
+        "sampleSize": 857,
+        "costRelativeWpa": 0.031899883313885644,
+        "mean_purchase_time_min": 20.853208868144694,
+        "mean_prob_before": 0.4923617269544923,
+        "aheadWpa": 0.013794498381877024,
+        "behindWpa": 0.019892116182572615,
+        "aheadBehindDiff": -0.006097617800695591,
+        "best_purchase_time": {
+          "time_min": 22.465060240963854
+        },
+        "mean_net_worth_before": 17224.452773278877
+      },
+      {
+        "item": "Sprint Boots",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 800,
+        "wpaValue": 0.01571945773524721,
+        "sampleSize": 627,
+        "costRelativeWpa": 0.12575566188197768,
+        "mean_purchase_time_min": 17.200271132376397,
+        "mean_prob_before": 0.4630419457735247,
+        "aheadWpa": -0.014024770642201832,
+        "behindWpa": 0.04046301369863014,
+        "aheadBehindDiff": -0.05448778434083197,
+        "best_purchase_time": {
+          "time_min": 10.5
+        },
+        "mean_net_worth_before": 8065.126016746412
+      },
+      {
+        "item": "Enduring Speed",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 1600,
+        "wpaValue": 0.015473900841908328,
+        "sampleSize": 2138,
+        "costRelativeWpa": 0.06189560336763331,
+        "mean_purchase_time_min": 20.526641721234807,
+        "mean_prob_before": 0.4942986435921422,
+        "aheadWpa": 0.009795522388059703,
+        "behindWpa": 0.011089349112426036,
+        "aheadBehindDiff": -0.0012938267243663322,
+        "best_purchase_time": {
+          "time_min": 15.283863423760524
+        },
+        "mean_net_worth_before": 15301.157645977548
+      }
+    ],
+    "B": [
+      {
+        "item": "Fleetfoot",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 1600,
+        "wpaValue": 0.01343634232121923,
+        "sampleSize": 853,
+        "costRelativeWpa": 0.05374536928487692,
+        "mean_purchase_time_min": 12.52862837045721,
+        "mean_prob_before": 0.49476072684642436,
+        "aheadWpa": 0.00449607843137255,
+        "behindWpa": 0.0072944444444444445,
+        "aheadBehindDiff": -0.0027983660130718943,
+        "best_purchase_time": {
+          "time_min": 9.695896834701056
+        },
+        "mean_net_worth_before": 8296.52985627198
+      },
+      {
+        "item": "Spirit Resilience",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 3200,
+        "wpaValue": 0.012469323290001217,
+        "sampleSize": 8231,
+        "costRelativeWpa": 0.024938646580002433,
+        "mean_purchase_time_min": 23.902099380391206,
+        "mean_prob_before": 0.47487027092698336,
+        "aheadWpa": 0.007642862345229425,
+        "behindWpa": 0.011838920330866348,
+        "aheadBehindDiff": -0.004196057985636922,
+        "best_purchase_time": {
+          "time_min": 19.21838396111786
+        },
+        "mean_net_worth_before": 20374.79429128903
+      },
+      {
+        "item": "Slowing Hex",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 1600,
+        "wpaValue": 0.011856924315619966,
+        "sampleSize": 7452,
+        "costRelativeWpa": 0.04742769726247986,
+        "mean_purchase_time_min": 15.466065485775632,
+        "mean_prob_before": 0.47474499463231346,
+        "aheadWpa": 0.0030503179947624394,
+        "behindWpa": 0.02299883720930233,
+        "aheadBehindDiff": -0.01994851921453989,
+        "best_purchase_time": {
+          "time_min": 14.664689303449201
+        },
+        "mean_net_worth_before": 11186.691899409556
+      },
+      {
+        "item": "Weakening Headshot",
+        "heroName": "Billy",
+        "category": "Damage",
+        "cost": 1600,
+        "wpaValue": 0.011365468113975577,
+        "sampleSize": 4422,
+        "costRelativeWpa": 0.04546187245590231,
+        "mean_purchase_time_min": 11.51332881049299,
+        "mean_prob_before": 0.47690167345092715,
+        "aheadWpa": -0.0018309877340219496,
+        "behindWpa": 0.015782213029989656,
+        "aheadBehindDiff": -0.017613200764011606,
+        "best_purchase_time": {
+          "time_min": 8.1429540827867
+        },
+        "mean_net_worth_before": 6800.20894450475
+      },
+      {
+        "item": "Spirit Snatch",
+        "heroName": "Billy",
+        "category": "Damage",
+        "cost": 3200,
+        "wpaValue": 0.010976776894905903,
+        "sampleSize": 1419358,
+        "costRelativeWpa": 0.021953553789811807,
+        "mean_purchase_time_min": 17.07077111623674,
+        "mean_prob_before": 0.4697956679710117,
+        "aheadWpa": -0.001861820608563928,
+        "behindWpa": 0.018075181757237845,
+        "aheadBehindDiff": -0.019937002365801773,
+        "best_purchase_time": {
+          "time_min": 13.700143586246154
+        },
+        "mean_net_worth_before": 12682.462925580268
+      },
+      {
+        "item": "Mystic Expansion",
+        "heroName": "Billy",
+        "category": "Damage",
+        "cost": 800,
+        "wpaValue": 0.010947853881278542,
+        "sampleSize": 1095,
+        "costRelativeWpa": 0.08758283105022834,
+        "mean_purchase_time_min": 23.96904109589041,
+        "mean_prob_before": 0.5125153424657535,
+        "aheadWpa": 0.019220143884892085,
+        "behindWpa": -0.004499283154121864,
+        "aheadBehindDiff": 0.02371942703901395,
+        "best_purchase_time": {
+          "time_min": 20.74958904109589
+        },
+        "mean_net_worth_before": 17673.525122648403
+      },
+      {
+        "item": "Point Blank",
+        "heroName": "Billy",
+        "category": "Damage",
+        "cost": 3200,
+        "wpaValue": 0.010438708994210939,
+        "sampleSize": 42494,
+        "costRelativeWpa": 0.020877417988421878,
+        "mean_purchase_time_min": 21.005045653504013,
+        "mean_prob_before": 0.477757852873347,
+        "aheadWpa": 0.009572184520230214,
+        "behindWpa": 0.008103628852166145,
+        "aheadBehindDiff": 0.0014685556680640692,
+        "best_purchase_time": {
+          "time_min": 16.702496881839362
+        },
+        "mean_net_worth_before": 16978.66809638537
+      },
+      {
+        "item": "Reactive Barrier",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 1600,
+        "wpaValue": 0.010138786764705884,
+        "sampleSize": 1632,
+        "costRelativeWpa": 0.040555147058823536,
+        "mean_purchase_time_min": 16.29954656862745,
+        "mean_prob_before": 0.47920526960784315,
+        "aheadWpa": 0.0035227739726027382,
+        "behindWpa": 0.005885496183206107,
+        "aheadBehindDiff": -0.0023627222106033688,
+        "best_purchase_time": {
+          "time_min": 14.01029411764706
+        },
+        "mean_net_worth_before": 11510.579022610294
+      },
+      {
+        "item": "Weighted Shots",
+        "heroName": "Billy",
+        "category": "Damage",
+        "cost": 3200,
+        "wpaValue": 0.008929915433403806,
+        "sampleSize": 2838,
+        "costRelativeWpa": 0.017859830866807612,
+        "mean_purchase_time_min": 22.013826638477806,
+        "mean_prob_before": 0.4793125440451022,
+        "aheadWpa": 0.007337093495934961,
+        "behindWpa": 0.005283098591549296,
+        "aheadBehindDiff": 0.0020539949043856653,
+        "best_purchase_time": {
+          "time_min": 18.949154334038056
+        },
+        "mean_net_worth_before": 18503.581733756168
+      },
+      {
+        "item": "Cultist Sacrifice",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 3200,
+        "wpaValue": 0.008858905967450271,
+        "sampleSize": 6636,
+        "costRelativeWpa": 0.017717811934900542,
+        "mean_purchase_time_min": 9.793563893911998,
+        "mean_prob_before": 0.4762419379144062,
+        "aheadWpa": -0.0017267894516534116,
+        "behindWpa": 0.01659897260273973,
+        "aheadBehindDiff": -0.01832576205439314,
+        "best_purchase_time": {
+          "time_min": 9.876593820648077
+        },
+        "mean_net_worth_before": 5619.727569107896
+      },
+      {
+        "item": "Extra Health",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 800,
+        "wpaValue": 0.007906569991121633,
+        "sampleSize": 3379,
+        "costRelativeWpa": 0.06325255992897307,
+        "mean_purchase_time_min": 20.13593666765315,
+        "mean_prob_before": 0.4939105356614384,
+        "aheadWpa": -0.0049050041701417845,
+        "behindWpa": 0.01491811125485123,
+        "aheadBehindDiff": -0.019823115424993015,
+        "best_purchase_time": {
+          "time_min": 19.266794909736607
+        },
+        "mean_net_worth_before": 14425.130510506064
+      },
+      {
+        "item": "Bullet Resist Shredder",
+        "heroName": "Billy",
+        "category": "Damage",
+        "cost": 1600,
+        "wpaValue": 0.006828804071246819,
+        "sampleSize": 7860,
+        "costRelativeWpa": 0.027315216284987277,
+        "mean_purchase_time_min": 14.997493638676849,
+        "mean_prob_before": 0.4900567811704835,
+        "aheadWpa": -0.005574291784702549,
+        "behindWpa": 0.019642339832869078,
+        "aheadBehindDiff": -0.025216631617571626,
+        "best_purchase_time": {
+          "time_min": 11.56482565538305
+        },
+        "mean_net_worth_before": 10866.367564732824
+      },
+      {
+        "item": "Melee Charge",
+        "heroName": "Billy",
+        "category": "Bruiser",
+        "cost": 1600,
+        "wpaValue": 0.006801058201058201,
+        "sampleSize": 3591,
+        "costRelativeWpa": 0.027204232804232804,
+        "mean_purchase_time_min": 21.393700918964075,
+        "mean_prob_before": 0.5123221943748261,
+        "aheadWpa": 0.0009472687545520757,
+        "behindWpa": 0.01184300578034682,
+        "aheadBehindDiff": -0.010895737025794744,
+        "best_purchase_time": {
+          "time_min": 24.704260651629074
+        },
+        "mean_net_worth_before": 16498.0092027012
+      },
+      {
+        "item": "Dispel Magic",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 3200,
+        "wpaValue": 0.006752935303514377,
+        "sampleSize": 5008,
+        "costRelativeWpa": 0.013505870607028753,
+        "mean_purchase_time_min": 20.055341453674124,
+        "mean_prob_before": 0.4832196884984025,
+        "aheadWpa": -0.011078427895981086,
+        "behindWpa": 0.02459771241830065,
+        "aheadBehindDiff": -0.035676140314281735,
+        "best_purchase_time": {
+          "time_min": 16.363843387934477
+        },
+        "mean_net_worth_before": 16119.376793670126
+      },
+      {
+        "item": "Metal Skin",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 3200,
+        "wpaValue": 0.005462551834130781,
+        "sampleSize": 3135,
+        "costRelativeWpa": 0.010925103668261563,
+        "mean_purchase_time_min": 26.028360446570993,
+        "mean_prob_before": 0.3782067623604462,
+        "aheadWpa": 0.005537111517367466,
+        "behindWpa": 0.0010603097773475311,
+        "aheadBehindDiff": 0.004476801740019935,
+        "best_purchase_time": {
+          "time_min": 20.22468899521531
+        },
+        "mean_net_worth_before": 24239.50270950558
+      }
+    ],
+    "C": [
+      {
+        "item": "Enchanter's Emblem",
+        "heroName": "Billy",
+        "category": "Mixed",
+        "cost": 1600,
+        "wpaValue": 0.0036525577557755774,
+        "sampleSize": 6060,
+        "costRelativeWpa": 0.01461023102310231,
+        "mean_purchase_time_min": 13.57658910891089,
+        "mean_prob_before": 0.4873204950495049,
+        "aheadWpa": -0.008802522836015661,
+        "behindWpa": 0.01994206231454006,
+        "aheadBehindDiff": -0.028744585150555724,
+        "best_purchase_time": {
+          "time_min": 11.37408813335534
+        },
+        "mean_net_worth_before": 9471.19371881188
+      },
+      {
+        "item": "Battle Vest",
+        "heroName": "Billy",
+        "category": "Mixed",
+        "cost": 1600,
+        "wpaValue": 0.0024998993159406546,
+        "sampleSize": 33769,
+        "costRelativeWpa": 0.009999597263762618,
+        "mean_purchase_time_min": 12.340446859545747,
+        "mean_prob_before": 0.4705234949213777,
+        "aheadWpa": -0.00951407771967599,
+        "behindWpa": 0.011679320113314448,
+        "aheadBehindDiff": -0.021193397832990436,
+        "best_purchase_time": {
+          "time_min": 10.59410092395167
+        },
+        "mean_net_worth_before": 8174.957297678337
+      },
+      {
+        "item": "Torment Pulse",
+        "heroName": "Billy",
+        "category": "Damage",
+        "cost": 3200,
+        "wpaValue": 0.00237113276492083,
+        "sampleSize": 821,
+        "costRelativeWpa": 0.00474226552984166,
+        "mean_purchase_time_min": 20.88021924482339,
+        "mean_prob_before": 0.5083929354445798,
+        "aheadWpa": 0.001974204946996468,
+        "behindWpa": 0.004997905759162304,
+        "aheadBehindDiff": -0.0030237008121658357,
+        "best_purchase_time": {
+          "time_min": 17.649208282582215
+        },
+        "mean_net_worth_before": 17153.182690255784
+      },
+      {
+        "item": "Melee Lifesteal",
+        "heroName": "Billy",
+        "category": "Bruiser",
+        "cost": 800,
+        "wpaValue": 0.001523918766453554,
+        "sampleSize": 2659,
+        "costRelativeWpa": 0.012191350131628432,
+        "mean_purchase_time_min": 3.965449417074087,
+        "mean_prob_before": 0.48134874012786766,
+        "aheadWpa": -0.00015069637883008397,
+        "behindWpa": 0.007605966587112173,
+        "aheadBehindDiff": -0.007756662965942257,
+        "best_purchase_time": {
+          "time_min": 4.565889432117338
+        },
+        "mean_net_worth_before": 2898.608491162092
+      },
+      {
+        "item": "Tankbuster",
+        "heroName": "Billy",
+        "category": "Damage",
+        "cost": 3200,
+        "wpaValue": 0.000857496194824969,
+        "sampleSize": 2628,
+        "costRelativeWpa": 0.001714992389649938,
+        "mean_purchase_time_min": 26.295403348554064,
+        "mean_prob_before": 0.5574073059360732,
+        "aheadWpa": 0.013646577017114907,
+        "behindWpa": -0.0372421686746988,
+        "aheadBehindDiff": 0.05088874569181371,
+        "best_purchase_time": {
+          "time_min": 19.919406392694064
+        },
+        "mean_net_worth_before": 23704.10577473366
+      },
+      {
+        "item": "Stalker",
+        "heroName": "Billy",
+        "category": "Damage",
+        "cost": 1600,
+        "wpaValue": 0.00034494433471773966,
+        "sampleSize": 1275391,
+        "costRelativeWpa": 0.0013797773388709586,
+        "mean_purchase_time_min": 7.226958368061317,
+        "mean_prob_before": 0.47032662830457905,
+        "aheadWpa": -0.0007982194298359885,
+        "behindWpa": 0.011484862682854187,
+        "aheadBehindDiff": -0.012283082112690176,
+        "best_purchase_time": {
+          "time_min": 5.003284331290296
+        },
+        "mean_net_worth_before": 3630.584601714001
+      },
+      {
+        "item": "Extra Charge",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 800,
+        "wpaValue": 0.00024762935700367936,
+        "sampleSize": 4619,
+        "costRelativeWpa": 0.001981034856029435,
+        "mean_purchase_time_min": 21.954299631954964,
+        "mean_prob_before": 0.5329739337518946,
+        "aheadWpa": 0.004433378287255565,
+        "behindWpa": -0.012331346841477948,
+        "aheadBehindDiff": 0.01676472512873351,
+        "best_purchase_time": {
+          "time_min": 19.593808183589523
+        },
+        "mean_net_worth_before": 16757.076854016002
+      },
+      {
+        "item": "Grit",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 800,
+        "wpaValue": 0.00012356278241366795,
+        "sampleSize": 30319,
+        "costRelativeWpa": 0.0009885022593093436,
+        "mean_purchase_time_min": 4.2528440911639525,
+        "mean_prob_before": 0.48689404993568414,
+        "aheadWpa": -0.0012204299999999998,
+        "behindWpa": 0.0017805863708399376,
+        "aheadBehindDiff": -0.0030010163708399373,
+        "best_purchase_time": {
+          "time_min": 4.296088132462563
+        },
+        "mean_net_worth_before": 2434.9331279560683
+      },
+      {
+        "item": "Extended Magazine",
+        "heroName": "Billy",
+        "category": "Damage",
+        "cost": 800,
+        "wpaValue": 0.00009127182044887771,
+        "sampleSize": 1203,
+        "costRelativeWpa": 0.0007301745635910217,
+        "mean_purchase_time_min": 17.93641729010806,
+        "mean_prob_before": 0.485837323358271,
+        "aheadWpa": -0.013308791208791209,
+        "behindWpa": 0.014290942028985508,
+        "aheadBehindDiff": -0.027599733237776716,
+        "best_purchase_time": {
+          "time_min": 5.59667497921862
+        },
+        "mean_net_worth_before": 10720.81629409809
+      },
+      {
+        "item": "Slowing Bullets",
+        "heroName": "Billy",
+        "category": "Damage",
+        "cost": 1600,
+        "wpaValue": -0.00032494226327944533,
+        "sampleSize": 866,
+        "costRelativeWpa": -0.00032494226327944533,
+        "mean_purchase_time_min": 17.003995381062357,
+        "mean_prob_before": 0.43000819861431877,
+        "aheadWpa": -0.00467422680412371,
+        "behindWpa": 0.005488796680497925,
+        "aheadBehindDiff": -0.010163023484621635,
+        "best_purchase_time": {
+          "time_min": 17.725057736720554
+        },
+        "mean_net_worth_before": 9270.190530138567
+      },
+      {
+        "item": "Spirit Shielding",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 1600,
+        "wpaValue": -0.0007264736953306575,
+        "sampleSize": 9466,
+        "costRelativeWpa": -0.0007264736953306575,
+        "mean_purchase_time_min": 12.555639129516164,
+        "mean_prob_before": 0.48479446439890134,
+        "aheadWpa": -0.015086350407450521,
+        "behindWpa": 0.012445376549094373,
+        "aheadBehindDiff": -0.027531726956544895,
+        "best_purchase_time": {
+          "time_min": 10.7
+        },
+        "mean_net_worth_before": 8500.399775723641
+      }
+    ],
+    "D": [
+      {
+        "item": "Debuff Reducer",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 1600,
+        "wpaValue": -0.003048201936376211,
+        "sampleSize": 1446,
+        "costRelativeWpa": -0.003048201936376211,
+        "mean_purchase_time_min": 26.01506915629322,
+        "mean_prob_before": 0.4938078146611341,
+        "aheadWpa": -0.024763960396039605,
+        "behindWpa": 0.03140916666666667,
+        "aheadBehindDiff": -0.056173127062706274,
+        "best_purchase_time": {
+          "time_min": 18.095435684647303
+        },
+        "mean_net_worth_before": 21428.863094674965
+      },
+      {
+        "item": "Monster Rounds",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 800,
+        "wpaValue": -0.003913498904309714,
+        "sampleSize": 6845,
+        "costRelativeWpa": -0.003913498904309714,
+        "mean_purchase_time_min": 3.979389335281227,
+        "mean_prob_before": 0.47925558802045287,
+        "aheadWpa": -0.00636831112711559,
+        "behindWpa": 0.0017430346051464066,
+        "aheadBehindDiff": -0.008111345732261997,
+        "best_purchase_time": {
+          "time_min": 4.506019871420222
+        },
+        "mean_net_worth_before": 2466.2040984806426
+      },
+      {
+        "item": "Extra Regen",
+        "heroName": "Billy",
+        "category": "Live",
+        "cost": 800,
+        "wpaValue": -0.004033187454412829,
+        "sampleSize": 4113,
+        "costRelativeWpa": -0.004033187454412829,
+        "mean_purchase_time_min": 2.3737855579868703,
+        "mean_prob_before": 0.433131363967906,
+        "aheadWpa": -0.007400399042298478,
+        "behindWpa": 0.00017315112540192923,
+        "aheadBehindDiff": -0.0075735501677004075,
+        "best_purchase_time": {
+          "time_min": 3.8
+        },
+        "mean_net_worth_before": 1880.0479252370526
+      },
+      {
+        "item": "Close Quarters",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 800,
+        "wpaValue": -0.004081938328814728,
+        "sampleSize": 780105,
+        "costRelativeWpa": -0.004081938328814728,
+        "mean_purchase_time_min": 3.956975445613128,
+        "mean_prob_before": 0.47038974612391626,
+        "aheadWpa": -0.010231037667168026,
+        "behindWpa": 0.0037778778908637246,
+        "aheadBehindDiff": -0.01400891555803175,
+        "best_purchase_time": {
+          "time_min": 4.3
+        },
+        "mean_net_worth_before": 2396.2647042024296
+      },
+      {
+        "item": "Return Fire",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 1600,
+        "wpaValue": -0.004211276190476185,
+        "sampleSize": 2625,
+        "costRelativeWpa": -0.004211276190476185,
+        "mean_purchase_time_min": 19.334529523809557,
+        "mean_prob_before": 0.5815846476190479,
+        "aheadWpa": -0.025356566820276497,
+        "behindWpa": 0.004437735849056603,
+        "aheadBehindDiff": -0.029794302669333098,
+        "best_purchase_time": {
+          "time_min": 18.894895238095238
+        },
+        "mean_net_worth_before": 15587.411808571427
+      },
+      {
+        "item": "Spirit Strike",
+        "heroName": "Billy",
+        "category": "Bruiser",
+        "cost": 800,
+        "wpaValue": -0.005021629485935984,
+        "sampleSize": 5155,
+        "costRelativeWpa": -0.005021629485935984,
+        "mean_purchase_time_min": 14.054442289039766,
+        "mean_prob_before": 0.48637555771096014,
+        "aheadWpa": -0.01927675392670157,
+        "behindWpa": 0.01481655172413793,
+        "aheadBehindDiff": -0.0340933056508395,
+        "best_purchase_time": {
+          "time_min": 12.229912706110573
+        },
+        "mean_net_worth_before": 8024.748991697382
+      },
+      {
+        "item": "Healbane",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 1600,
+        "wpaValue": -0.013328003613369464,
+        "sampleSize": 1107,
+        "costRelativeWpa": -0.013328003613369464,
+        "mean_purchase_time_min": 17.45457091237579,
+        "mean_prob_before": 0.46776576332429987,
+        "aheadWpa": -0.01082275132275132,
+        "behindWpa": -0.013233112582781455,
+        "aheadBehindDiff": 0.0024103612600301343,
+        "best_purchase_time": {
+          "time_min": 11.084462511291779
+        },
+        "mean_net_worth_before": 13061.327015085817
+      },
+      {
+        "item": "Rebuttal",
+        "heroName": "Billy",
+        "category": "Utility",
+        "cost": 800,
+        "wpaValue": -0.013874787535410762,
+        "sampleSize": 706,
+        "costRelativeWpa": -0.013874787535410762,
+        "mean_purchase_time_min": 9.375934844192635,
+        "mean_prob_before": 0.4823269121813031,
+        "aheadWpa": -0.013430970149253735,
+        "behindWpa": 0.0013661654135338345,
+        "aheadBehindDiff": -0.01479713556278757,
+        "best_purchase_time": {
+          "time_min": 6.342067988668555
+        },
+        "mean_net_worth_before": 8207.211042209632
+      }
+    ],
+    "F": [],
+    "_thresholds": {
+      "S": 0.03,
+      "A": 0.015,
+      "B": 0.005,
+      "C": -0.0025,
+      "D": -0.015,
+      "F": -0.015
+    }
+  },
+  "availableHeroes": [
+    "Abrams",
+    "Apollo",
+    "Bebop",
+    "Billy",
+    "Calico",
+    "Celeste",
+    "Drifter",
+    "Dynamo",
+    "Graves",
+    "Grey_Talon",
+    "Haze",
+    "Holliday",
+    "Infernus",
+    "Ivy",
+    "Kelvin",
+    "Lady_Geist",
+    "Lash",
+    "McGinnis",
+    "Mina",
+    "Mirage",
+    "Mo_and_Krill",
+    "Paige",
+    "Paradox",
+    "Pocket",
+    "Rem",
+    "Seven",
+    "Shiv",
+    "Silver",
+    "Sinclair",
+    "The_Doorman",
+    "Venator",
+    "Victor",
+    "Vindicta",
+    "Viscous",
+    "Vyper",
+    "Warden",
+    "Wraith",
+    "Yamato"
+  ],
+  "availableItems": [
+    "Active Reload",
+    "Alchemical Fire",
+    "Arcane Surge",
+    "Arctic Blast",
+    "Armor Piercing Rounds",
+    "Ballistic Enchantment",
+    "Battle Vest",
+    "Berserker",
+    "Blood Tribute",
+    "Boundless Spirit",
+    "Bullet Lifesteal",
+    "Bullet Resilience",
+    "Bullet Resist Shredder",
+    "Burst Fire",
+    "Capacitor",
+    "Cheat Death",
+    "Close Quarters",
+    "Cold Front",
+    "Colossus",
+    "Compress Cooldown",
+    "Counterspell",
+    "Crippling Headshot",
+    "Crushing Fists",
+    "Cultist Sacrifice",
+    "Cursed Relic",
+    "Debuff Reducer",
+    "Decay",
+    "Disarming Hex",
+    "Dispel Magic",
+    "Divine Barrier",
+    "Diviner's Kevlar",
+    "Duration Extender",
+    "Echo Shard",
+    "Enchanter's Emblem",
+    "Enduring Speed",
+    "Escalating Exposure",
+    "Escalating Resilience",
+    "Ethereal Shift",
+    "Express Shot",
+    "Extended Magazine",
+    "Extra Charge",
+    "Extra Health",
+    "Extra Regen",
+    "Extra Spirit",
+    "Extra Stamina",
+    "Fleetfoot",
+    "Focus Lens",
+    "Fortitude",
+    "Frenzy",
+    "Fury Trance",
+    "Glass Cannon",
+    "Greater Expansion",
+    "Grit",
+    "Guardian Ward",
+    "Headhunter",
+    "Headshot Booster",
+    "Healbane",
+    "Healing Booster",
+    "Healing Nova",
+    "Healing Rite",
+    "Healing Tempo",
+    "Heroic Aura",
+    "High-Velocity Rounds",
+    "Hollow Point",
+    "Hunter's Aura",
+    "Improved Spirit",
+    "Indomitable",
+    "Infuser",
+    "Inhibitor",
+    "Intensifying Magazine",
+    "Juggernaut",
+    "Kinetic Dash",
+    "Knockdown",
+    "Leech",
+    "Lifestrike",
+    "Lightning Scroll",
+    "Long Range",
+    "Lucky Shot",
+    "Magic Carpet",
+    "Majestic Leap",
+    "Melee Charge",
+    "Melee Lifesteal",
+    "Mercurial Magnum",
+    "Metal Skin",
+    "Monster Rounds",
+    "Mystic Burst",
+    "Mystic Expansion",
+    "Mystic Regeneration",
+    "Mystic Reverb",
+    "Mystic Shot",
+    "Mystic Slow",
+    "Mystic Vulnerability",
+    "Opening Rounds",
+    "Phantom Strike",
+    "Plated Armor",
+    "Point Blank",
+    "Quicksilver Reload",
+    "Radiant Regeneration",
+    "Rapid Recharge",
+    "Rapid Rounds",
+    "Reactive Barrier",
+    "Rebuttal",
+    "Recharging Rush",
+    "Refresher",
+    "Rescue Beam",
+    "Restorative Locket",
+    "Restorative Shot",
+    "Return Fire",
+    "Ricochet",
+    "Rusted Barrel",
+    "Scourge",
+    "Shadow Weave",
+    "Sharpshooter",
+    "Silence Wave",
+    "Silencer",
+    "Siphon Bullets",
+    "Slowing Bullets",
+    "Slowing Hex",
+    "Spellbreaker",
+    "Spellslinger",
+    "Spirit Burn",
+    "Spirit Lifesteal",
+    "Spirit Rend",
+    "Spirit Resilience",
+    "Spirit Sap",
+    "Spirit Shielding",
+    "Spirit Shredder Bullets",
+    "Spirit Snatch",
+    "Spirit Strike",
+    "Spiritual Overflow",
+    "Split Shot",
+    "Sprint Boots",
+    "Stalker",
+    "Stamina Mastery",
+    "Superior Cooldown",
+    "Superior Duration",
+    "Suppressor",
+    "Surge of Power",
+    "Swift Striker",
+    "Tankbuster",
+    "Tesla Bullets",
+    "Titanic Magazine",
+    "Torment Pulse",
+    "Toxic Bullets",
+    "Transcendent Cooldown",
+    "Trophy Collector",
+    "Unstoppable",
+    "Vampiric Burst",
+    "Veil Walker",
+    "Vortex Web",
+    "Warp Stone",
+    "Weakening Headshot",
+    "Weapon Shielding",
+    "Weighted Shots",
+    "Witchmail"
+  ],
+  "availablePatches": [
+    "patch_676255623445218601",
+    "patch_146261",
+    "patch_146261_presplit",
+    "patch_135477"
+  ],
+  "availableRanks": [
+    "rank_8",
+    "rank_9",
+    "rank_10"
+  ]
+}
