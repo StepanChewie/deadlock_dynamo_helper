@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { StatlockerRefreshService } from '../src/statlocker-adaptive/statlocker-refresh.service';
 import { statlockerV1Fixtures } from './fixtures/statlocker-v1';
 
@@ -335,5 +336,111 @@ describe('StatlockerRefreshService', () => {
       .flatMap(([targets]) => targets)
       .filter((target: any) => target.dataset === 'HERO_LEADERBOARD');
     expect(leaderboardTargets).toHaveLength(1);
+  });
+
+  describe('startup archetype recompile', () => {
+    let loggerError: jest.SpyInstance;
+
+    beforeEach(() => {
+      loggerError = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      loggerError.mockRestore();
+    });
+
+    function seedPatchRow(h: ReturnType<typeof createHarness>, fetchedAt: Date): void {
+      h.active.set([
+        'WPA_PATCH_DATA',
+        identity.rulesetVersion,
+        identity.catalogSha256,
+        '15-1',
+        'patch:current',
+      ].join('|'), {
+        dataset: 'WPA_PATCH_DATA',
+        scopeKey: 'patch:current',
+        rulesetVersion: identity.rulesetVersion,
+        catalogSha256: identity.catalogSha256,
+        statlockerPatchId: '15-1',
+        contentSha256: '1'.repeat(64),
+        fetchedAt,
+      });
+    }
+
+    it('recompiles every pool hero sequentially with the resolved identity on bootstrap', async () => {
+      const pending: Array<() => void> = [];
+      const archetypeRefreshV2 = {
+        refreshHero: jest.fn((_heroId: number) => new Promise<void>((resolve) => { pending.push(resolve); })),
+      };
+      const h = createHarness({ archetypeRefreshV2 });
+      seedPatchRow(h, new Date(Date.parse('2026-09-01T00:00:00.000Z')));
+
+      h.service.onApplicationBootstrap();
+
+      expect(archetypeRefreshV2.refreshHero).toHaveBeenCalledTimes(1);
+      expect(archetypeRefreshV2.refreshHero).toHaveBeenCalledWith(1, {
+        rulesetVersion: identity.rulesetVersion,
+        catalogSha256: identity.catalogSha256,
+        statlockerPatchId: '15-1',
+      });
+
+      while (pending.length > 0) {
+        pending.shift()!();
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+
+      expect(archetypeRefreshV2.refreshHero).toHaveBeenCalledTimes(EXPECTED_STATLOCKER_HERO_POOL.length);
+      expect(archetypeRefreshV2.refreshHero.mock.calls.map(([heroId]) => heroId)).toEqual(EXPECTED_STATLOCKER_HERO_POOL);
+    });
+
+    it('continues the startup recompile when one hero fails', async () => {
+      const archetypeRefreshV2 = {
+        refreshHero: jest.fn(async (heroId: number) => {
+          if (heroId === 6) throw new Error('recompile failed for hero');
+          return { published: true };
+        }),
+      };
+      const h = createHarness({ archetypeRefreshV2 });
+      seedPatchRow(h, new Date(Date.parse('2026-09-01T00:00:00.000Z')));
+
+      h.service.onApplicationBootstrap();
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(archetypeRefreshV2.refreshHero.mock.calls.map(([heroId]) => heroId)).toEqual(EXPECTED_STATLOCKER_HERO_POOL);
+      expect(loggerError).toHaveBeenCalledWith(expect.stringContaining('hero 6'));
+    });
+
+    it('skips the startup recompile when no identity is available', async () => {
+      const archetypeRefreshV2 = {
+        refreshHero: jest.fn(),
+      };
+      const h = createHarness({ observeIdentity: false, archetypeRefreshV2 });
+      h.versionRepo.find.mockResolvedValue([]);
+
+      h.service.onApplicationBootstrap();
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(archetypeRefreshV2.refreshHero).not.toHaveBeenCalled();
+    });
+
+    it('does not start a second startup recompile while one is in flight', async () => {
+      const pending: Array<() => void> = [];
+      const archetypeRefreshV2 = {
+        refreshHero: jest.fn((_heroId: number) => new Promise<void>((resolve) => { pending.push(resolve); })),
+      };
+      const h = createHarness({ archetypeRefreshV2 });
+      seedPatchRow(h, new Date(Date.parse('2026-09-01T00:00:00.000Z')));
+
+      h.service.onApplicationBootstrap();
+      h.service.onApplicationBootstrap();
+      expect(archetypeRefreshV2.refreshHero).toHaveBeenCalledTimes(1);
+
+      while (pending.length > 0) {
+        pending.shift()!();
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+
+      expect(archetypeRefreshV2.refreshHero.mock.calls.map(([heroId]) => heroId)).toEqual(EXPECTED_STATLOCKER_HERO_POOL);
+    });
   });
 });

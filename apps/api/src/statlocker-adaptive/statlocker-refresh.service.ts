@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap, Optional } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -17,7 +17,7 @@ import {
   StatlockerNormalizedDatasetV1,
   StatlockerNormalizedPayloadV1,
 } from './statlocker-adaptive.types';
-import { StatlockerSnapshotStoreService } from './statlocker-snapshot-store.service';
+import { StatlockerSnapshotStoreService, StatlockerStoredSnapshotV1 } from './statlocker-snapshot-store.service';
 import { StatlockerVsHeroWpaPublisherV1Service } from './statlocker-vs-hero-wpa-publisher-v1.service';
 import { StatlockerVsHeroWpaRawStoreV1Service } from './statlocker-vs-hero-wpa-raw-store-v1.service';
 import { StatlockerVsHeroWpaRowNormalizerV1Service } from './statlocker-vs-hero-wpa-row-normalizer-v1.service';
@@ -50,7 +50,8 @@ const COLLECTOR_VERSION = 'statlocker-browser-collector-v1';
 const NORMALIZER_VERSION = 'statlocker-normalizer-v1';
 
 @Injectable()
-export class StatlockerRefreshService {
+export class StatlockerRefreshService implements OnApplicationBootstrap {
+  private readonly logger = new Logger(StatlockerRefreshService.name);
   private identity?: StatlockerGameIdentityV1;
   private readonly activeHeroes = new Map<number, number>();
   private readonly lastSuccessByKey = new Map<string, number>();
@@ -65,6 +66,7 @@ export class StatlockerRefreshService {
   private lastAttemptAt?: string;
   private lastSuccessAt?: string;
   private lastError?: string;
+  private startupRecompileInFlight = false;
 
   constructor(
     private readonly collector: StatlockerBrowserCollectorService,
@@ -263,6 +265,12 @@ export class StatlockerRefreshService {
     });
   }
 
+  onApplicationBootstrap(): void {
+    void this.runStartupArchetypeRecompile().catch((error) => {
+      this.logger.error(`Startup archetype recompile failed: ${describeError(error)}`);
+    });
+  }
+
   @Cron('* * * * *')
   async scheduledTick(nowMs = Date.now()): Promise<void> {
     this.pruneInactiveHeroes(nowMs);
@@ -308,6 +316,49 @@ export class StatlockerRefreshService {
     });
   }
 
+  private async runStartupArchetypeRecompile(): Promise<void> {
+    if (this.startupRecompileInFlight) return;
+    this.startupRecompileInFlight = true;
+    try {
+      if (!this.identity) await this.bootstrapIdentity();
+      if (!this.identity) return;
+      const identity = this.identity;
+      const rows = this.store.listActive().filter((row) =>
+        row.rulesetVersion === identity.rulesetVersion &&
+        row.catalogSha256.toLowerCase() === identity.catalogSha256.toLowerCase(),
+      );
+      const statlockerPatchId = this.resolveCurrentV2PatchId(rows);
+      if (!statlockerPatchId) return;
+      for (const heroId of STATLOCKER_HERO_IDS_V1) {
+        try {
+          await this.archetypeRefreshV2?.refreshHero(heroId, {
+            rulesetVersion: identity.rulesetVersion,
+            catalogSha256: identity.catalogSha256,
+            statlockerPatchId,
+          });
+        } catch (error) {
+          this.logger.error(`Startup archetype recompile failed for hero ${heroId}: ${describeError(error)}`);
+        }
+      }
+    } finally {
+      this.startupRecompileInFlight = false;
+    }
+  }
+
+  private resolveCurrentV2PatchId(rows: readonly StatlockerStoredSnapshotV1[], heroId?: number): string | undefined {
+    const currentPatchId = rows
+      .filter((row) => row.dataset === 'WPA_PATCH_DATA' || row.dataset === 'T4_CHAINS')
+      .sort((a, b) => b.fetchedAt.getTime() - a.fetchedAt.getTime())[0]?.statlockerPatchId;
+    if (currentPatchId) return currentPatchId;
+    const latestLeaderboard = rows
+      .filter((row) =>
+        row.dataset === 'HERO_LEADERBOARD' &&
+        (heroId === undefined || row.scopeKey === `hero:${heroId}`),
+      )
+      .sort((a, b) => b.fetchedAt.getTime() - a.fetchedAt.getTime())[0];
+    return latestLeaderboard?.statlockerPatchId;
+  }
+
   private async takeNextDuePoolHero(identity: StatlockerGameIdentityV1, nowMs: number): Promise<number | undefined> {
     if (STATLOCKER_HERO_IDS_V1.length === 0) return undefined;
     for (let offset = 0; offset < STATLOCKER_HERO_IDS_V1.length; offset += 1) {
@@ -328,6 +379,7 @@ export class StatlockerRefreshService {
     const currentPatchId = rows
       .filter((row) => row.dataset === 'WPA_PATCH_DATA' || row.dataset === 'T4_CHAINS')
       .sort((a, b) => b.fetchedAt.getTime() - a.fetchedAt.getTime())[0]?.statlockerPatchId;
+    const currentV2PatchId = this.resolveCurrentV2PatchId(rows, heroId);
     const latestHeroSnapshot = rows
       .filter((row) =>
         row.dataset === 'HERO_LEADERBOARD' &&
@@ -335,8 +387,6 @@ export class StatlockerRefreshService {
         (!currentPatchId || row.statlockerPatchId === currentPatchId),
       )
       .sort((a, b) => b.fetchedAt.getTime() - a.fetchedAt.getTime())[0];
-
-    const currentV2PatchId = currentPatchId || latestHeroSnapshot?.statlockerPatchId;
     if (this.archetypeRefreshV2 && this.archetypeSnapshotStoreV2) {
       if (!currentV2PatchId) return true;
       const hasActiveV2 = await this.archetypeSnapshotStoreV2.hasActive({
