@@ -1,1 +1,0 @@
-SELECT "itemId", name, "className", "itemSlotType", cost FROM items WHERE "itemId" IN (519124136, 3561817145, 1998374645, 2670099061, 397010810);

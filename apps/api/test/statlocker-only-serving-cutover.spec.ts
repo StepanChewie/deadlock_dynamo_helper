@@ -26,11 +26,17 @@ describe('Statlocker-only recommendation serving cutover', () => {
     expect(source).not.toContain('LiveBuildRecommendationTraversalService');
   });
 
-  test('Recommendation Value V6 live controller is not mounted', () => {
-    const source = readRepoFile('api/src/deadlock-live/recommendation-value-v6.module.ts');
-    const controllersBlock = source.match(/controllers:\s*\[([\s\S]*?)\],\s*providers:/)?.[1] || '';
+  test('Recommendation Value V6 module is removed entirely', () => {
+    // The legacy V6 module file was deleted with the ML-model cleanup, so the
+    // controller cannot be mounted even in principle.
+    const modulePath = resolve(
+      __dirname,
+      '..',
+      '..',
+      'api/src/deadlock-live/recommendation-value-v6.module.ts',
+    );
 
-    expect(controllersBlock).not.toContain('RecommendationValueV6LiveController');
+    expect(existsSync(modulePath)).toBe(false);
   });
 
   test('Overwolf bundle contains only the adaptive recommendation runtime', () => {
