@@ -57,11 +57,10 @@ DB_RUN_MIGRATIONS=true yarn workspace @deadlock-live-probe/api start
 SELECT COUNT(*) FROM heroes;
 SELECT COUNT(*) FROM items;
 SELECT COUNT(*) FROM item_components;
-SELECT COUNT(*) FROM raw_match_metadata;
 SELECT COUNT(*) FROM item_catalog_versions;
 ```
 
-The first three tables should be populated after the API starts. The raw and versioned catalog tables remain empty until metadata is crawled or a versioned catalog import is implemented.
+The first three tables should be populated after the API starts. The versioned catalog tables remain empty until a versioned catalog import is implemented.
 
 ## Migration commands
 
@@ -75,14 +74,4 @@ Generate a future migration:
 
 ```bash
 yarn db:generate src/database/migrations/describe-change
-```
-
-## Raw metadata reprocessing
-
-Every successful single-match metadata response is stored in `raw_match_metadata` before the crawler receives it.
-
-Reprocess the newest stored payload without calling the external API:
-
-```bash
-curl -X POST http://localhost:3000/deadlock/analysis/raw-matches/93314383/reprocess
 ```

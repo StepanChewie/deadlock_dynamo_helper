@@ -80,12 +80,9 @@ export class RulesetWindowManifestService {
   ) {}
 
   async getStatus() {
-    const [rulesets, catalogs, resolutionRows] = await Promise.all([
+    const [rulesets, catalogs] = await Promise.all([
       this.rulesetRepository.find({ order: { clientVersion: 'ASC' } }),
       this.catalogVersionRepository.find({ order: { clientVersion: 'ASC' } }),
-      this.dataSource.query(
-        `SELECT "rulesetResolutionMethod" AS "method", COUNT(*) AS "count" FROM "raw_match_metadata" GROUP BY "rulesetResolutionMethod" ORDER BY "rulesetResolutionMethod"`,
-      ),
     ]);
     const catalogVersions = new Set(catalogs.map((catalog) => Number(catalog.clientVersion)));
     const candidates = rulesets.map(toRulesetWindowCandidate);
@@ -108,12 +105,6 @@ export class RulesetWindowManifestService {
         .filter((candidate) => !catalogVersions.has(candidate.clientVersion))
         .map((candidate) => candidate.clientVersion),
       conflicts,
-      resolutionMethods: Object.fromEntries(
-        (resolutionRows as Array<Record<string, unknown>>).map((row) => [
-          String(row.method),
-          toCount(row.count),
-        ]),
-      ),
     };
   }
 
@@ -537,9 +528,4 @@ function parseManifestDate(
 
 function normalizePositiveInteger(value: number | undefined): number | undefined {
   return value !== undefined && Number.isSafeInteger(value) && value > 0 ? value : undefined;
-}
-
-function toCount(value: unknown): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
 }
