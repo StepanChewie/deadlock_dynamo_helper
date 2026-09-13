@@ -130,7 +130,24 @@ export class FullBuildTransactionPlannerV2Service {
       let action: FullBuildTransitionIntentV2 | undefined;
 
       if (next.nextIndex === 0) {
-        if (projectedInventory.length === input.capacity) {
+        // A standalone goal whose mechanics recipe consumes an already-held
+        // component executes as an in-place UPGRADE: the component's slot is
+        // reused, no replacement runs, and the component never counts as an
+        // extra item on top of the pending goal.
+        const heldRecipe = executableUpgradeFromHeldComponents(
+          buyItemId,
+          projectedInventory,
+          input.itemGraph,
+          input.rulesetId,
+        );
+        if (heldRecipe) {
+          action = {
+            action: 'UPGRADE',
+            buyItemId,
+            recipeId: heldRecipe.recipeId,
+            reasonCodes: ['HELD_COMPONENT_UPGRADE'],
+          };
+        } else if (projectedInventory.length === input.capacity) {
           // New family-entry BUY at full capacity: replacement may run.
           action = this.replaceAtCapacity(
             input,
@@ -515,6 +532,26 @@ function executableOneSlotRecipe(
       && recipe.consumedItemIds[0] === consumedItemId
       && inventoryItemIds.includes(consumedItemId),
   );
+}
+
+function executableUpgradeFromHeldComponents(
+  buyItemId: number,
+  inventoryItemIds: readonly number[],
+  itemGraph: RecommendationItemGraph,
+  rulesetId: string,
+) {
+  for (const recipe of itemGraph.getExecutableUpgradeRecipes(buyItemId)) {
+    if (recipe.consumedItemIds.length !== 1) continue;
+    const executable = executableOneSlotRecipe(
+      buyItemId,
+      recipe.consumedItemIds[0],
+      inventoryItemIds,
+      itemGraph,
+      rulesetId,
+    );
+    if (executable) return executable;
+  }
+  return undefined;
 }
 
 function verifiedDirectPurchasable(

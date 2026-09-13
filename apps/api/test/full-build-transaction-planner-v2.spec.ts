@@ -210,6 +210,81 @@ describe('FullBuildTransactionPlannerV2Service', () => {
     ]);
   });
 
+  it('executes a standalone terminal as an in-place upgrade when its recipe consumes a held component', () => {
+    const heldComponentId = 900;
+    const upgradeC = {
+      ...item(C, { recipeId: 'component-to-C', consumedItemIds: [heldComponentId] }),
+      directPurchaseCost: 1_600,
+    };
+    const standaloneFamily = {
+      ...family(),
+      progressionEdges: [],
+      progressionNodes: family().progressionNodes.filter((node) => node.itemId === C),
+      terminalCandidates: family().terminalCandidates.filter((candidate) => candidate.itemId === C),
+    };
+    const result = planner.plan({
+      archetype: archetype([standaloneFamily]),
+      desiredState: desired(C, 'DEFAULT_TERMINAL'),
+      itemGraph: createRecommendationItemGraph([item(heldComponentId), upgradeC]),
+      rulesetId: 'r1',
+      capacity: 12,
+      currentInventoryItemIds: [heldComponentId],
+    });
+
+    expect(result.actions).toEqual([
+      expect.objectContaining({ action: 'UPGRADE', buyItemId: C, recipeId: 'component-to-C' }),
+    ]);
+  });
+
+  it('does not drop the last build item when a held component occupies a slot at full capacity', () => {
+    // 12/12 held with a component whose upgrade recipe completes a standalone
+    // goal, plus one more pending standalone goal: the in-place upgrade must
+    // free the component slot so the last goal still fits without replacement.
+    const heldComponentId = 900;
+    const lateGoalId = 901;
+    const upgradeC = {
+      ...item(C, { recipeId: 'component-to-C', consumedItemIds: [heldComponentId] }),
+      directPurchaseCost: 1_600,
+    };
+    const standaloneC = {
+      ...family(),
+      familyId: 300,
+      progressionEdges: [],
+      progressionNodes: family().progressionNodes.filter((node) => node.itemId === C),
+      terminalCandidates: family().terminalCandidates.filter((candidate) => candidate.itemId === C),
+    };
+    const standaloneLate = standaloneFamily(lateGoalId, lateGoalId, 1_500);
+    const filler = fillerInventory(10, 1_000);
+    const currentInventory = [heldComponentId, ...filler];
+
+    const localDesired: DesiredBuildStateV2 = {
+      families: [
+        { ...desired(C, 'DEFAULT_TERMINAL').families[0], familyId: 300 },
+        { ...desired(lateGoalId, 'DEFAULT_TERMINAL').families[0], familyId: lateGoalId },
+      ],
+      selectedChoiceFamilyIdsByGroup: {},
+      reasonCodes: [],
+    };
+    const result = planner.plan({
+      archetype: archetype([standaloneC, standaloneLate]),
+      desiredState: localDesired,
+      itemGraph: createRecommendationItemGraph([
+        item(heldComponentId),
+        item(lateGoalId),
+        upgradeC,
+        ...Array.from({ length: 10 }, (_, index) => item(1_000 + index)),
+      ]),
+      rulesetId: 'r1',
+      capacity: 12,
+      currentInventoryItemIds: currentInventory,
+    });
+
+    expect(result.actions).toEqual([
+      expect.objectContaining({ action: 'UPGRADE', buyItemId: C }),
+      expect.objectContaining({ action: 'BUY', buyItemId: lateGoalId }),
+    ]);
+  });
+
   it('fails closed when Statlocker confirms progression but the executable recipe is unavailable', () => {
     const confirmedFamily = {
       ...family(),
