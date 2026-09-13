@@ -455,7 +455,9 @@ function compileItem(family: FamilyEvidenceV2, profileCount: number): BuildArche
     .sort((left, right) => left.accountId.localeCompare(right.accountId));
   const tier = modeTier(perProfile.map((entry) => entry.frequencyTier));
   const timingValues = perProfile.map((entry) => entry.medianBuyTimeS);
-  const timingMedian = median(timingValues);
+  const timingMedian = weightedMedian(
+    perProfile.map((entry) => ({ value: entry.medianBuyTimeS, weight: entry.purchaseRate })),
+  );
 
   return {
     itemId: representativeItemId,

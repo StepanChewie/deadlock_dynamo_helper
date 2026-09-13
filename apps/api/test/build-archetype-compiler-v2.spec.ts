@@ -370,6 +370,15 @@ describe('BuildArchetypeCompilerV2Service', () => {
     expect(progressionNodeOf(archetype, A).timing.medianBuyTimeS).toBe(423);
   });
 
+  it('weights the compiled item timing median by family purchase rate', () => {
+    const archetype = compile([
+      profile('p1', [itemAt(A, 303, { purchaseRate: 0.21 })]),
+      profile('p2', [itemAt(A, 423, { purchaseRate: 0.45 })]),
+    ]);
+
+    expect(archetype.items.find((entry) => entry.itemId === A)?.timing.medianBuyTimeS).toBe(423);
+  });
+
   it('keeps the plain timing median when profile purchase rates are equal', () => {
     const archetype = compile([
       profile('p1', [itemAt(A, 300)]),
