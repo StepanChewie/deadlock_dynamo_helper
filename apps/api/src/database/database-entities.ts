@@ -15,21 +15,11 @@ import { MatchPlayerItem } from '../deadlock-live/entities/match-player-item.ent
 import { MatchPlayerSkillUpgrade } from '../deadlock-live/entities/match-player-skill-upgrade.entity';
 import { MatchPlayer } from '../deadlock-live/entities/match-player.entity';
 import { Match } from '../deadlock-live/entities/match.entity';
-import { ModelBundleRegistryV1 } from '../deadlock-live/entities/model-bundle-registry.entity';
 import { RawMatchMetadata } from '../deadlock-live/entities/raw-match-metadata.entity';
-import { RecommendationDatasetRegistryV1 } from '../deadlock-live/entities/recommendation-dataset-registry.entity';
-import { RecommendationDecisionCandidateV8 } from '../deadlock-live/entities/recommendation-decision-candidate.entity';
-import { RecommendationDecisionV8 } from '../deadlock-live/entities/recommendation-decision.entity';
 import { RecommendationEconomyRulesSnapshotV1Entity } from '../deadlock-live/entities/recommendation-economy-rules-snapshot-v1.entity';
-import { RecommendationEvidenceSnapshotV8 } from '../deadlock-live/entities/recommendation-evidence-snapshot-v8.entity';
-import { RecommendationExposureAckV8 } from '../deadlock-live/entities/recommendation-exposure-ack.entity';
 import { RecommendationItemCatalogItemV1 } from '../deadlock-live/entities/recommendation-item-catalog-item-v1.entity';
 import { RecommendationItemCatalogRecipeV1 } from '../deadlock-live/entities/recommendation-item-catalog-recipe-v1.entity';
 import { RecommendationItemCatalogVersionV1 } from '../deadlock-live/entities/recommendation-item-catalog-version-v1.entity';
-import { RecommendationRoadmapEvidenceEntityV1 } from '../deadlock-live/entities/recommendation-roadmap-evidence.entity';
-import { RecommendationTelemetryEvent } from '../deadlock-live/entities/recommendation-telemetry-event.entity';
-import { RecommendationTelemetryRejectionV8 } from '../deadlock-live/entities/recommendation-telemetry-rejection.entity';
-import { RecommendationValueDatasetRegistryV1 } from '../deadlock-live/entities/recommendation-value-dataset-registry.entity';
 import { SoulsAffordabilityEvidenceV2Entity } from '../deadlock-live/entities/souls-affordability-evidence-v2.entity';
 import { StatlockerEvidenceSnapshotV1Entity } from '../deadlock-live/entities/statlocker-evidence-snapshot-v1.entity';
 import { StatlockerVsHeroWpaRawSnapshotV1Entity } from '../deadlock-live/entities/statlocker-vs-hero-wpa-raw-snapshot-v1.entity';
@@ -53,12 +43,6 @@ export const DATABASE_ENTITIES = [
   RecommendationItemCatalogVersionV1,
   RecommendationItemCatalogItemV1,
   RecommendationItemCatalogRecipeV1,
-  RecommendationTelemetryEvent,
-  RecommendationTelemetryRejectionV8,
-  RecommendationDecisionV8,
-  RecommendationDecisionCandidateV8,
-  RecommendationEvidenceSnapshotV8,
-  RecommendationExposureAckV8,
   SoulsAffordabilityEvidenceV2Entity,
   StatlockerEvidenceSnapshotV1Entity,
   StatlockerVsHeroWpaRawSnapshotV1Entity,
@@ -68,8 +52,4 @@ export const DATABASE_ENTITIES = [
   BuildArchetypeSnapshotV2Entity,
   BuildStrategySnapshotV1Entity,
   RecommendationEconomyRulesSnapshotV1Entity,
-  ModelBundleRegistryV1,
-  RecommendationDatasetRegistryV1,
-  RecommendationValueDatasetRegistryV1,
-  RecommendationRoadmapEvidenceEntityV1,
 ];

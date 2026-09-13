@@ -1,6 +1,5 @@
 import { Test } from '@nestjs/testing';
 import { InventoryShadowReplayService } from '../src/deadlock-live/inventory-shadow-replay.service';
-import { LiveBuildRecommendationTraversalService } from '../src/deadlock-live/live-build-recommendation-traversal.service';
 import { LiveIngestController } from '../src/deadlock-live/live-ingest.controller';
 import { LiveInventoryEventNormalizerService } from '../src/deadlock-live/live-inventory-event-normalizer.service';
 import { LiveMatchStateService } from '../src/deadlock-live/live-match-state.service';
@@ -9,12 +8,6 @@ import { RecentLiveEventsService } from '../src/deadlock-live/recent-live-events
 
 describe('LiveIngestController', () => {
   it('ingests events and exposes state and recent events', async () => {
-    const traversalService = {
-      observeState: jest.fn(),
-      getMatchSnapshot: jest.fn(),
-      getStatus: jest.fn(),
-      getAllSnapshots: jest.fn(),
-    };
     const moduleRef = await Test.createTestingModule({
       controllers: [LiveIngestController],
       providers: [
@@ -33,10 +26,6 @@ describe('LiveIngestController', () => {
             getPlayerTimeline: jest.fn().mockReturnValue(undefined),
           },
         },
-        {
-          provide: LiveBuildRecommendationTraversalService,
-          useValue: traversalService,
-        },
       ],
     }).compile();
 
@@ -49,6 +38,5 @@ describe('LiveIngestController', () => {
 
     expect(controller.getStates()).toHaveLength(1);
     expect(controller.getRecentEvents()).toHaveLength(1);
-    expect(traversalService.observeState).not.toHaveBeenCalled();
   });
 });
