@@ -310,7 +310,9 @@ function compileProgressionNode(
   profileCount: number,
 ): Omit<BuildProgressionNodeV2, 'progressionRole'> {
   const times = observed.map((item) => item.medianBuyTimeS);
-  const timingMedian = median(times);
+  const timingMedian = weightedMedian(
+    observed.map((item) => ({ value: item.medianBuyTimeS, weight: item.purchaseRate })),
+  );
   return {
     itemId,
     rawFrequencyTier: modeTier(observed.map((item) => item.frequencyTier)),
@@ -855,6 +857,24 @@ function median(values: readonly number[]): number {
   return sorted.length % 2 === 0
     ? (sorted[middle - 1] + sorted[middle]) / 2
     : sorted[middle];
+}
+
+function weightedMedian(observations: readonly { value: number; weight: number }[]): number {
+  const values = observations.map((observation) => observation.value);
+  const totalWeight = observations.reduce((sum, observation) => sum + observation.weight, 0);
+  if (!Number.isFinite(totalWeight) || totalWeight <= 0) return median(values);
+  // Equal weights must keep matching the legacy even-count median, which averages the middle pair.
+  if (observations.every((observation) => observation.weight === observations[0].weight)) {
+    return median(values);
+  }
+  const sorted = [...observations].sort((left, right) => left.value - right.value);
+  const halfWeight = totalWeight / 2;
+  let cumulative = 0;
+  for (const observation of sorted) {
+    cumulative += observation.weight;
+    if (cumulative >= halfWeight) return observation.value;
+  }
+  return sorted[sorted.length - 1].value;
 }
 
 function mean(values: readonly number[]): number {

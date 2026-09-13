@@ -1,6 +1,10 @@
 import { createRecommendationItemGraph, RecommendationItemGraph } from '@deadlock-live-probe/build-domain';
 import { BuildArchetypeCompilerV2Service } from '../src/statlocker-adaptive/build-archetype-compiler-v2.service';
-import { StatlockerBuildProfileItemV2, StatlockerBuildProfileV2 } from '../src/statlocker-adaptive/build-archetype-v2';
+import {
+  BuildProgressionNodeV2,
+  StatlockerBuildProfileItemV2,
+  StatlockerBuildProfileV2,
+} from '../src/statlocker-adaptive/build-archetype-v2';
 import { BuildArchetypeClusterV2 } from '../src/statlocker-adaptive/build-archetype-miner-v2.service';
 
 const A = 101;
@@ -56,6 +60,17 @@ function compile(
     catalogSha256: 'a'.repeat(64),
     itemGraph,
   });
+}
+
+function progressionNodeOf(
+  archetype: ReturnType<BuildArchetypeCompilerV2Service['compile']>,
+  itemId: number,
+): BuildProgressionNodeV2 {
+  const node = archetype.families
+    ?.flatMap((family) => family.progressionNodes)
+    .find((entry) => entry.itemId === itemId);
+  if (!node) throw new Error(`missing progression node for item ${itemId}`);
+  return node;
 }
 
 function progressionGraph(): RecommendationItemGraph {
@@ -344,5 +359,32 @@ describe('BuildArchetypeCompilerV2Service', () => {
       statlockerPatchId: 'p1',
       catalogSha256: 'a'.repeat(64),
     });
+  });
+
+  it('weights the progression timing median by purchase rate', () => {
+    const archetype = compile([
+      profile('p1', [itemAt(A, 303, { purchaseRate: 0.21 })]),
+      profile('p2', [itemAt(A, 423, { purchaseRate: 0.45 })]),
+    ]);
+
+    expect(progressionNodeOf(archetype, A).timing.medianBuyTimeS).toBe(423);
+  });
+
+  it('keeps the plain timing median when profile purchase rates are equal', () => {
+    const archetype = compile([
+      profile('p1', [itemAt(A, 300)]),
+      profile('p2', [itemAt(A, 900)]),
+    ]);
+
+    expect(progressionNodeOf(archetype, A).timing.medianBuyTimeS).toBe(600);
+  });
+
+  it('falls back to the plain timing median when purchase rates sum to zero', () => {
+    const archetype = compile([
+      profile('p1', [itemAt(A, 300, { purchaseRate: 0 })]),
+      profile('p2', [itemAt(A, 900, { purchaseRate: 0 })]),
+    ]);
+
+    expect(progressionNodeOf(archetype, A).timing.medianBuyTimeS).toBe(600);
   });
 });

@@ -1,5 +1,5 @@
 {
-  "note": "Approved real-data golden for the frozen Billy capture. Confirmed same-profile progressions (Spirit Shielding, Weighted Shots, Greater Expansion) execute as component BUY followed by in-place UPGRADE. Pricing half of the real-data gate: verified Deadlock shop mechanic (full component credit, operator-observed) derives each upgrade surcharge from captured costs - Spirit Shielding 1600-800=800, Weighted Shots 3200-1600=1600, Greater Expansion 3200-800=2400. Confirmed terminals are never direct-BUYed. Provisional flex fill (FLEX_PROVISIONAL_FILL, real captured SITUATIONAL families without a matchup advantage on this roster) completes the visible build to 12 slots. Flex selection is invest-aware: only an exact top-up purchase (cost equals the remaining gap to the 4800-souls invest breakpoint on its weapon/vitality/spirit track) ranks as a closer; big overshooting items never count. Non-closers rank best-of-worst by matchup WPA with zero-evidence items last. Purchase order still follows Statlocker timing, and flex items are the first candidates a real situational discovery replaces at 12/12.",
+  "note": "Approved real-data golden for the frozen Billy capture. Confirmed same-profile progressions (Spirit Shielding, Weighted Shots, Greater Expansion) execute as component BUY followed by in-place UPGRADE. Pricing half of the real-data gate: verified Deadlock shop mechanic (full component credit, operator-observed) derives each upgrade surcharge from captured costs - Spirit Shielding 1600-800=800, Weighted Shots 3200-1600=1600, Greater Expansion 3200-800=2400. Confirmed terminals are never direct-BUYed. Provisional flex fill (FLEX_PROVISIONAL_FILL, real captured SITUATIONAL families without a matchup advantage on this roster) completes the visible build to 12 slots. Flex selection is invest-aware: only an exact top-up purchase (cost equals the remaining gap to the 4800-souls invest breakpoint on its weapon/vitality/spirit track) ranks as a closer; big overshooting items never count. Non-closers rank best-of-worst by matchup WPA with zero-evidence items last. Purchase order still follows Statlocker timing, and flex items are the first candidates a real situational discovery replaces at 12/12. Re-approved 2026-09-13: desiredFamilies/finalFamilySatisfaction ordering of families 754480263 (Greater Expansion) and 3731635960 (Dispel Magic) shifts by design from the purchaseRate-weighted progression timing median; terminal selections and actionSemanticKeys are unchanged.",
   "selectedArchetypeId": "archetype:hero:72:cluster:ed85aa4f11192e58",
   "desiredFamilies": [
     {
@@ -33,13 +33,13 @@
       "selectedTerminalKind": "DEFAULT_TERMINAL"
     },
     {
-      "familyId": 3731635960,
-      "selectedTerminalItemId": 3731635960,
+      "familyId": 754480263,
+      "selectedTerminalItemId": 1193964439,
       "selectedTerminalKind": "DEFAULT_TERMINAL"
     },
     {
-      "familyId": 754480263,
-      "selectedTerminalItemId": 1193964439,
+      "familyId": 3731635960,
+      "selectedTerminalItemId": 3731635960,
       "selectedTerminalKind": "DEFAULT_TERMINAL"
     },
     {
@@ -113,14 +113,14 @@
       "terminalItemId": 1235347618
     },
     {
-      "familyId": 3731635960,
-      "status": "DEFAULT_TERMINAL_SATISFIED",
-      "terminalItemId": 3731635960
-    },
-    {
       "familyId": 754480263,
       "status": "DEFAULT_TERMINAL_SATISFIED",
       "terminalItemId": 1193964439
+    },
+    {
+      "familyId": 3731635960,
+      "status": "DEFAULT_TERMINAL_SATISFIED",
+      "terminalItemId": 3731635960
     },
     {
       "familyId": 2417568017,
