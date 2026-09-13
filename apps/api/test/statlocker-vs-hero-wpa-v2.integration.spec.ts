@@ -111,7 +111,7 @@ integrationDescribe('Statlocker VS_HERO_WPA V2 PostgreSQL serving path', () => {
       }),
     ]));
     expect(rows.every((row) => typeof row.itemId === 'number')).toBe(true);
-    expect(observability.getStatus().counters.wpaQueryCount).toBe(1);
+    expect(observability.getStatus().wpaQueryCount).toBe(1);
 
     const scorer = new ThreatWeightedMatchupV1Service();
     const score = scorer.scoreItem({
