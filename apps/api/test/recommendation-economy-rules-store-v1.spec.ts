@@ -109,4 +109,46 @@ describe('recommendation economy rules store v1', () => {
       },
     })).rejects.toThrow('base slot total');
   });
+
+  it('resolves persisted rules after a JSONB key reorder', async () => {
+    // Postgres jsonb does not preserve object key order: the persisted payload
+    // comes back with reordered keys, so a hash computed over insertion order
+    // can never match. resolveExact must hash canonically instead.
+    const repo = repository();
+    const store = new RecommendationEconomyRulesStoreV1Service(repo);
+    const rulesWithUpgradePricing = {
+      ...rules,
+      source: 'deadlock-shop-full-component-credit',
+      upgradePricingPolicy: {
+        mode: 'TARGET_COST_MINUS_VERIFIED_COMPONENT_CREDIT' as const,
+        componentCreditRatio: 1,
+        evidence: 'OBSERVED' as const,
+        source: 'deadlock-shop-full-component-credit',
+      },
+    };
+    await store.publish({
+      snapshotId: 'jsonb-reorder',
+      source: 'test',
+      rules: rulesWithUpgradePricing,
+    });
+
+    const stored = repo.rows[0];
+    const reorder = (value: any): any => {
+      if (Array.isArray(value)) return value.map(reorder);
+      if (value && typeof value === 'object') {
+        return Object.fromEntries(
+          Object.entries(value)
+            .map(([key, entry]) => [key, reorder(entry)])
+            .sort(([left], [right]) => left.localeCompare(right)),
+        );
+      }
+      return value;
+    };
+    repo.rows[0] = { ...stored, payload: reorder(stored.payload) };
+
+    const resolved = await store.resolveExact('r1', catalogSha256);
+    expect(resolved).toBeDefined();
+    expect(resolved?.upgradePricingPolicy).toEqual(rulesWithUpgradePricing.upgradePricingPolicy);
+    expect(resolved?.source).toBe('deadlock-shop-full-component-credit');
+  });
 });

@@ -146,7 +146,21 @@ function normalizeBreakpoints(values: readonly number[]): number[] {
 }
 
 function hashRules(rules: RecommendationEconomyRulesV1): string {
-  return createHash('sha256').update(JSON.stringify(rules)).digest('hex');
+  // Canonical (key-sorted) serialization: Postgres jsonb does not preserve
+  // object key order, so an insertion-order hash never matches after a
+  // persist/load round trip.
+  return createHash('sha256').update(stableStringify(rules)).digest('hex');
+}
+
+function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map((entry) => stableStringify(entry)).join(',')}]`;
+  if (value !== null && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entry]) => `${JSON.stringify(key)}:${stableStringify(entry)}`);
+    return `{${entries.join(',')}}`;
+  }
+  return JSON.stringify(value);
 }
 
 function isNonNegativeInteger(value: unknown): value is number {
