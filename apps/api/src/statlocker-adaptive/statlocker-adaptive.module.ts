@@ -27,6 +27,7 @@ import { BuildArchetypeSessionV2Service } from './build-archetype-session-v2.ser
 import { BuildArchetypeSnapshotStoreV2Service } from './build-archetype-snapshot-store-v2.service';
 import { BuildDebugTraceStoreV2Service } from './build-debug-trace-store-v2.service';
 import { BuildItemUtilityV2Service } from './build-item-utility-v2.service';
+import { BuildIterationHistoryV1Service } from './build-iteration-history-v1.service';
 import { BuildSkeletonService } from './build-skeleton.service';
 import { EnemyThreatV1Service } from './enemy-threat-v1.service';
 import { FamilyFirstFullBuildResolverV2Service } from './family-first-full-build-resolver-v2.service';
@@ -98,6 +99,7 @@ import { ThreatWeightedMatchupV1Service } from './threat-weighted-matchup-v1.ser
     BuildArchetypeSessionV2Service,
     BuildDebugTraceStoreV2Service,
     BuildItemUtilityV2Service,
+    BuildIterationHistoryV1Service,
     FullBuildMatchupProtectionV1Service,
     FullBuildSellRankerV1Service,
     FullBuildReplacementV2Service,
@@ -123,6 +125,7 @@ import { ThreatWeightedMatchupV1Service } from './threat-weighted-matchup-v1.ser
     AdaptiveRecommendationObservabilityV1Service,
     RecommendationEconomyRulesBootstrapV1Service,
     BuildDebugTraceStoreV2Service,
+    BuildIterationHistoryV1Service,
     StatlockerRefreshService,
     StatlockerEvidenceService,
     RecommendationEconomyRulesStoreV1Service,
