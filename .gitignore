@@ -12,3 +12,5 @@ storage
 .codex/
 .zcode/
 graphify-out/
+.openclaw/
+.superpowers/
