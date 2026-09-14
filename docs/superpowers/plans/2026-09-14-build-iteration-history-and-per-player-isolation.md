@@ -1737,3 +1737,127 @@ git commit -m "feat(api): verify build iteration retention and document pinning"
 **Type consistency:** `BuildIterationCaptureV1` fields are used identically in Tasks 8 and 9 (`steamId`, `heroId`, `gameTimeSec`, `capacity`, `inventoryItemIds`, `spendableSouls`, `enemyHeroIds`, `enemyThreats`, `archetype`, `evidence`, `stages`). `planFingerprintV1` / `blockerFingerprintV1` / `extractRejectsV1` / `projectPlanForStorageV1` / `boundRejectsForStorageV1` keep the names and signatures from Task 7 in Task 8. `record()` takes `RecordBuildIterationV1Input` in both Task 8 and Task 9.
 
 **Verified while writing the plan:** `ObservedFact<T>` in `packages/deadlock-build-domain/src/recommendation-action-domain.ts` is `{ value?: T; evidence: FactEvidence; source: string }`, so Task 9's read of `decision.state.economy.spendableSouls.value` is correct as written. `AdaptiveRecommendationResultV2.evidence` is optional, which is why `buildEvidencePayload` falls back to it when the capture has no summary.
+
+
+---
+
+### Task 11: Record the hysteresis outcome in the decision trace (added by controller ruling, 2026-09-14)
+
+> Origin: the batch B-1 review proved that `SUPPRESSED_BY_HYSTERESIS` has no producer — the `PLAN_SEARCH` entry is recorded before the hysteresis decision and marks every branch `SELECTED`, and `payload.hysteresis` is never populated, so the history table's `rejects` column would never contain hysteresis suppressions despite design §B2 and the column comment promising them. Controller ruling: close the gap with this task, executed after Tasks 8–10 and before the final review.
+
+**Files:**
+- Modify: `apps/api/src/statlocker-adaptive/family-first-full-build-resolver-v2.service.ts`
+- Test: `apps/api/test/adaptive-recommendation-v2-previous-plan-wiring.spec.ts` (extend; it already wires `previousPlan` + trace store)
+- Optional: `apps/api/test/family-first-resolver-hysteresis-trace.spec.ts` (new, if cleaner)
+
+**Interfaces:**
+- Consumes: `FullBuildHysteresisV2Service.choose()` (returns `{ action, selected, requiredImprovement, reasonCodes }`), `BuildPlanSearchTracePayloadV2` (already has an optional `hysteresis: { action, improvement, requiredImprovement, reasonCodes }` field), `BuildDecisionTraceCollectorV2.record()`.
+- Produces: `PLAN_SEARCH` trace entries that (a) populate `payload.hysteresis` whenever a previous plan existed and a decision was made, (b) mark the *selected* plan's steps `SELECTED`, and (c) mark the *candidate* plan's steps that did not survive the hysteresis decision as `SUPPRESSED_BY_HYSTERESIS` with the hysteresis `reasonCodes`. `extractRejectsV1` (Task 7) then stores them into history without further changes.
+
+**Implementation (approved shape):**
+
+1. Change `applyPreviousPlanHysteresis()` to also return the decision:
+
+```ts
+  private applyPreviousPlanHysteresis(
+    input: FamilyFirstFullBuildLifetimeResolverV2Input,
+    candidate: ResolvedFullBuildPlanV2,
+  ): { plan: ResolvedFullBuildPlanV2; reasonCodes: readonly string[]; decision?: BuildPlanSwitchDecisionV2 } {
+    const previous = input.previousPlan;
+    if (
+      !previous ||
+      !previous.validation.valid ||
+      previous.matchId !== candidate.matchId ||
+      previous.heroId !== candidate.heroId ||
+      previous.archetypeId !== candidate.archetypeId ||
+      previous.stateRevision !== candidate.stateRevision
+    ) {
+      return { plan: candidate, reasonCodes: [] };
+    }
+
+    const decision = this.hysteresis.choose(previous, candidate, {
+      improvement: desiredStateScore(candidate) - desiredStateScore(previous),
+      coreReplacement: false,
+      recentPurchaseProtected: hasProtectedRecentPurchase(input),
+    });
+    return { plan: decision.selected, reasonCodes: decision.reasonCodes, decision };
+  }
+```
+
+2. Move the `PLAN_SEARCH` record to **after** the hysteresis decision and build the payload as:
+
+```ts
+    const hysteresis = selected.decision
+      ? {
+          action: selected.decision.action,
+          improvement: selected.decision.improvement,
+          requiredImprovement: selected.decision.requiredImprovement,
+          reasonCodes: [...selected.decision.reasonCodes],
+        }
+      : undefined;
+    const selectedKeys = new Set(
+      selected.plan.steps.map((step) => stepSemanticTraceKey(step)),
+    );
+    const suppressed = hysteresis?.action === 'KEEP_PREVIOUS'
+      ? candidate.steps
+          .filter((step) => !selectedKeys.has(stepSemanticTraceKey(step)))
+          .map((step, index) => ({
+            sequence: selected.plan.steps.length + index + 1,
+            targetItemId: step.buyItemId,
+            action: step.action,
+            disposition: 'SUPPRESSED_BY_HYSTERESIS' as const,
+            reasonCodes: [...(hysteresis?.reasonCodes ?? [])],
+          }))
+      : [];
+    input.trace?.record({
+      stage: 'PLAN_SEARCH',
+      reasonCodes: uniqueStrings([
+        ...transactionPlan.reasonCodes,
+        ...rejectedOutsideReasonCodes,
+        ...(hysteresis?.reasonCodes ?? []),
+      ]),
+      payload: {
+        branches: [
+          ...selected.plan.steps.map((step, index) => ({
+            sequence: index + 1,
+            targetItemId: step.buyItemId,
+            action: step.action,
+            disposition: 'SELECTED' as const,
+            reasonCodes: [
+              ...step.reasonCodes,
+              ...(hysteresis && hysteresis.action === 'SWITCH_TO_CANDIDATE'
+                ? ['PLAN_HYSTERESIS_MARGIN_CLEARED']
+                : []),
+            ],
+          })),
+          ...suppressed,
+        ],
+        ...(hysteresis === undefined ? {} : { hysteresis }),
+      },
+    });
+```
+
+with a module-level helper identical to the hysteresis service's semantic key:
+
+```ts
+function stepSemanticTraceKey(step: FullBuildStepV2): string {
+  return [step.action, step.buyItemId, step.sellItemId ?? '', step.recipeId ?? ''].join(':');
+}
+```
+
+Import `BuildPlanSearchTracePayloadV2` and `BuildPlanSwitchDecisionV2` from their existing modules; do not widen any public API. The current PLAN_SEARCH record (recorded before SEMANTIC_VALIDATION) is removed and replaced by the post-hysteresis record; the SEMANTIC_VALIDATION and FINAL_PLAN records stay where they are.
+
+**Tests (three scenarios, assert against `traceStore.revisions(...).stages`):**
+
+- KEEP_PREVIOUS: with a valid `previousPlan` whose improvement margin is not cleared, the PLAN_SEARCH payload has `hysteresis.action === 'KEEP_PREVIOUS'` and `reasonCodes` containing `PLAN_HYSTERESIS_MARGIN_NOT_CLEARED`; the candidate step that differs from the selected plan appears once with `disposition === 'SUPPRESSED_BY_HYSTERESIS'`; the selected steps are `SELECTED`.
+- SWITCH_TO_CANDIDATE: with a margin above `requiredImprovement`, `hysteresis.action === 'SWITCH_TO_CANDIDATE'`, no suppressed branches, and selected steps carry `PLAN_HYSTERESIS_MARGIN_CLEARED` in their `reasonCodes`.
+- No previous plan: `payload.hysteresis` is absent and every branch is `SELECTED`.
+
+Build the resolver fixture the way `adaptive-recommendation-v2-previous-plan-wiring.spec.ts` already does (it wires `previousPlan` and a trace store; extend that spec rather than inventing a new harness). Run that spec after each edit; run the full api suite before committing; keep the existing e2e green.
+
+- [ ] **Step 1: Write the failing test** (KEEP_PREVIOUS scenario asserts `payload.hysteresis` and the `SUPPRESSED_BY_HYSTERESIS` branch — it fails because the payload never carries them).
+- [ ] **Step 2: Run it to verify the failure**: `yarn workspace @deadlock-live-probe/api test -- test/adaptive-recommendation-v2-previous-plan-wiring.spec.ts` — expect FAIL on the missing `hysteresis` payload / missing suppressed branch.
+- [ ] **Step 3: Implement** the two changes above.
+- [ ] **Step 4: Run the spec** — expect PASS; add the SWITCH and no-previous-plan scenarios and keep them green.
+- [ ] **Step 5: Full api suite** — `yarn workspace @deadlock-live-probe/api test` — expected green (existing PLAN_SEARCH order-dependent tests may need their expectations moved with the record).
+- [ ] **Step 6: Commit** `feat(api): record hysteresis outcome in the plan-search trace`.
