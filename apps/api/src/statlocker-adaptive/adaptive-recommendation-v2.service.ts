@@ -13,6 +13,7 @@ import {
   AdaptiveRecommendationResultV2,
 } from '@deadlock-live-probe/shared';
 import { BuildArchetypeMatchLockV2Entity } from '../deadlock-live/entities/build-archetype-match-lock-v2.entity';
+import { BuildIterationCaptureV1 } from './build-iteration-capture-v1';
 import { candidateGeneratorRulesFromSlotStateV1 } from './adaptive-economy-v1';
 import {
   AdaptiveDecisionStateV1,
@@ -84,7 +85,10 @@ export class AdaptiveRecommendationV2Service {
     private readonly lifecycleRepository?: StatlockerItemLifecycleRepositoryV1Service,
   ) {}
 
-  async recommend(request: AdaptiveRecommendationRequestV2): Promise<AdaptiveRecommendationResultV2> {
+  async recommend(
+    request: AdaptiveRecommendationRequestV2,
+    capture?: BuildIterationCaptureV1,
+  ): Promise<AdaptiveRecommendationResultV2> {
     validateRequest(request);
     const decision = await this.decisionState.build(request.matchId, request.localSteamId);
     const existingLock = await this.session.get(request.matchId, decision.localSteamId);
@@ -159,6 +163,29 @@ export class AdaptiveRecommendationV2Service {
       trace,
     };
     const plan = this.resolver.resolve(resolverInput);
+    if (capture) {
+      capture.steamId = decision.localSteamId;
+      capture.heroId = decision.state.heroId;
+      capture.gameTimeSec = decision.state.gameTimeSec;
+      capture.capacity = Number(capacity);
+      capture.inventoryItemIds = [...decision.state.inventory.heldByItemId.keys()];
+      capture.spendableSouls = typeof decision.state.economy.spendableSouls.value === 'number'
+        ? decision.state.economy.spendableSouls.value
+        : undefined;
+      capture.enemyHeroIds = [...enemyHeroIds];
+      capture.enemyThreats = enemyThreats;
+      capture.archetype = {
+        archetypeId: lock.archetypeId,
+        snapshotId: lock.snapshotId,
+        scores: selection.scores.map((score) => ({
+          archetypeId: score.archetypeId,
+          score: score.score,
+          confidence: score.confidence,
+        })),
+      };
+      capture.evidence = evidenceSummary(snapshot, evidence, vsHeroRows.length);
+      capture.stages = trace.stages();
+    }
     this.traceStore.put({
       matchId: request.matchId,
       steamId: decision.localSteamId,

@@ -592,7 +592,11 @@ describe('Statlocker Build V2 real Billy fixture', () => {
       resolver,
       traceStore,
     );
-    const controller = new AdaptiveRecommendationV2Controller(service);
+    const controller = new AdaptiveRecommendationV2Controller(
+      service,
+      { record: jest.fn().mockResolvedValue(undefined) } as any,
+      { getState: () => undefined } as any,
+    );
 
     const result = await controller.recommend({ matchId: fixture.request.matchId });
     const runtimeTrace = traceStore.get(fixture.request.matchId, 'real-fixture-local');

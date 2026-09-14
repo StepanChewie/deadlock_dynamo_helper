@@ -365,7 +365,11 @@ function harness(resolverOverride?: { resolve(input: unknown): ResolvedFullBuild
     resolver as any,
     traceStore,
   );
-  const controller = new AdaptiveRecommendationV2Controller(service);
+  const controller = new AdaptiveRecommendationV2Controller(
+    service,
+    { record: jest.fn().mockResolvedValue(undefined) } as any,
+    { getState: () => undefined } as any,
+  );
 
   return {
     controller,

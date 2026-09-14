@@ -4,11 +4,18 @@ import {
   AdaptiveRecommendationResultV2,
 } from '@deadlock-live-probe/shared';
 import { AdaptiveLiveStateNotReadyError } from './adaptive-decision-state-v1.service';
+import { BuildIterationCaptureV1 } from './build-iteration-capture-v1';
+import { BuildIterationHistoryV1Service } from './build-iteration-history-v1.service';
 import { AdaptiveRecommendationV2Service } from './adaptive-recommendation-v2.service';
+import { LiveMatchStateService } from '../deadlock-live/live-match-state.service';
 
 @Controller('deadlock/adaptive/v2')
 export class AdaptiveRecommendationV2Controller {
-  constructor(private readonly recommendation: AdaptiveRecommendationV2Service) {}
+  constructor(
+    private readonly recommendation: AdaptiveRecommendationV2Service,
+    private readonly history: BuildIterationHistoryV1Service,
+    private readonly liveState: LiveMatchStateService,
+  ) {}
 
   @Post('recommend')
   async recommend(@Body() body: AdaptiveRecommendationRequestV2): Promise<AdaptiveRecommendationResultV2> {
@@ -25,15 +32,35 @@ export class AdaptiveRecommendationV2Controller {
       matchId: body.matchId.trim(),
       ...(body.localSteamId === undefined ? {} : { localSteamId: body.localSteamId.trim() }),
     };
+    const capture = new BuildIterationCaptureV1();
+    const fallbackSteamId = request.localSteamId ?? resolveMarkedLocalSteamId(this.liveState, request.matchId);
+
+    let result: AdaptiveRecommendationResultV2;
     try {
-      return await this.recommendation.recommend(request);
+      result = await this.recommendation.recommend(request, capture);
     } catch (error) {
       if (error instanceof AdaptiveLiveStateNotReadyError) {
-        return waitingRecommendation(request.matchId, error.blocker);
+        result = waitingRecommendation(request.matchId, error.blocker);
+      } else {
+        throw error;
       }
-      throw error;
     }
+
+    await this.history.record({
+      matchId: request.matchId,
+      steamId: capture.steamId ?? fallbackSteamId ?? 'unknown',
+      result,
+      capture,
+    });
+    return result;
   }
+}
+
+function resolveMarkedLocalSteamId(liveState: LiveMatchStateService, matchId: string): string | undefined {
+  const state = liveState.getState(matchId);
+  if (!state) return undefined;
+  const marked = Object.values(state.playersBySteamId).filter((player) => player.isLocal);
+  return marked.length === 1 ? marked[0].steamId : undefined;
 }
 
 function waitingRecommendation(
