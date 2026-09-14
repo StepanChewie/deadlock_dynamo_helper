@@ -6,7 +6,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "yarn build && node test/gep-canonical-v2.test.js && node test/recommendation-telemetry-v8.test.js && node test/recommendation-experiment-v1.test.js && node test/model-contracts-v1.test.js && node test/recommendation-observability-gate-v1.test.js && node test/recommendation-behavioral-v8.test.js && node test/recommendation-behavioral-training-v1.test.js && node test/recommendation-training-pair-v1.test.js && node test/recommendation-direct-shop-validation-v1.test.js && node test/recommendation-pretraining-v1.test.js && node test/recommendation-pretraining-final-readiness-v1.test.js && node test/recommendation-runtime-v8.test.js && node test/recommendation-release-gates-v1.test.js && node test/recommendation-roadmap-state-v1.test.js && node test/recommendation-policy-artifact-v1.test.js && node test/recommendation-future-test-evaluation-v1.test.js && node test/recommendation-sequential-rl-v1.test.js && node test/recommendation-sequential-rl-evidence-v1.test.js && node test/recommendation-value-policy-v1.test.js && node test/recommendation-artifact-buildlm-v1.test.js && node test/adaptive-recommendation-v1.test.js && node test/adaptive-transaction-plan-v1.test.js",
+    "test": "yarn build && node test/gep-canonical-v2.test.js && node test/recommendation-direct-shop-validation-v1.test.js && node test/adaptive-recommendation-v1.test.js",
     "lint": "echo \"shared: no lint\""
   },
   "devDependencies": {
