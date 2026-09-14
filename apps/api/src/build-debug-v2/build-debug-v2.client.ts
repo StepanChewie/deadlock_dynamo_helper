@@ -19,6 +19,7 @@ export const BUILD_DEBUG_V2_CLIENT_JS = String.raw`(() => {
   let reconnectTimer;
   let reconnectAttempts = 0;
   let currentMatchId = '';
+  let currentSteamId = '';
 
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -45,6 +46,7 @@ export const BUILD_DEBUG_V2_CLIENT_JS = String.raw`(() => {
     if (!selection.matchId) {
       closeStream();
       currentMatchId = '';
+      currentSteamId = '';
       clearTrace();
       return;
     }
@@ -84,10 +86,11 @@ export const BUILD_DEBUG_V2_CLIENT_JS = String.raw`(() => {
   async function selectMatch(matchId, steamId) {
     closeStream();
     currentMatchId = matchId;
+    currentSteamId = steamId || '';
     reconnectAttempts = 0;
     status.textContent = 'Loading snapshot for ' + matchId + '...';
     const loaded = await loadSnapshot(matchId, steamId);
-    if (!loaded || currentMatchId !== matchId) return;
+    if (!loaded || !isCurrentSelection(matchId, steamId)) return;
     connectStream(matchId, steamId);
   }
 
@@ -103,25 +106,25 @@ export const BUILD_DEBUG_V2_CLIENT_JS = String.raw`(() => {
       return false;
     }
     const trace = await response.json();
-    if (currentMatchId !== matchId) return false;
+    if (!isCurrentSelection(matchId, steamId)) return false;
     renderTrace(trace);
     status.textContent = 'Snapshot loaded. Opening realtime stream...';
     return true;
   }
 
   function connectStream(matchId, steamId) {
-    if (currentMatchId !== matchId) return;
+    if (!isCurrentSelection(matchId, steamId)) return;
     const source = new EventSource('/debug/build-v2/matches/' + encodeURIComponent(matchId) +
       '/stream?steamId=' + encodeURIComponent(steamId || ''));
     stream = source;
 
     source.onopen = () => {
-      if (stream !== source || currentMatchId !== matchId) return;
+      if (stream !== source || !isCurrentSelection(matchId, steamId)) return;
       status.textContent = 'Realtime trace connected';
     };
 
     source.addEventListener('trace', (event) => {
-      if (stream !== source || currentMatchId !== matchId) return;
+      if (stream !== source || !isCurrentSelection(matchId, steamId)) return;
       try {
         const trace = JSON.parse(event.data);
         if (!trace || trace.matchId !== matchId) return;
@@ -134,7 +137,7 @@ export const BUILD_DEBUG_V2_CLIENT_JS = String.raw`(() => {
     });
 
     source.onerror = () => {
-      if (stream !== source || currentMatchId !== matchId) return;
+      if (stream !== source || !isCurrentSelection(matchId, steamId)) return;
       source.close();
       if (stream === source) stream = undefined;
       if (reconnectAttempts >= MAX_SSE_RECONNECT_ATTEMPTS) {
@@ -149,7 +152,7 @@ export const BUILD_DEBUG_V2_CLIENT_JS = String.raw`(() => {
       status.textContent = 'SSE disconnected. Reconnecting ' + reconnectAttempts + '/' + MAX_SSE_RECONNECT_ATTEMPTS + '...';
       reconnectTimer = setTimeout(() => {
         reconnectTimer = undefined;
-        if (currentMatchId === matchId) connectStream(matchId);
+        if (isCurrentSelection(matchId, steamId)) connectStream(matchId, steamId);
       }, delay);
     };
   }
@@ -576,6 +579,10 @@ export const BUILD_DEBUG_V2_CLIENT_JS = String.raw`(() => {
 
   function formatMatchSelection(matchId, steamId) {
     return JSON.stringify([matchId, steamId || '']);
+  }
+
+  function isCurrentSelection(matchId, steamId) {
+    return currentMatchId === matchId && currentSteamId === (steamId || '');
   }
 
   function parseMatchSelection(value) {

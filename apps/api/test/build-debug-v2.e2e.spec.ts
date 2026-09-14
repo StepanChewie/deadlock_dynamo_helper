@@ -512,7 +512,7 @@ describe('Build debugger V2 HTTP API', () => {
     const matchSelect = harness.element('activeMatchSelect');
     await harness.element('refreshMatches').dispatch('click');
     await flushMicrotasks();
-    matchSelect.value = matchSelect.children[0].value;
+    matchSelect.value = matchSelect.children[1].value;
     await matchSelect.dispatch('change');
     await flushMicrotasks();
 
@@ -525,6 +525,10 @@ describe('Build debugger V2 HTTP API', () => {
 
     expect(harness.streams.length).toBeLessThanOrEqual(6);
     expect(harness.element('debugStatus').textContent).toContain('reconnect limit');
+
+    const streamOperations = harness.operations.filter((entry) => entry.startsWith('sse:'));
+    expect(streamOperations.length).toBeGreaterThan(1);
+    expect(streamOperations.every((entry) => entry.endsWith('?steamId=steam-222'))).toBe(true);
   });
 
   it('invalidates the server-side session on logout', async () => {
