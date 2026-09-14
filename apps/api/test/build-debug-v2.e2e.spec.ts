@@ -12,10 +12,10 @@ const STEAM_ID = 'steam-111';
 const PASSWORD = 'debug-password-test';
 const SESSION_SECRET = 'debug-session-secret-test';
 
-function trace(revision = 1): BuildDecisionTraceV2 {
+function trace(revision = 1, steamId = STEAM_ID): BuildDecisionTraceV2 {
   return {
     matchId: MATCH_ID,
-    steamId: STEAM_ID,
+    steamId,
     revision,
     stateRevision: `state-${revision}`,
     generatedAt: new Date(1_700_000_000_000 + revision * 1000).toISOString(),
@@ -449,18 +449,28 @@ describe('Build debugger V2 HTTP API', () => {
     expect(body).toContain('"revision":2');
   });
 
-  it('renders the complete trace fixture after snapshot-first match selection and updates from SSE', async () => {
+  it('renders the complete trace fixture after selecting the addressed player and updates from SSE', async () => {
     const fixture = renderFixtureTrace(7);
     const harness = createBrowserHarness(fixture);
     const matchSelect = harness.element('activeMatchSelect');
-    matchSelect.value = MATCH_ID;
 
+    await harness.element('refreshMatches').dispatch('click');
+    await flushMicrotasks();
+
+    const options = matchSelect.children;
+    expect(options.map((option) => option.textContent)).toEqual([
+      `${MATCH_ID} - player steam-111 - revision 7`,
+      `${MATCH_ID} - player steam-222 - revision 7`,
+    ]);
+
+    matchSelect.value = options[1].value;
     await matchSelect.dispatch('change');
     await flushMicrotasks();
 
-    expect(harness.operations.slice(0, 2)).toEqual([
-      `fetch:/debug/build-v2/matches/${MATCH_ID}`,
-      `sse:/debug/build-v2/matches/${MATCH_ID}/stream`,
+    expect(harness.operations.slice(0, 3)).toEqual([
+      'fetch:/debug/build-v2/matches',
+      `fetch:/debug/build-v2/matches/${MATCH_ID}?steamId=steam-222`,
+      `sse:/debug/build-v2/matches/${MATCH_ID}/stream?steamId=steam-222`,
     ]);
 
     const traceHtml = harness.element('traceStages').innerHTML;
@@ -500,7 +510,9 @@ describe('Build debugger V2 HTTP API', () => {
   it('bounds SSE reconnect attempts instead of reconnecting forever', async () => {
     const harness = createBrowserHarness(renderFixtureTrace(9));
     const matchSelect = harness.element('activeMatchSelect');
-    matchSelect.value = MATCH_ID;
+    await harness.element('refreshMatches').dispatch('click');
+    await flushMicrotasks();
+    matchSelect.value = matchSelect.children[0].value;
     await matchSelect.dispatch('change');
     await flushMicrotasks();
 
@@ -527,6 +539,30 @@ describe('Build debugger V2 HTTP API', () => {
     expect(logout.headers.get('set-cookie') ?? '').toContain('Max-Age=0');
 
     expect((await fetch(`${baseUrl}/debug/build-v2/matches`, { headers: { cookie } })).status).toBe(401);
+  });
+
+  it('lists and serves each player of a shared match independently', async () => {
+    const sharedMatchId = 'match-debug-v2-shared';
+    traceStore.put({ ...trace(1, 'steam-111'), matchId: sharedMatchId });
+    traceStore.put({ ...trace(1, 'steam-222'), matchId: sharedMatchId });
+    const { cookie } = await login();
+
+    const matches = await (await fetch(`${baseUrl}/debug/build-v2/matches`, { headers: { cookie } })).json();
+    expect(matches.filter((row: { matchId: string }) => row.matchId === sharedMatchId)).toEqual([
+      expect.objectContaining({ matchId: sharedMatchId, steamId: 'steam-111', revision: 1 }),
+      expect.objectContaining({ matchId: sharedMatchId, steamId: 'steam-222', revision: 1 }),
+    ]);
+
+    const first = await fetch(`${baseUrl}/debug/build-v2/matches/${sharedMatchId}?steamId=steam-111`, {
+      headers: { cookie },
+    });
+    const second = await fetch(`${baseUrl}/debug/build-v2/matches/${sharedMatchId}?steamId=steam-222`, {
+      headers: { cookie },
+    });
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect((await first.json()).steamId).toBe('steam-111');
+    expect((await second.json()).steamId).toBe('steam-222');
   });
 
   async function login(): Promise<{ response: Response; cookie: string }> {
@@ -635,8 +671,9 @@ function createBrowserHarness(snapshot: BuildDecisionTraceV2): {
   };
 
   const fetchStub = async (input: string): Promise<Response> => {
-    const pathname = new URL(input, 'http://debug.test').pathname;
-    operations.push(`fetch:${pathname}`);
+    const url = new URL(input, 'http://debug.test');
+    const pathname = url.pathname;
+    operations.push(`fetch:${pathname}${url.search}`);
     if (pathname === `/debug/build-v2/matches/${MATCH_ID}`) {
       return new Response(JSON.stringify(snapshot), {
         status: 200,
@@ -644,7 +681,10 @@ function createBrowserHarness(snapshot: BuildDecisionTraceV2): {
       });
     }
     if (pathname === '/debug/build-v2/matches') {
-      return new Response(JSON.stringify([{ matchId: MATCH_ID, revision: snapshot.revision }]), {
+      return new Response(JSON.stringify([
+        { matchId: MATCH_ID, steamId: 'steam-111', revision: snapshot.revision },
+        { matchId: MATCH_ID, steamId: 'steam-222', revision: snapshot.revision },
+      ]), {
         status: 200,
         headers: { 'content-type': 'application/json' },
       });
@@ -655,7 +695,8 @@ function createBrowserHarness(snapshot: BuildDecisionTraceV2): {
   class HarnessEventSource extends FakeBrowserEventSource {
     constructor(url: string) {
       super(url);
-      operations.push(`sse:${new URL(url, 'http://debug.test').pathname}`);
+      const parsed = new URL(url, 'http://debug.test');
+      operations.push(`sse:${parsed.pathname}${parsed.search}`);
       streams.push(this);
     }
   }

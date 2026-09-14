@@ -19,7 +19,6 @@ export const BUILD_DEBUG_V2_CLIENT_JS = String.raw`(() => {
   let reconnectTimer;
   let reconnectAttempts = 0;
   let currentMatchId = '';
-  const matchSteamIds = new Map();
 
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -42,14 +41,14 @@ export const BUILD_DEBUG_V2_CLIENT_JS = String.raw`(() => {
 
   refreshButton?.addEventListener('click', refreshMatches);
   matchSelect?.addEventListener('change', async () => {
-    const matchId = matchSelect.value;
-    if (!matchId) {
+    const selection = parseMatchSelection(matchSelect.value);
+    if (!selection.matchId) {
       closeStream();
       currentMatchId = '';
       clearTrace();
       return;
     }
-    await selectMatch(matchId);
+    await selectMatch(selection.matchId, selection.steamId);
   });
 
   async function refreshMatches() {
@@ -67,33 +66,34 @@ export const BUILD_DEBUG_V2_CLIENT_JS = String.raw`(() => {
       return;
     }
     const matches = await response.json();
-    matchSelect.innerHTML = '<option value="">Select matchId</option>';
+    matchSelect.innerHTML = '<option value="">Select match</option>';
     for (const match of matches) {
+      const steamId = typeof match.steamId === 'string' ? match.steamId : '';
       const option = document.createElement('option');
-      option.value = match.matchId;
-      option.textContent = match.matchId + ' - revision ' + match.revision;
+      option.value = formatMatchSelection(match.matchId, steamId);
+      option.textContent = match.matchId + ' - player ' + (steamId || 'unknown') + ' - revision ' + match.revision;
       matchSelect.appendChild(option);
-      if (typeof match.steamId === 'string') matchSteamIds.set(match.matchId, match.steamId);
     }
-    if (previousSelection && matches.some((match) => match.matchId === previousSelection)) {
+    if (previousSelection && matches.some((match) =>
+      formatMatchSelection(match.matchId, typeof match.steamId === 'string' ? match.steamId : '') === previousSelection)) {
       matchSelect.value = previousSelection;
     }
     status.textContent = matches.length ? 'Active matches loaded: ' + matches.length : 'No active matches';
   }
 
-  async function selectMatch(matchId) {
+  async function selectMatch(matchId, steamId) {
     closeStream();
     currentMatchId = matchId;
     reconnectAttempts = 0;
     status.textContent = 'Loading snapshot for ' + matchId + '...';
-    const loaded = await loadSnapshot(matchId);
+    const loaded = await loadSnapshot(matchId, steamId);
     if (!loaded || currentMatchId !== matchId) return;
-    connectStream(matchId);
+    connectStream(matchId, steamId);
   }
 
-  async function loadSnapshot(matchId) {
+  async function loadSnapshot(matchId, steamId) {
     const response = await fetch('/debug/build-v2/matches/' + encodeURIComponent(matchId) +
-      '?steamId=' + encodeURIComponent(matchSteamIds.get(matchId) || ''));
+      '?steamId=' + encodeURIComponent(steamId || ''));
     if (response.status === 401) {
       status.textContent = 'Session expired. Authenticate again.';
       return false;
@@ -109,10 +109,10 @@ export const BUILD_DEBUG_V2_CLIENT_JS = String.raw`(() => {
     return true;
   }
 
-  function connectStream(matchId) {
+  function connectStream(matchId, steamId) {
     if (currentMatchId !== matchId) return;
     const source = new EventSource('/debug/build-v2/matches/' + encodeURIComponent(matchId) +
-      '/stream?steamId=' + encodeURIComponent(matchSteamIds.get(matchId) || ''));
+      '/stream?steamId=' + encodeURIComponent(steamId || ''));
     stream = source;
 
     source.onopen = () => {
@@ -572,6 +572,22 @@ export const BUILD_DEBUG_V2_CLIENT_JS = String.raw`(() => {
 
   function humanize(value) {
     return String(value || '').replace(/_/g, ' ');
+  }
+
+  function formatMatchSelection(matchId, steamId) {
+    return JSON.stringify([matchId, steamId || '']);
+  }
+
+  function parseMatchSelection(value) {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed) && typeof parsed[0] === 'string') {
+        return { matchId: parsed[0], steamId: typeof parsed[1] === 'string' ? parsed[1] : '' };
+      }
+    } catch (_error) {
+      // Fall through to legacy bare matchId values.
+    }
+    return { matchId: value, steamId: '' };
   }
 
   function escapeHtml(value) {
