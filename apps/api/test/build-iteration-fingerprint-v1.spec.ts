@@ -97,4 +97,48 @@ describe('build iteration fingerprints', () => {
     expect(compacted.payload.steps).toHaveLength(400);
     expect((compacted.payload.steps as any[])[0].inventoryBefore).toBeUndefined();
   });
+
+  it('halves reject entries per stage when the payload exceeds the size cap', () => {
+    const makeEntry = (itemId: number) => ({
+      disposition: 'REJECTED' as const,
+      itemId,
+      reasonCodes: ['LOW_COVERAGE'],
+    });
+    const rejects = {
+      stages: [
+        { stage: 'ARCHETYPE_SELECTION', entries: Array.from({ length: 8 }, (_, index) => makeEntry(index)) },
+        { stage: 'PLAN_SEARCH', entries: Array.from({ length: 8 }, (_, index) => makeEntry(100 + index)) },
+      ],
+      totalRejected: 16,
+    };
+
+    const bounded = boundRejectsForStorageV1(rejects, 300);
+
+    expect(bounded.truncated).toBe(true);
+    const stages = bounded.payload.stages as Array<{ stage: string; entries: unknown[] }>;
+    expect(stages.map((stage) => stage.stage)).toEqual(['ARCHETYPE_SELECTION', 'PLAN_SEARCH']);
+    expect(stages[0].entries.length).toBeGreaterThan(0);
+    expect(stages[0].entries.length).toBeLessThanOrEqual(4);
+    expect(stages[1].entries.length).toBeLessThanOrEqual(4);
+    expect(stages.reduce((total, stage) => total + stage.entries.length, 0)).toBeLessThan(16);
+  });
+
+  it('terminates and reports truncation when even the empty skeleton exceeds the cap', () => {
+    const rejects = {
+      stages: [
+        {
+          stage: 'PLAN_SEARCH',
+          entries: [{ disposition: 'REJECTED' as const, itemId: 1, reasonCodes: ['LOW_COVERAGE'] }],
+        },
+      ],
+      totalRejected: 1,
+    };
+
+    const bounded = boundRejectsForStorageV1(rejects, 1);
+
+    expect(bounded.truncated).toBe(true);
+    const stages = bounded.payload.stages as Array<{ stage: string; entries: unknown[] }>;
+    expect(stages.map((stage) => stage.stage)).toEqual(['PLAN_SEARCH']);
+    expect(stages[0].entries).toEqual([]);
+  });
 });
