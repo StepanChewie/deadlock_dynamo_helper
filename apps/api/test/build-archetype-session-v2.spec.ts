@@ -12,18 +12,19 @@ function selection(archetypeId: string): BuildArchetypeSelectionV2 {
 
 function fakeRepository() {
   const rows = new Map<string, any>();
+  const key = (row: any) => `${row.matchId}|${row.steamId}`;
   return {
     rows,
-    findOne: jest.fn(async ({ where }: any) => rows.get(where.matchId)),
+    findOne: jest.fn(async ({ where }: any) => rows.get(`${where.matchId}|${where.steamId}`)),
     create: jest.fn((input: any) => ({ ...input })),
     save: jest.fn(async (row: any) => {
-      if (rows.has(row.matchId)) {
+      if (rows.has(key(row))) {
         const error = new Error('duplicate key value violates unique constraint');
         (error as any).code = '23505';
         throw error;
       }
-      rows.set(row.matchId, { ...row });
-      return rows.get(row.matchId);
+      rows.set(key(row), { ...row });
+      return rows.get(key(row));
     }),
   } as any;
 }
@@ -33,7 +34,7 @@ describe('BuildArchetypeSessionV2Service', () => {
     const repository = fakeRepository();
     const service = new BuildArchetypeSessionV2Service(repository);
 
-    const first = await service.getOrLock('match-1', {
+    const first = await service.getOrLock('match-1', 'steam-111', {
       heroId: 72,
       snapshotId: 'snapshot-1',
       enemyHeroIds: [10, 20],
@@ -41,7 +42,7 @@ describe('BuildArchetypeSessionV2Service', () => {
       lockedGameTimeS: 1,
     }, new Date('2026-09-10T00:00:00.000Z'));
 
-    const second = await service.getOrLock('match-1', {
+    const second = await service.getOrLock('match-1', 'steam-111', {
       heroId: 72,
       snapshotId: 'snapshot-2',
       enemyHeroIds: [30, 40],
@@ -58,7 +59,7 @@ describe('BuildArchetypeSessionV2Service', () => {
   it('returns the persisted lock after service recreation', async () => {
     const repository = fakeRepository();
     const firstService = new BuildArchetypeSessionV2Service(repository);
-    await firstService.getOrLock('match-1', {
+    await firstService.getOrLock('match-1', 'steam-111', {
       heroId: 72,
       snapshotId: 'snapshot-1',
       enemyHeroIds: [10, 20],
@@ -66,7 +67,7 @@ describe('BuildArchetypeSessionV2Service', () => {
     }, new Date('2026-09-10T00:00:00.000Z'));
 
     const recreatedService = new BuildArchetypeSessionV2Service(repository);
-    const persisted = await recreatedService.getOrLock('match-1', {
+    const persisted = await recreatedService.getOrLock('match-1', 'steam-111', {
       heroId: 72,
       snapshotId: 'snapshot-2',
       enemyHeroIds: [30, 40],
@@ -80,7 +81,7 @@ describe('BuildArchetypeSessionV2Service', () => {
   it('recovers the winning persisted lock if a concurrent insert loses the unique-key race', async () => {
     const repository = fakeRepository();
     repository.save.mockImplementationOnce(async (row: any) => {
-      repository.rows.set(row.matchId, {
+      repository.rows.set(`${row.matchId}|${row.steamId}`, {
         ...row,
         archetypeId: 'archetype-existing',
         selection: selection('archetype-existing'),
@@ -91,7 +92,7 @@ describe('BuildArchetypeSessionV2Service', () => {
     });
     const service = new BuildArchetypeSessionV2Service(repository);
 
-    const lock = await service.getOrLock('match-race', {
+    const lock = await service.getOrLock('match-race', 'steam-111', {
       heroId: 72,
       snapshotId: 'snapshot-1',
       enemyHeroIds: [10, 20],
@@ -99,5 +100,39 @@ describe('BuildArchetypeSessionV2Service', () => {
     }, new Date('2026-09-10T00:00:00.000Z'));
 
     expect(lock.archetypeId).toBe('archetype-existing');
+  });
+
+  it('gives two players in the same match their own lock', async () => {
+    const repository = fakeRepository();
+    const service = new BuildArchetypeSessionV2Service(repository);
+
+    const firstPlayer = await service.getOrLock('match-1', 'steam-111', {
+      heroId: 72,
+      snapshotId: 'snapshot-1',
+      enemyHeroIds: [10, 20],
+      selection: selection('archetype-a'),
+    }, new Date('2026-09-14T00:00:00.000Z'));
+
+    const secondPlayer = await service.getOrLock('match-1', 'steam-222', {
+      heroId: 45,
+      snapshotId: 'snapshot-2',
+      enemyHeroIds: [10, 20],
+      selection: selection('archetype-b'),
+    }, new Date('2026-09-14T00:00:05.000Z'));
+
+    expect(firstPlayer.heroId).toBe(72);
+    expect(secondPlayer.heroId).toBe(45);
+    expect(secondPlayer.archetypeId).toBe('archetype-b');
+    expect(repository.save).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects an empty steamId', async () => {
+    const service = new BuildArchetypeSessionV2Service(fakeRepository());
+    await expect(service.getOrLock('match-1', '  ', {
+      heroId: 72,
+      snapshotId: 'snapshot-1',
+      enemyHeroIds: [10, 20],
+      selection: selection('archetype-a'),
+    })).rejects.toThrow('steamId is invalid');
   });
 });

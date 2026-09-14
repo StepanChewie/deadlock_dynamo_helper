@@ -19,24 +19,31 @@ export class BuildArchetypeSessionV2Service {
     private readonly repository: Repository<BuildArchetypeMatchLockV2Entity>,
   ) {}
 
-  async get(matchId: string): Promise<BuildArchetypeMatchLockV2Entity | undefined> {
+  async get(matchId: string, steamId: string): Promise<BuildArchetypeMatchLockV2Entity | undefined> {
     validateMatchId(matchId);
-    return (await this.repository.findOne({ where: { matchId } })) ?? undefined;
+    validateSteamId(steamId);
+    return (
+      (await this.repository.findOne({ where: { matchId, steamId } })) ?? undefined
+    );
   }
 
   async getOrLock(
     matchId: string,
+    steamId: string,
     input: LockBuildArchetypeV2Input,
     lockedAt: Date = new Date(),
   ): Promise<BuildArchetypeMatchLockV2Entity> {
+    validateMatchId(matchId);
+    validateSteamId(steamId);
     validateLockInput(matchId, input, lockedAt);
 
-    const existing = await this.get(matchId);
+    const existing = await this.get(matchId, steamId);
     if (existing) return existing;
 
     const enemyHeroIds = [...new Set(input.enemyHeroIds)].sort((a, b) => a - b);
     const row = this.repository.create({
       matchId,
+      steamId,
       heroId: input.heroId,
       snapshotId: input.snapshotId,
       archetypeId: input.selection.archetypeId,
@@ -51,7 +58,7 @@ export class BuildArchetypeSessionV2Service {
       return await this.repository.save(row);
     } catch (error) {
       if (!isUniqueViolation(error)) throw error;
-      const winner = await this.get(matchId);
+      const winner = await this.get(matchId, steamId);
       if (!winner) throw error;
       return winner;
     }
@@ -92,6 +99,12 @@ function validateLockInput(matchId: string, input: LockBuildArchetypeV2Input, lo
 function validateMatchId(matchId: string): void {
   if (matchId.trim() === '' || matchId.length > 128) {
     throw new Error('Build archetype v2 session: matchId is invalid');
+  }
+}
+
+function validateSteamId(steamId: string): void {
+  if (steamId.trim() === '' || steamId.length > 32) {
+    throw new Error('Build archetype v2 session: steamId is invalid');
   }
 }
 
