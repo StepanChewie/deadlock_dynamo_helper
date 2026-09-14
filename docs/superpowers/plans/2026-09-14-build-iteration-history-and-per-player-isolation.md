@@ -1861,3 +1861,96 @@ Build the resolver fixture the way `adaptive-recommendation-v2-previous-plan-wir
 - [ ] **Step 4: Run the spec** — expect PASS; add the SWITCH and no-previous-plan scenarios and keep them green.
 - [ ] **Step 5: Full api suite** — `yarn workspace @deadlock-live-probe/api test` — expected green (existing PLAN_SEARCH order-dependent tests may need their expectations moved with the record).
 - [ ] **Step 6: Commit** `feat(api): record hysteresis outcome in the plan-search trace`.
+
+
+---
+
+### Task 12: Record every state change — previous-state dedupe (added by controller ruling, 2026-09-14)
+
+> Origin: the user's requirement is explicit — A → B → A must produce THREE history rows ("если после Б опять А, то тоже записали"), while five unchanged ticks produce one. The Task 8 fingerprint unique indexes `(matchId, steamId, fingerprint)` collapse the returning A into the first row, so the schema cannot express the requirement. Task 8 review confirmed the oscillation loss ("state oscillation PLAN → NOT_READY → PLAN is deduped against the first PLAN row"). Ruling: replace unique-index dedupe with previous-state comparison.
+
+**Files:**
+- Modify: `apps/api/src/database/migrations/1789315200000-create-adaptive-build-iterations-v1.ts`
+- Modify: `apps/api/test/production-database-migration.integration.spec.ts`
+- Modify: `apps/api/src/statlocker-adaptive/build-iteration-history-v1.service.ts`
+- Modify: `apps/api/test/build-iteration-history-v1.spec.ts`
+
+**Interfaces:**
+- Consumes: `AdaptiveBuildIterationV1Entity`, the fingerprint module (unchanged), `BuildIterationCaptureV1`.
+- Produces: `record()` that inserts exactly when the emitted state (`kind` + `fingerprint`) differs from the LAST stored row for that `(matchId, steamId)` — across kinds. The migration no longer carries `uq_build_iteration_plan_v1` / `uq_build_iteration_not_ready_v1`; it gains `idx_build_iteration_last_v1 ON ("matchId", "steamId", "id" DESC)` for the latest-row lookup. `cleanupExpired(passLimit)` from Task 10 stays as is.
+
+**Migration edit (amend the unmerged migration, do not add a second one):**
+
+Remove the two `CREATE UNIQUE INDEX ... uq_build_iteration_*` statements and their `WHERE kind = ...` predicates; add:
+
+```sql
+      CREATE INDEX IF NOT EXISTS "idx_build_iteration_last_v1"
+      ON "adaptive_build_iterations_v1" ("matchId", "steamId", "id" DESC)
+```
+
+Update the integration spec's index assertions (`creates the build iteration history indexes`): the four required names become `idx_build_iteration_last_v1`, `idx_build_iteration_match_v1`, `idx_build_iteration_player_v1`, `idx_build_iteration_retention_v1` — the two `uq_*` names are gone. Add one scenario to the live-DB spec: run the integration migration, insert a PLAN row for (m, s) with fingerprint X, then insert the same fingerprint again — both must succeed (no unique violation).
+
+**Service change (`record()`):**
+
+```ts
+  private readonly lastWritten = new Map<
+    string,
+    { kind: 'PLAN' | 'NOT_READY'; fingerprint: string }
+  >();
+
+  async record(input: RecordBuildIterationV1Input): Promise<void> {
+    try {
+      const row = this.buildRow(input);
+      const key = `${input.matchId}|${row.steamId as string}`;
+      const last = this.lastWritten.get(key) ?? (await this.readLastWritten(input.matchId, row.steamId as string));
+      const unchanged =
+        last !== undefined &&
+        last.kind === row.kind &&
+        last.fingerprint === row.fingerprint;
+      if (unchanged) return;
+
+      await this.repository
+        .createQueryBuilder()
+        .insert()
+        .into(AdaptiveBuildIterationV1Entity)
+        .values(row)
+        .execute();
+
+      this.lastWritten.set(key, {
+        kind: row.kind as 'PLAN' | 'NOT_READY',
+        fingerprint: row.fingerprint as string,
+      });
+    } catch (error) {
+      this.logger.warn(`Build iteration history write failed: ${describeError(error)}`);
+    }
+  }
+
+  private async readLastWritten(
+    matchId: string,
+    steamId: string,
+  ): Promise<{ kind: 'PLAN' | 'NOT_READY'; fingerprint: string } | undefined> {
+    const last = await this.repository.findOne({
+      where: { matchId, steamId },
+      order: { id: 'DESC' },
+    });
+    return last ? { kind: last.kind, fingerprint: last.fingerprint } : undefined;
+  }
+```
+
+The `.orIgnore()` call is dropped (no unique index to conflict with). The in-memory map bounds the SELECT to one per (matchId, steamId) per process; after a restart the SELECT path re-hydrates the last state, so an unchanged state does not write a duplicate row, and the next real change writes exactly one row. Keep the never-throw contract. Remove the Task 8 mock's ON CONFLICT modelling and replace it with a fake that stores rows and serves `findOne` with the latest row for the key.
+
+**Tests (extend `build-iteration-history-v1.spec.ts`):**
+
+- A → B → A produces three PLAN rows (the previously-committed behaviour would produce two).
+- Five identical recommendations → one row.
+- PLAN → NOT_READY → PLAN → three rows (kinds in that order).
+- Fresh service instance over the same fake repository (simulating a restart): writing the same unchanged state adds no row; the next changed state adds exactly one.
+- The migration assertions from the integration spec are exercised in the live-DB run.
+
+- [ ] **Step 1: failing tests** (A → B → A expects three rows — currently two).
+- [ ] **Step 2: run, verify failure**: `yarn workspace @deadlock-live-probe/api test -- test/build-iteration-history-v1.spec.ts`.
+- [ ] **Step 3: implement** the service change and the migration amendment.
+- [ ] **Step 4: spec green**, then the live-DB integration run:
+  `DB_HOST=127.0.0.1 DB_PORT=5433 DB_USER=postgres DB_PASSWORD=*** DB_NAME=deadlock_builds DB_MIGRATION_INTEGRATION=true yarn workspace @deadlock-live-probe/api test -- test/production-database-migration.integration.spec.ts` — expected PASS with the amended index list and the no-unique-violation scenario.
+- [ ] **Step 5: full api suite** — green.
+- [ ] **Step 6: Commit** `feat(api): record every build state change against the previous row`.
