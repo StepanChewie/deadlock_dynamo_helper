@@ -1,5 +1,7 @@
 # Statlocker Build Strategy V2 Family-First Completion Implementation Plan
 
+> **Implemented.** The described progression/replacement model is in the code and recorded as ADR-005 and ADR-006. Kept as the design record.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to execute this plan task-by-task. Use TDD for every behavior change and `superpowers:verification-before-completion` before completion claims.
 
 **Goal:** Correct V2 lifetime-build semantics so Statlocker upgrade families produce coherent final-state goals and legal BUY/UPGRADE/REPLACE trajectories, rerun and human-review the frozen Billy full-pipeline E2E, then finish the original V2 Overwolf cutover and production release gates.

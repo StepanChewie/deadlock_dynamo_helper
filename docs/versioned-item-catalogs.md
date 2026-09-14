@@ -79,23 +79,9 @@ List rulesets:
 curl http://localhost:3000/deadlock/reference-data/rulesets
 ```
 
-## Ruleset Resolution Priority
+## Ruleset Resolution Priority (removed)
 
-The resolver applies the following order:
-
-1. `OBSERVED` - an explicit `client_version` in the match payload.
-2. `DEMO_METADATA` - a supported client/build field in nested demo metadata that matches an imported ruleset or catalog.
-3. `TIME_WINDOW` - exactly one active ruleset window contains the match start time.
-4. `UNKNOWN` - no reliable match was found.
-
-Confidence values:
-
-- `OBSERVED`: `1.0`
-- `DEMO_METADATA`: `0.95`
-- `TIME_WINDOW`: `0.75`
-- `UNKNOWN`: `0`
-
-The resolver stores the selected ruleset, selected catalog, method, confidence, details, and resolution timestamp on `raw_match_metadata`.
+Match-level resolution was part of the removed raw-match pipeline. The priority chain `OBSERVED` / `DEMO_METADATA` / `TIME_WINDOW` / `UNKNOWN` (confidence `1.0` / `0.95` / `0.75` / `0`) and the `raw_match_metadata` write no longer exist in the runtime: the table was dropped in migration `1789142400000-drop-legacy-match-and-crawler-tables`. Nothing today resolves a ruleset per match; the adaptive pipeline scopes itself by `(rulesetId, catalogSha256)` of the current catalog.
 
 ## Time Windows
 
@@ -112,35 +98,11 @@ curl -X PUT \
   http://localhost:3000/deadlock/reference-data/rulesets/6518/window
 ```
 
-Matches near a window boundary are intentionally left unresolved. The exclusion margin defaults to six hours and can be changed with:
+Windows are validated with an exclusive `validTo`; adjacent windows are valid. Matches near a window boundary are intentionally left unresolved instead of guessed. There is no configurable boundary margin in the current resolver.
 
-```env
-RULESET_BOUNDARY_MARGIN_MINUTES=360
-```
+## Match-level ruleset resolution (removed)
 
-## Match Diagnostics
-
-Get the stored or newly resolved ruleset for a match:
-
-```bash
-curl http://localhost:3000/deadlock/analysis/raw-matches/93125215/ruleset
-```
-
-Force re-resolution of one match:
-
-```bash
-curl -X POST \
-  http://localhost:3000/deadlock/analysis/raw-matches/93125215/ruleset/resolve
-```
-
-Resolve a batch of unresolved raw rows:
-
-```bash
-curl -X POST \
-  -H 'Content-Type: application/json' \
-  -d '{"limit":500}' \
-  http://localhost:3000/deadlock/analysis/raw-matches/rulesets/resolve-pending
-```
+The raw-match resolution endpoints (`/deadlock/analysis/raw-matches/...`), the `raw_match_metadata` table and the legacy match/crawler tables were removed in `chore(db): drop legacy match and crawler tables` (migration `1789142400000-drop-legacy-match-and-crawler-tables`). Versioned catalogs are now consumed by the adaptive recommendation pipeline through the `recommendation_item_catalog_*` tables; see `docs/architecture.md`.
 
 ## Deployment
 
@@ -161,31 +123,13 @@ curl -X POST \
   http://localhost:3000/deadlock/reference-data/catalogs/import
 ```
 
-Resolve previously stored raw rows after importing catalogs:
-
-```bash
-curl -X POST \
-  -H 'Content-Type: application/json' \
-  -d '{"limit":500}' \
-  http://localhost:3000/deadlock/analysis/raw-matches/rulesets/resolve-pending
-```
-
 Verify:
 
 ```sql
 SELECT * FROM migrations ORDER BY timestamp;
+SELECT COUNT(*) FROM game_rulesets;
 SELECT COUNT(*) FROM item_catalog_versions;
 SELECT COUNT(*) FROM item_catalog_items;
 SELECT COUNT(*) FROM item_catalog_recipes;
-SELECT
-  "matchId",
-  "clientVersion",
-  "rulesetResolutionMethod",
-  "rulesetResolutionConfidence",
-  "resolvedRulesetId",
-  "resolvedCatalogVersionId",
-  "resolvedAt"
-FROM raw_match_metadata
-ORDER BY "fetchedAt" DESC
-LIMIT 20;
+SELECT COUNT(*) FROM recommendation_item_catalog_versions;
 ```

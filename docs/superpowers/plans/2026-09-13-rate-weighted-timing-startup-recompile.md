@@ -1,5 +1,7 @@
 # Plan: Rate-weighted archetype timing + startup snapshot recompile
 
+> **Implemented.** The described changes are in the code (rate-weighted archetype timing median and startup archetype recompile). Kept as the design record.
+
 Date: 2026-09-13
 Spec: approved in chat (brainstorming). Design authority = this plan.
 

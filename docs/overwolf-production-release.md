@@ -1,49 +1,39 @@
-# Overwolf sideload rollout
+# API deployment and Overwolf sideload rollout
 
-This runbook deploys the API and Contextual V3 model, then validates the current unpacked Overwolf client through Developer Mode. OPK packaging and Developer Console publishing are intentionally outside the current scope.
+Two paths deploy the same artifact: the GitHub Actions `deploy.yml` workflow (self-hosted runner on the VPS, triggered by a push to `main`) and the manual `deploy.sh` script (rsync + docker build over `ssh my-vps`). Use the manual path when a push is intentionally marked `[skip ci]`, or when Actions are unavailable. The steps are equivalent.
+
+The Overwolf client is validated through Developer Mode. OPK packaging and Developer Console publishing are intentionally outside the current scope.
 
 ## Prerequisites
 
-- The public API hostname resolves over HTTPS from the internet.
-- The deployment host contains the approved Contextual V3 artifacts in the persistent `deadlock-storage` volume.
-- Repository variable `PUBLIC_API_BASE_URL` points to the public API origin used by the Overwolf client.
+- The public API hostname resolves over HTTPS from the internet (`PUBLIC_API_BASE_URL`).
+- The deployment host holds the compose file, `.env` and the `deadlock-storage` volume (`docker-compose.yml`, service `api`, container `deadlock_dynamo_helper-api-1`).
 - Overwolf Developer Mode is enabled on the test machine.
 
-## 1. Deploy the API and model
+## 1. Deploy the API
 
-Merge the production pull request into `main`. The `Deploy API` workflow will:
+Automated (GitHub Actions): merge into `main`. `deploy.yml` rebuilds the image, runs migrations, recreates the container, waits for the Docker health check, verifies `/deadlock/adaptive/v1/status` locally and through the public HTTPS origin, and confirms that retired routes (`/deadlock/analysis/*`, `/deadlock/live/build-recommendations`) return 404.
 
-1. rebuild the API image;
-2. run database migrations;
-3. restart the API container;
-4. wait for the Docker health check;
-5. require Contextual V3 mode `PRODUCTION` and model state `READY`;
-6. verify the live recommendation traversal endpoint;
-7. verify the same model status through the public HTTPS origin.
-
-A deployment is not considered successful when the container is running but the model artifacts are missing, invalid, or unreachable through the public hostname.
-
-Verify manually when needed:
+Manual (no Actions) — commit with `[skip ci]`, push, then run from the repository root:
 
 ```bash
-curl -sS "$PUBLIC_API_BASE_URL/deadlock/analysis/contextual-v3-live/status" | jq
-curl -sS "$PUBLIC_API_BASE_URL/deadlock/live/build-recommendations/status" | jq
+bash deploy.sh
 ```
 
-Expected model status:
+`deploy.sh` rsyncs the tree to `my-vps:~/apps/deadlock_dynamo_helper/` (excluding `node_modules`, `dist`, `.git`, `.env`, `storage`, `.worktrees`, `graphify-out`, `.codex`, `.zcode`), builds `deadlock-adaptive-production:current` on the VPS, runs migrations (`node run-migrations.js`), and recreates the container with `docker compose up -d`.
 
-```json
-{
-  "mode": "PRODUCTION",
-  "model": {
-    "state": "READY"
-  }
-}
+Verify manually:
+
+```bash
+ssh my-vps "cd ~/apps/deadlock_dynamo_helper && docker compose ps"
+curl -sS "$PUBLIC_API_BASE_URL/deadlock/adaptive/v1/status" | jq
 ```
+
+Expected: the container reports `healthy` and the status payload reports fresh evidence. A deployment is not considered successful when the container is running but the status endpoint fails or reports stale or missing datasets.
 
 ## 2. Build the unpacked Overwolf client
 
-Build the client with the deployed public API base URL:
+Build the client against the deployed public API base URL:
 
 ```bash
 OVERWOLF_API_BASE_URL=https://your-api.example.com \
@@ -51,15 +41,7 @@ OVERWOLF_PUBLIC_TARGET=/path/to/overwolf-sideload/public \
 yarn workspace @deadlock-live-probe/overwolf-client build
 ```
 
-The build:
-
-- compiles the shared package and Overwolf bundle;
-- embeds the supplied API base URL into the compiled client;
-- updates `externally_connectable` to the matching origin;
-- validates the manifest, windows, permissions, assets, and compiled files;
-- copies the resulting unpacked app to `OVERWOLF_PUBLIC_TARGET`.
-
-CI also uploads the unpacked `public` directory as the `overwolf-client-*` artifact for every successful pull request build.
+The build compiles the shared package and the Overwolf bundle, embeds the supplied API base URL, updates `externally_connectable` to the matching origin, validates the manifest, windows, permissions, assets and compiled files, and copies the unpacked app to `OVERWOLF_PUBLIC_TARGET`.
 
 ## 3. Load through Overwolf Developer Mode
 
@@ -73,25 +55,22 @@ CI also uploads the unpacked `public` directory as the `overwolf-client-*` artif
 
 1. Start Deadlock and verify the app launches automatically.
 2. Verify GEP registration reaches `REGISTERED`.
-3. Enter a Sandbox or test match and confirm the local player, hero, roster, game clock, and inventory are updating.
-4. Confirm the in-game build overlay opens and receives `READY` recommendations.
-5. Buy, upgrade, and sell items and verify the recommendation changes without restarting the app.
-6. Confirm the overlay can be toggled with `Ctrl+Tab` and the desktop window opens with `Ctrl+Shift+B`.
-7. Confirm the public model status remains `READY` and `fallbackCount` does not continuously increase.
-8. End the match and verify the overlay clears the previous match state.
+3. Enter a Sandbox or test match and confirm the local player, hero, roster, game clock and inventory update.
+4. Confirm the in-game build overlay opens and receives recommendations from `POST /deadlock/adaptive/v2/recommend`.
+5. Buy, upgrade and sell items; verify the recommendation changes without restarting the app.
+6. Toggle the overlay and open the desktop build window with the registered hotkeys.
+7. End the match and verify the overlay clears the previous match state.
+8. Confirm `/deadlock/adaptive/v1/status` stays healthy and its dataset freshness stays `FRESH`.
 
 ## Rollback
 
-API/model rollback:
+API — retag and recreate with the previous known-good image:
 
-```env
-DEADLOCK_CONTEXTUAL_V3_LIVE_MODE=BASELINE
+```bash
+ssh my-vps "docker tag deadlock-adaptive-production:<known-good-tag> deadlock-adaptive-production:current"
+ssh my-vps "cd ~/apps/deadlock_dynamo_helper && docker compose up -d --force-recreate --no-build api"
 ```
 
-Recreate the API container and verify the public recommendation endpoint still returns baseline recommendations.
+`deploy.yml` tags every verified image as `deadlock-adaptive-production:current` (the `Record verified adaptive Compose fallback` step); keep the previous tag aside before deploying.
 
-Overwolf rollback:
-
-- load the previous known-good unpacked `public` directory;
-- keep its API origin available;
-- investigate the failed build using API status, fallback counters, Docker logs, and Overwolf logs.
+Overwolf — load the previous known-good unpacked `public` directory, keep its API origin available, and investigate through `/deadlock/adaptive/v1/status`, Docker logs and the Overwolf log.

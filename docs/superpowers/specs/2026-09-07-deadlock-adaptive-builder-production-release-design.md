@@ -1,5 +1,7 @@
 # Deadlock Adaptive Builder Production Release Design
 
+> **Historical design record.** At the time of writing this documented the referenced work; parts have since been implemented, refined by the ADRs, or superseded. It is kept for provenance, not as current instructions. Current architecture: `docs/architecture.md`; decisions: `docs/decisions/`.
+
 ## Status
 
 Approved requirements captured from the production-release roadmap request on 2026-09-07. This document is the normative architecture contract for the implementation roadmap in `docs/superpowers/plans/2026-09-07-deadlock-adaptive-builder-production-release-roadmap.md`.

@@ -73,17 +73,6 @@ Always validate the same body with `POST /rulesets/windows/validate` before appl
 
 `replaceExistingWindows: true` clears windows that are not present in the manifest. The manifest hash, source, evidence, and apply timestamp are retained in `game_rulesets.rawMetadata`.
 
-## Re-resolve and replay
+## Re-resolve and replay (removed)
 
-After applying verified windows, rerun historical processing with `force: true` and `resolveRuleset: true`:
-
-```json
-{
-  "limit": 250,
-  "afterMatchId": 0,
-  "force": true,
-  "resolveRuleset": true
-}
-```
-
-This recalculates the ruleset and rebuilds match data with the resolved versioned catalog. Matches near a configured patch boundary remain `UNKNOWN` according to the resolver boundary margin.
+Historical match reprocessing (`force: true`, `resolveRuleset: true`) and the raw-match ruleset resolution it drove were removed with the legacy match pipeline: `raw_match_metadata` and the match/crawler tables were dropped in migration `1789142400000-drop-legacy-match-and-crawler-tables`. The catalog and window APIs above remain; there is no match replay endpoint in the current runtime.

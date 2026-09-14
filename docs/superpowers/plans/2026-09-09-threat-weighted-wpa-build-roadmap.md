@@ -1,5 +1,7 @@
 # Threat-weighted WPA build implementation roadmap
 
+> **Historical design record.** At the time of writing this documented the referenced work; parts have since been implemented, refined by the ADRs, or superseded. It is kept for provenance, not as current instructions. Current architecture: `docs/architecture.md`; decisions: `docs/decisions/`.
+
 > Implementation plan for the approved hybrid architecture. This document is intentionally detailed and test-first. The branch containing this roadmap changes documentation only.
 
 **Goal:** evolve the current strategy-first adaptive planner so it returns one coherent build whose structure comes from consensus/skeleton evidence while branch, optional, situational, and exceptional wildcard choices adapt to the exact enemy draft using Statlocker `VS_HERO_WPA` weighted by live enemy threat.

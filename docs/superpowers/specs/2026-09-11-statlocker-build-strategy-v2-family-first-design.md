@@ -1,5 +1,7 @@
 # Statlocker Build Strategy V2 - Family-First Lifetime Build Design
 
+> **Implemented.** The described progression/replacement model is in the code and recorded as ADR-005 and ADR-006. Kept as the design record.
+
 Date: 2026-09-11
 Status: Approved design pending written-spec review
 Scope: Correct the semantic/full-build portion of Statlocker Build Strategy V2, reconcile the unfinished Billy roadmap, and preserve all still-valid V2 production requirements.

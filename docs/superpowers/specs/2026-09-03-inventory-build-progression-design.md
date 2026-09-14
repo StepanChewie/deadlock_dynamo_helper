@@ -1,5 +1,7 @@
 # Inventory Build Progression Design
 
+> **Historical design record.** At the time of writing this documented the referenced work; parts have since been implemented, refined by the ADRs, or superseded. It is kept for provenance, not as current instructions. Current architecture: `docs/architecture.md`; decisions: `docs/decisions/`.
+
 ## Goal
 
 When Deadlock reports a purchased item, the adaptive recommendation must mark it `OWNED`, advance `NEXT`, hide the owned item from the in-game overlay, and retain the owned marker in the normal Overwolf window.

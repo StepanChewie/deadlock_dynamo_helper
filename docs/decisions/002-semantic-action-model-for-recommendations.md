@@ -16,7 +16,7 @@ Design authority: `docs/superpowers/specs/2026-09-07-deadlock-adaptive-builder-p
 
 ## Decision
 
-1. `AdaptiveRecommendationResultV1` is a discriminated union: `AdaptiveReadyRecommendationV1` (`ready: true`) or `AdaptiveUnavailableRecommendationV1` (`ready: false`). An unavailable result carries exact blockers and never carries a stale or fabricated build.
+1. `AdaptiveRecommendationResultV1` carries an explicit `ready: boolean` plus `blockers: readonly string[]` (`packages/shared/src/adaptive-recommendation-v1.ts`); `AdaptiveRecommendationResultV2` has the same `ready` / `blockers` / `degradedReasons` shape. An unavailable result (`ready: false`) carries exact blockers and never carries a stale or fabricated build.
 2. One `AdaptivePlanActionV1` = one user-facing intent: `BUY`, `UPGRADE` (names all consumed components), `REPLACE` (names the item to sell), `WAIT`/`BLOCKED`, or `COMPLETE`. Requirements (souls, flex, shop availability, consumed components, replacement sale) are embedded in the action — they are never separate user-facing cards.
 3. `planActionId` is the card identity; the item ID is not an identity or deduplication key.
 4. `recommendedBuild` is a compatibility projection derived only from `planActions`, never independently.

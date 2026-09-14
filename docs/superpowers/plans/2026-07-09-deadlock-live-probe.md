@@ -1,5 +1,7 @@
 # Deadlock Live Probe Implementation Plan
 
+> **Historical design record.** At the time of writing this documented the referenced work; parts have since been implemented, refined by the ADRs, or superseded. It is kept for provenance, not as current instructions. Current architecture: `docs/architecture.md`; decisions: `docs/decisions/`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a local MVP that captures Deadlock live data through Overwolf, ships it to a NestJS API, logs raw events, reduces a minimal match state, and exposes a debug page for live lobby verification.

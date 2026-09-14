@@ -1,5 +1,7 @@
 # Adaptive Full Build Endpoint Regression Implementation Plan
 
+> **Historical design record.** At the time of writing this documented the referenced work; parts have since been implemented, refined by the ADRs, or superseded. It is kept for provenance, not as current instructions. Current architecture: `docs/architecture.md`; decisions: `docs/decisions/`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Lock the already-merged adaptive full-build-path fix across the real Nest HTTP route and the Overwolf HTTP-client-to-presentation path so transaction barriers can never collapse the semantic `recommendedBuild` again.

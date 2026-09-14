@@ -1,5 +1,7 @@
 # Statlocker Build Strategy V2 Implementation Plan
 
+> **Historical design record.** At the time of writing this documented the referenced work; parts have since been implemented, refined by the ADRs, or superseded. It is kept for provenance, not as current instructions. Current architecture: `docs/architecture.md`; decisions: `docs/decisions/`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace the broken ordinal V1 strategy pipeline with a Statlocker-first semantic archetype system that locks one archetype per match, resolves a complete live lifetime build with BUY/UPGRADE/REPLACE transitions, exposes a production browser debugger, and proves the result with a deterministic real-data E2E fixture.

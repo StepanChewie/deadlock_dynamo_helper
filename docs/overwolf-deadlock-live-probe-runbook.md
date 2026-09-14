@@ -1,6 +1,6 @@
 # Overwolf Deadlock Live Probe Runbook
 
-This guide walks through starting the Deadlock Live Probe telemetry bridge, loading the Overwolf client, and verifying real-time game telemetry and live build recommendations from a Deadlock session.
+This guide walks through starting the Deadlock Live Probe telemetry bridge, loading the Overwolf client, and verifying real-time game telemetry and adaptive build recommendations from a Deadlock session.
 
 ---
 
@@ -56,7 +56,7 @@ Verify that the server has booted and is listening on `http://localhost:3000`.
 2. Go to **Settings** > **Support** > **Development Options**.
 3. Click **Load unpacked extension...**.
 4. Select `apps/overwolf-client/public`, which contains `manifest.json`.
-5. Confirm that **Deadlock Live Probe 0.0.2** opens and reaches `REGISTERED` after Deadlock starts.
+5. Confirm that the client (manifest `meta.name`, currently `Deadlock Live Probe` v0.1.15) opens and reaches `REGISTERED` after Deadlock starts.
 6. Reload the unpacked extension after every new Overwolf client build.
 
 ---
@@ -77,40 +77,32 @@ Verify that the server has booted and is listening on `http://localhost:3000`.
 
 ---
 
-## Live Build HUD Verification
+## Adaptive recommendation verification
 
-The in-game overlay polls the backend traversal snapshot once per second, but rerenders only when the recommendation lifecycle, `traversalKey`, stale state, selected action, or refresh generation changes.
+The in-game overlay renders the semantic actions returned by `POST /deadlock/adaptive/v2/recommend` (`ready`, `blockers`, `nextAction`, `fullBuild`). The legacy per-second traversal snapshot endpoints (`/deadlock/live/build-recommendations`) were removed with the v1 serving path.
 
-1. Check traversal status:
-
-```bash
-curl -sS https://aboba-telegramovich.duckdns.org/deadlock/live/build-recommendations/status | jq
-```
-
-2. After entering a match and selecting a hero, list tracked recommendations:
+1. Check serving status and evidence freshness:
 
 ```bash
-curl -sS https://aboba-telegramovich.duckdns.org/deadlock/live/build-recommendations | jq '[.[] | {state, matchId, steamId, heroId, inventoryStateKey, gameTimeS, timeBucket, traversalKey, isStale, refreshCount, cacheHitCount, discardedResultCount, lastError}]'
+curl -sS https://aboba-telegramovich.duckdns.org/deadlock/adaptive/v1/status | jq
 ```
 
-3. In the Overwolf in-game window, verify that the **NEXT BUILD ACTION** panel appears and shows:
-   - `READY`, `REFRESHING`, `WAITING`, or `ERROR` state.
-   - Primary action label such as `Buy Grit`.
-   - Item slot, cost, tier, confidence, typical time, and explanation.
-   - Up to four evidence-filtered alternatives.
+2. After entering a match, request a recommendation directly:
 
-4. Without changing inventory, wait for several telemetry batches. `cacheHitCount` should increase while the HUD remains visually stable.
+```bash
+curl -sS -X POST -H 'Content-Type: application/json' \
+  -d '{"matchId":"<match-id>"}' \
+  https://aboba-telegramovich.duckdns.org/deadlock/adaptive/v2/recommend \
+  | jq '{ready, blockers, nextAction, lock, degradedReasons}'
+```
 
-5. Buy or sell an item. Verify that:
-   - `inventoryStateKey` changes.
-   - `traversalKey` changes.
-   - `refreshCount` increases.
-   - The HUD briefly shows `REFRESHING` or `UPDATING` when the previous result is stale.
-   - The new recommendation replaces the previous action.
+3. In the Overwolf in-game window verify the HUD shows the next action with its embedded requirements (souls, flex, consumed components, replacement sale) — one card per action, no duplicated items.
 
-6. Cross a 30-second game-time boundary without changing inventory. Verify that `timeBucket` and `traversalKey` change and the recommendation refreshes.
+4. Buy, upgrade or sell an item and verify the next action changes without restarting the app.
 
-7. End the match. Verify that match tracking and the live recommendation panel are cleared.
+5. When a critical input is missing or stale, verify the HUD shows an explicit unavailable state with blockers instead of an earlier recommendation.
+
+6. End the match and verify the overlay clears the previous match state.
 
 ---
 

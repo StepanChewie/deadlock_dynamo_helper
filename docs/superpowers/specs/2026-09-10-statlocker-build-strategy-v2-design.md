@@ -1,5 +1,7 @@
 # Statlocker Build Strategy V2 Design
 
+> **Historical design record.** At the time of writing this documented the referenced work; parts have since been implemented, refined by the ADRs, or superseded. It is kept for provenance, not as current instructions. Current architecture: `docs/architecture.md`; decisions: `docs/decisions/`.
+
 Date: 2026-09-10
 Status: Approved design
 Scope: Production recommendation architecture, production browser debugger, and captured-data end-to-end validation

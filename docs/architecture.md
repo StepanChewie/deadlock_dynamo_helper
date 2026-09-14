@@ -17,8 +17,9 @@ Overwolf client (GEP live events)
 |---|---|
 | `apps/api` | NestJS API: event ingestion, NDJSON logging, adaptive recommendation pipeline, debug inspector, database access |
 | `apps/overwolf-client` | Overwolf runtime app: GEP integration, event buffering, transport to the API, in-game overlay and debug window |
-| `packages/deadlock-build-domain` | Pure domain library: recommendation ruleset catalog, item graph, candidate generation, inventory reduction, skill-build search |
+| `packages/deadlock-build-domain` | Pure domain library: recommendation ruleset catalog, item graph, candidate generation, inventory reduction, capacity-driven replacement |
 | `packages/shared` | Shared TypeScript DTOs and state types |
+| `deploy.sh` | Manual VPS deploy: rsync + docker build + migrations + `docker compose up` (used when Actions are skipped) |
 | `ops/nginx` | Reverse-proxy configuration for the VPS deployment |
 | `docs/decisions/` | Architecture Decision Records (ADRs) |
 | `docs/superpowers/` | Historical design specs and implementation plans (design authority for the ADRs) |
@@ -64,7 +65,7 @@ No training or policy learning uses our own players' or match data (ADR-007).
 
 ## Domain library (`packages/deadlock-build-domain/src`)
 
-Pure, framework-free logic shared by the API and tests: `recommendation-ruleset-catalog.ts` (strict catalog compilation, upgrade recipes), item graph (family/lineage relationships, `isComponentAncestor`), `recommendation-candidate-generator.ts`, `inventory-reducer.ts`, `skill-build-path-search.ts`, diagnostic match parsing and baseline models.
+Pure, framework-free logic shared by the API and tests: `recommendation-ruleset-catalog.ts` (strict catalog compilation, upgrade recipes), item graph (family/lineage relationships, `isComponentAncestor`), `recommendation-candidate-generator.ts`, `inventory-reducer.ts`, diagnostic match parsing and baseline models.
 
 ## Commands
 

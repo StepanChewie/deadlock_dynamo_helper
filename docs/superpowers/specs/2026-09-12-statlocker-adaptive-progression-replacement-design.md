@@ -1,5 +1,7 @@
 # Statlocker Adaptive progression and replacement design
 
+> **Implemented.** The described progression/replacement model is in the code and recorded as ADR-005 and ADR-006. Kept as the design record.
+
 Date: 2026-09-12
 Status: approved in chat, pending written-spec review
 Scope: Statlocker Adaptive build compilation, upgrade execution, long build timelines, 12-slot replacement, Statlocker hero-item WPA evidence, matchup protection, and economy-rule persistence.

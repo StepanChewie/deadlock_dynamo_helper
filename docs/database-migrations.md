@@ -57,10 +57,12 @@ DB_RUN_MIGRATIONS=true yarn workspace @deadlock-live-probe/api start
 SELECT COUNT(*) FROM heroes;
 SELECT COUNT(*) FROM items;
 SELECT COUNT(*) FROM item_components;
+SELECT COUNT(*) FROM game_rulesets;
 SELECT COUNT(*) FROM item_catalog_versions;
+SELECT COUNT(*) FROM recommendation_item_catalog_versions;
 ```
 
-The first three tables should be populated after the API starts. The versioned catalog tables remain empty until a versioned catalog import is implemented.
+The first three tables are populated when the API starts. The versioned catalog tables (`game_rulesets`, `item_catalog_*`) are populated by the catalog importer (`POST /deadlock/reference-data/catalogs/import`, see `docs/versioned-item-catalogs.md`); the recommendation pipeline reads the `recommendation_item_catalog_*` tables.
 
 ## Migration commands
 

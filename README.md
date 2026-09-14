@@ -1,12 +1,15 @@
 # Deadlock Live Probe
 
-Yarn workspace monorepo capturing real-time *Deadlock* game events through Overwolf, transporting them to a NestJS API for raw event persistence, reducing a minimal match state, and displaying telemetry details on a live debug dashboard.
+Yarn workspace monorepo that captures real-time *Deadlock* game events through Overwolf and serves **Statlocker-adaptive build recommendations** from a NestJS API: raw event persistence, live match-state reduction, the archetype-based v2 recommendation pipeline, and the in-game HUD / desktop presentation.
 
 ## 📁 Repository Structure
 
 - `apps/api`: NestJS API server owning event ingestion, NDJSON logging, state reduction, and the debug inspector.
 - `apps/overwolf-client`: Overwolf runtime app integrating GEP, event buffering, and transport to the API.
-- `packages/shared`: Common TypeScript DTOs and state types.
+- `packages/deadlock-build-domain`: pure domain library (ruleset catalog, item graph, candidate generation, inventory reduction).
+- `packages/shared`: common TypeScript DTOs and state types.
+- `ops/nginx`: reverse-proxy configuration for the VPS deployment.
+- `docs/`: architecture overview, ADRs, runbooks and historical design records.
 
 ## 🚀 Quick Start Commands
 

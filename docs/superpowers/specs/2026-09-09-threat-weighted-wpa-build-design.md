@@ -1,5 +1,7 @@
 # Threat-weighted WPA build design
 
+> **Historical design record.** At the time of writing this documented the referenced work; parts have since been implemented, refined by the ADRs, or superseded. It is kept for provenance, not as current instructions. Current architecture: `docs/architecture.md`; decisions: `docs/decisions/`.
+
 Date: 2026-09-09
 Branch: `design/threat-weighted-wpa-build-roadmap`
 Base: `main` at `b49f326b8c32f3e249f64b3d16c7a37657ee2580`

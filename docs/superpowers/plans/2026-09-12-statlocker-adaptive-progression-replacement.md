@@ -1,5 +1,7 @@
 # Statlocker Adaptive Progression and Replacement Implementation Plan
 
+> **Implemented.** The described progression/replacement model is in the code and recorded as ADR-005 and ADR-006. Kept as the design record.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make Statlocker Adaptive preserve Statlocker-confirmed upgrade progressions, allow full-build timelines longer than 12 transactions while never holding more than 12 items, and perform sell/replacement only at 12/12 capacity using verified Statlocker lifecycle and full-team matchup evidence.
