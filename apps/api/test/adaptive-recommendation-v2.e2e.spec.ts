@@ -334,8 +334,10 @@ function harness(resolverOverride?: { resolve(input: unknown): ResolvedFullBuild
     findActive: jest.fn(async () => currentRows),
   };
   const sessionRepository = {
-    findOne: jest.fn(async ({ where }: { where: { matchId: string } }) =>
-      persistedLock?.matchId === where.matchId ? persistedLock : null),
+    findOne: jest.fn(async ({ where }: { where: { matchId: string; steamId: string } }) =>
+      persistedLock?.matchId === where.matchId && persistedLock?.steamId === where.steamId
+        ? persistedLock
+        : null),
     create: jest.fn((value: any) => value),
     save: jest.fn(async (value: any) => {
       persistedLock = value;
@@ -418,9 +420,9 @@ describe('Adaptive recommendation V2 endpoint', () => {
     expect(second.fullBuild?.semanticValidation?.valid).toBe(true);
     expect(second.fullBuild?.steps.map((step) => step.buyItemId))
       .toEqual(first.fullBuild?.steps.map((step) => step.buyItemId));
-    expect(h.traceStore.revisions('match-v2-a')).toHaveLength(2);
-    expect(h.traceStore.get('match-v2-a')?.finalPlan?.desiredState).toBeDefined();
-    expect(h.traceStore.get('match-v2-a')?.finalPlan?.semanticValidation?.valid).toBe(true);
+    expect(h.traceStore.revisions('match-v2-a', 'steam-local')).toHaveLength(2);
+    expect(h.traceStore.get('match-v2-a', 'steam-local')?.finalPlan?.desiredState).toBeDefined();
+    expect(h.traceStore.get('match-v2-a', 'steam-local')?.finalPlan?.semanticValidation?.valid).toBe(true);
   });
 
   it('holds instead of exposing an action from a plan that failed validation', async () => {

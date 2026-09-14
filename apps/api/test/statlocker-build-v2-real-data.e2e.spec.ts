@@ -198,7 +198,8 @@ function snapshotPersistence() {
 function lockPersistence() {
   let row: any;
   const repository = {
-    findOne: jest.fn(async ({ where }: any) => row?.matchId === where.matchId ? row : null),
+    findOne: jest.fn(async ({ where }: any) =>
+      row?.matchId === where.matchId && row?.steamId === where.steamId ? row : null),
     create: jest.fn((value: any) => ({ ...value })),
     save: jest.fn(async (value: any) => {
       if (!row) row = { ...value };
@@ -594,7 +595,7 @@ describe('Statlocker Build V2 real Billy fixture', () => {
     const controller = new AdaptiveRecommendationV2Controller(service);
 
     const result = await controller.recommend({ matchId: fixture.request.matchId });
-    const runtimeTrace = traceStore.get(fixture.request.matchId);
+    const runtimeTrace = traceStore.get(fixture.request.matchId, 'real-fixture-local');
     const combinedStages = [
       ...precomputeTrace.stages().map((entry) => entry.stage),
       ...(runtimeTrace?.stages.map((entry) => entry.stage) ?? []),

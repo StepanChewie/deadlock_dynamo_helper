@@ -87,7 +87,7 @@ export class AdaptiveRecommendationV2Service {
   async recommend(request: AdaptiveRecommendationRequestV2): Promise<AdaptiveRecommendationResultV2> {
     validateRequest(request);
     const decision = await this.decisionState.build(request.matchId, request.localSteamId);
-    const existingLock = await this.session.get(request.matchId);
+    const existingLock = await this.session.get(request.matchId, decision.localSteamId);
     const context = existingLock
       ? await this.reuseLock(decision, existingLock)
       : await this.createLock(decision, request.matchId);
@@ -137,7 +137,7 @@ export class AdaptiveRecommendationV2Service {
     }
     const lifecycleEvidence = await this.loadLifecycleEvidence(decision);
 
-    const previousTrace = this.traceStore.get(request.matchId);
+    const previousTrace = this.traceStore.get(request.matchId, decision.localSteamId);
     const resolverInput: FamilyFirstFullBuildLifetimeResolverV2Input & { previousPlan?: ResolvedFullBuildPlanV2 } = {
       matchId: request.matchId,
       stateRevision: decision.stateRevision,
@@ -161,6 +161,7 @@ export class AdaptiveRecommendationV2Service {
     const plan = this.resolver.resolve(resolverInput);
     this.traceStore.put({
       matchId: request.matchId,
+      steamId: decision.localSteamId,
       revision: (previousTrace?.revision ?? 0) + 1,
       stateRevision: decision.stateRevision,
       generatedAt: new Date().toISOString(),
@@ -265,7 +266,7 @@ export class AdaptiveRecommendationV2Service {
       vsHeroRows,
       wpaQueryCount: 1,
     }, trace);
-    const lock = await this.session.getOrLock(matchId, {
+    const lock = await this.session.getOrLock(matchId, decision.localSteamId, {
       heroId: decision.state.heroId,
       snapshotId: snapshot.snapshotId,
       enemyHeroIds,

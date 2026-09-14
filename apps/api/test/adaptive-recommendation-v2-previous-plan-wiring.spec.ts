@@ -180,7 +180,7 @@ describe('AdaptiveRecommendationV2Service previous-plan wiring', () => {
     const h = harness();
 
     await h.service.recommend({ matchId: MATCH_ID, localSteamId: 'steam-local' });
-    const previousPlan = h.traceStore.get(MATCH_ID)?.finalPlan;
+    const previousPlan = h.traceStore.get(MATCH_ID, 'steam-local')?.finalPlan;
     expect(previousPlan).toBeDefined();
 
     await h.service.recommend({ matchId: MATCH_ID, localSteamId: 'steam-local' });
