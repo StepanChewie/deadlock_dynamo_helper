@@ -36,14 +36,8 @@ export class CreateAdaptiveBuildIterationsV11789315200000 implements MigrationIn
       'Candidates rejected or suppressed by hysteresis. Incident review only (ADR-007).'
     `);
     await queryRunner.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS "uq_build_iteration_plan_v1"
-      ON "adaptive_build_iterations_v1" ("matchId", "steamId", "fingerprint")
-      WHERE "kind" = 'PLAN'
-    `);
-    await queryRunner.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS "uq_build_iteration_not_ready_v1"
-      ON "adaptive_build_iterations_v1" ("matchId", "steamId", "fingerprint")
-      WHERE "kind" = 'NOT_READY'
+      CREATE INDEX IF NOT EXISTS "idx_build_iteration_last_v1"
+      ON "adaptive_build_iterations_v1" ("matchId", "steamId", "id" DESC)
     `);
     await queryRunner.query(`
       CREATE INDEX IF NOT EXISTS "idx_build_iteration_match_v1"

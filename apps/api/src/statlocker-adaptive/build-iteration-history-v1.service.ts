@@ -30,6 +30,16 @@ export class BuildIterationHistoryV1Service {
   private readonly logger = new Logger(BuildIterationHistoryV1Service.name);
   private readonly maxJsonBytes = readPositiveInteger(process.env.ADAPTIVE_BUILD_ITERATION_MAX_JSON_KB, DEFAULT_MAX_JSON_KB) * 1024;
 
+  /**
+   * Last state written for a (matchId, steamId) key in this process. Keeps the
+   * previous-state lookup at one SELECT per key; after a restart the lookup
+   * re-hydrates from the table instead.
+   */
+  private readonly lastWritten = new Map<
+    string,
+    { kind: 'PLAN' | 'NOT_READY'; fingerprint: string }
+  >();
+
   constructor(
     @InjectRepository(AdaptiveBuildIterationV1Entity)
     private readonly repository: Repository<AdaptiveBuildIterationV1Entity>,
@@ -37,16 +47,37 @@ export class BuildIterationHistoryV1Service {
 
   async record(input: RecordBuildIterationV1Input): Promise<void> {
     try {
+      const row = this.buildRow(input);
+      const steamId = row.steamId as string;
+      const kind = row.kind as 'PLAN' | 'NOT_READY';
+      const fingerprint = row.fingerprint as string;
+      const key = `${input.matchId}|${steamId}`;
+      const last = this.lastWritten.get(key) ?? (await this.readLastWritten(input.matchId, steamId));
+      const unchanged = last !== undefined && last.kind === kind && last.fingerprint === fingerprint;
+      if (unchanged) return;
+
       await this.repository
         .createQueryBuilder()
         .insert()
         .into(AdaptiveBuildIterationV1Entity)
-        .values(this.buildRow(input))
-        .orIgnore()
+        .values(row)
         .execute();
+
+      this.lastWritten.set(key, { kind, fingerprint });
     } catch (error) {
       this.logger.warn(`Build iteration history write failed: ${describeError(error)}`);
     }
+  }
+
+  private async readLastWritten(
+    matchId: string,
+    steamId: string,
+  ): Promise<{ kind: 'PLAN' | 'NOT_READY'; fingerprint: string } | undefined> {
+    const last = await this.repository.findOne({
+      where: { matchId, steamId },
+      order: { id: 'DESC' },
+    });
+    return last ? { kind: last.kind, fingerprint: last.fingerprint } : undefined;
   }
 
   @Cron('0 * * * *')

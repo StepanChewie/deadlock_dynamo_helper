@@ -149,10 +149,34 @@ integrationDescribe('production database migration integration', () => {
     )) as Array<{ indexname: string }>;
     const names = indexes.map((row) => row.indexname);
 
-    expect(names).toContain('uq_build_iteration_plan_v1');
-    expect(names).toContain('uq_build_iteration_not_ready_v1');
+    expect(names).toContain('idx_build_iteration_last_v1');
     expect(names).toContain('idx_build_iteration_match_v1');
     expect(names).toContain('idx_build_iteration_player_v1');
+    expect(names).toContain('idx_build_iteration_retention_v1');
+    expect(names).not.toContain('uq_build_iteration_plan_v1');
+    expect(names).not.toContain('uq_build_iteration_not_ready_v1');
+  });
+
+  it('accepts a repeated identical plan fingerprint for the same player', async () => {
+    const fingerprint = 'a'.repeat(64);
+    const insertPlanRow = () =>
+      dataSource.query(
+        `INSERT INTO adaptive_build_iterations_v1
+           ("matchId", "steamId", "kind", "fingerprint", "stateRevision", "score", "evidence", "context", "capturedAt")
+         VALUES ($1, $2, 'PLAN', $3, 'rev-1', '{}'::jsonb, '{}'::jsonb, '{}'::jsonb, NOW())`,
+        ['match-oscillation', 'steam-oscillation', fingerprint],
+      );
+
+    await insertPlanRow();
+    await insertPlanRow();
+
+    const rows = (await dataSource.query(
+      `SELECT COUNT(*)::int AS count FROM adaptive_build_iterations_v1
+       WHERE "matchId" = $1 AND "steamId" = $2`,
+      ['match-oscillation', 'steam-oscillation'],
+    )) as Array<{ count: number }>;
+
+    expect(rows[0]?.count).toBe(2);
   });
 
   it('scopes archetype match locks by player', async () => {
