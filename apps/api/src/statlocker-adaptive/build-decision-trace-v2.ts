@@ -203,6 +203,7 @@ export type BuildDecisionTraceStageEntryV2 =
 
 export interface BuildDecisionTraceV2 {
   matchId: string;
+  steamId: string;
   revision: number;
   stateRevision: string;
   generatedAt: string;

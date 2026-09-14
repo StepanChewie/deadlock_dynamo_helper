@@ -4,6 +4,7 @@ import { BuildDecisionTraceV2 } from './build-decision-trace-v2';
 
 export interface BuildDebugMatchSummaryV2 {
   matchId: string;
+  steamId: string;
   revision: number;
   stateRevision: string;
   generatedAt: string;
@@ -26,7 +27,7 @@ export class BuildDebugTraceStoreV2Service {
     this.purgeExpired();
     validateTrace(trace);
 
-    const existing = this.matches.get(trace.matchId);
+    const existing = this.matches.get(traceKey(trace.matchId, trace.steamId));
     const current = existing?.revisions[existing.revisions.length - 1];
     if (current && trace.revision <= current.revision) {
       throw new Error(
@@ -40,75 +41,88 @@ export class BuildDebugTraceStoreV2Service {
       DEFAULT_TRACE_TAIL_SIZE,
     );
     const revisions = [...(existing?.revisions ?? []), immutableTrace].slice(-tailSize);
-    this.matches.set(trace.matchId, {
+    this.matches.set(traceKey(trace.matchId, trace.steamId), {
       revisions,
       updatedAtMs: Date.now(),
     });
-    this.stream(trace.matchId).next(immutableTrace);
+    this.stream(trace.matchId, trace.steamId).next(immutableTrace);
   }
 
-  get(matchId: string): BuildDecisionTraceV2 | undefined {
+  get(matchId: string, steamId: string): BuildDecisionTraceV2 | undefined {
     this.purgeExpired();
-    const revisions = this.matches.get(matchId)?.revisions ?? [];
+    validateMatchId(matchId);
+    validateSteamId(steamId);
+    const revisions = this.matches.get(traceKey(matchId, steamId))?.revisions ?? [];
     return revisions[revisions.length - 1];
   }
 
   listActive(): readonly BuildDebugMatchSummaryV2[] {
     this.purgeExpired();
-    return [...this.matches.entries()]
-      .map(([matchId, state]) => {
+    return [...this.matches.values()]
+      .map((state) => {
         const current = state.revisions[state.revisions.length - 1];
         return {
-          matchId,
+          matchId: current.matchId,
+          steamId: current.steamId,
           revision: current.revision,
           stateRevision: current.stateRevision,
           generatedAt: current.generatedAt,
         };
       })
-      .sort((left, right) => left.matchId.localeCompare(right.matchId));
+      .sort((left, right) =>
+        left.matchId.localeCompare(right.matchId) || left.steamId.localeCompare(right.steamId));
   }
 
-  revisions(matchId: string): readonly BuildDecisionTraceV2[] {
-    this.purgeExpired();
-    return [...(this.matches.get(matchId)?.revisions ?? [])];
-  }
-
-  observe(matchId: string): Observable<BuildDecisionTraceV2> {
+  revisions(matchId: string, steamId: string): readonly BuildDecisionTraceV2[] {
     this.purgeExpired();
     validateMatchId(matchId);
-    const existingStream = this.streams.get(matchId);
+    validateSteamId(steamId);
+    return [...(this.matches.get(traceKey(matchId, steamId))?.revisions ?? [])];
+  }
+
+  observe(matchId: string, steamId: string): Observable<BuildDecisionTraceV2> {
+    this.purgeExpired();
+    validateMatchId(matchId);
+    validateSteamId(steamId);
+    const existingStream = this.streams.get(traceKey(matchId, steamId));
     if (existingStream) return existingStream.asObservable();
 
     const subject = new ReplaySubject<BuildDecisionTraceV2>(1);
-    this.streams.set(matchId, subject);
-    const current = this.get(matchId);
+    this.streams.set(traceKey(matchId, steamId), subject);
+    const current = this.get(matchId, steamId);
     if (current) subject.next(current);
     return subject.asObservable();
   }
 
-  private stream(matchId: string): ReplaySubject<BuildDecisionTraceV2> {
-    const existing = this.streams.get(matchId);
+  private stream(matchId: string, steamId: string): ReplaySubject<BuildDecisionTraceV2> {
+    const key = traceKey(matchId, steamId);
+    const existing = this.streams.get(key);
     if (existing) return existing;
     const subject = new ReplaySubject<BuildDecisionTraceV2>(1);
-    this.streams.set(matchId, subject);
+    this.streams.set(key, subject);
     return subject;
   }
 
   private purgeExpired(): void {
     const nowMs = Date.now();
     const ttlMs = readTraceTtlMs();
-    for (const [matchId, state] of this.matches) {
+    for (const [key, state] of this.matches) {
       if (nowMs - state.updatedAtMs <= ttlMs) continue;
-      this.matches.delete(matchId);
-      const stream = this.streams.get(matchId);
+      this.matches.delete(key);
+      const stream = this.streams.get(key);
       stream?.complete();
-      this.streams.delete(matchId);
+      this.streams.delete(key);
     }
   }
 }
 
+function traceKey(matchId: string, steamId: string): string {
+  return `${matchId}|${steamId}`;
+}
+
 function validateTrace(trace: BuildDecisionTraceV2): void {
   validateMatchId(trace.matchId);
+  validateSteamId(trace.steamId);
   if (!Number.isInteger(trace.revision) || trace.revision <= 0) {
     throw new Error('Build debug trace store v2: revision must be a positive integer');
   }
@@ -123,6 +137,12 @@ function validateTrace(trace: BuildDecisionTraceV2): void {
 function validateMatchId(matchId: string): void {
   if (!matchId.trim()) {
     throw new Error('Build debug trace store v2: matchId must not be empty');
+  }
+}
+
+function validateSteamId(steamId: string): void {
+  if (steamId.trim() === '' || steamId.length > 32) {
+    throw new Error('Build debug trace store v2: steamId is invalid');
   }
 }
 
