@@ -55,5 +55,5 @@ The lock stays immutable per player for the duration of a match; only its scope 
 - Two or more players in one match each get their own archetype, build plan and trace.
 - Hysteresis stops borrowing another player's plan in multi-player matches; behaviour changes for those matches, intentionally.
 - Existing lock rows cannot be attributed to a player after the fact; the migration deletes them. Locks only matter within an active match, so the loss is limited to a single archetype re-selection if a match is live during the deploy.
-- Downstream consumers of the trace store (the build debugger) must pass a `steamId`. The debugger page is currently broken and is repaired separately.
+- Downstream consumers of the trace store (the build debugger) must pass a `steamId`. The debugger's client is updated in this same change to address the match list, the trace fetch and the SSE stream by `(matchId, steamId)`, so two players in one match are distinguishable and the selected player survives stream reconnects.
 - Per-player build history (`adaptive_build_iterations_v1`) can now be keyed consistently; see the 2026-09-14 design.

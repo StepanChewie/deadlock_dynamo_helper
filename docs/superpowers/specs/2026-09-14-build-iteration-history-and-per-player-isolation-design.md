@@ -39,7 +39,7 @@ A support report of the form "my build was wrong at minute 12" cannot be answere
 
 ## 3. Non-goals
 
-- No UI for reviewing history. The read path is SQL. (The existing build debugger is currently broken and is not repaired here.)
+- No UI for reviewing history. The read path is SQL. (The build debugger's player handling is repaired in this change — see A6 — but the debugger gains no view of the new history table.)
 - No reuse of this data as a training corpus — ADR-007 forbids it. The table name and a column comment must make the prohibition visible.
 - No changes to the response DTO consumed by the Overwolf client.
 
@@ -100,7 +100,7 @@ Deployment note: a match in progress during the deploy loses its lock and re-sel
 - `GET /debug/build-v2/matches/:matchId?steamId=…` → trace for that player.
 - `GET /debug/build-v2/matches/:matchId/stream?steamId=…` → SSE for that player.
 
-The broken debug page is not repaired here; the endpoints are changed so that they are correct whenever the page is fixed.
+The debug page's player dimension is repaired in this change: the match list, the trace fetch and the SSE stream are all addressed by `(matchId, steamId)`, so two players in one match are distinguishable and the selected player is preserved across stream reconnects. The endpoints below are changed to match that client.
 
 ## 5. Part B — build iteration history
 
@@ -249,7 +249,7 @@ Part A first, then part B, in the order of sections A1 → A6, B1 → B5. The re
 | Risk | Handling |
 |---|---|
 | Lock migration deletes rows of a match in progress | deploy outside live play; one archetype re-selection at worst |
-| Trace store key change breaks the (already broken) debug page further | endpoints are corrected in the same change; the page itself stays out of scope |
+| Trace store key change breaks the debug page | the endpoints and the page's client are corrected together in the same change: the match list, the trace fetch and the SSE stream are all addressed by `(matchId, steamId)` |
 | Hysteresis behaviour changes in multi-player matches | intended: it stops borrowing another player's plan |
 | Row size growth | 64 KB cap per JSON column with `truncated` flag |
 | History mistaken for a training corpus | explicit column/table comment, ADR-007 referenced in the spec and the ADR |
