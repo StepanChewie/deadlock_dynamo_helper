@@ -1,8 +1,8 @@
 export const SOULS_AFFORDABILITY_CONTRACT_VERSION = 'souls-affordability-v1' as const;
-export const SOULS_AFFORDABILITY_MIN_OBSERVATIONS = 100;
-export const SOULS_AFFORDABILITY_MIN_SUCCESS_WHEN_SUFFICIENT = 0.999;
-export const SOULS_AFFORDABILITY_MAX_SUCCESS_WHEN_INSUFFICIENT = 0.001;
-export const SOULS_AFFORDABILITY_MIN_HUD_MATCH_RATE = 0.999;
+const SOULS_AFFORDABILITY_MIN_OBSERVATIONS = 100;
+const SOULS_AFFORDABILITY_MIN_SUCCESS_WHEN_SUFFICIENT = 0.999;
+const SOULS_AFFORDABILITY_MAX_SUCCESS_WHEN_INSUFFICIENT = 0.001;
+const SOULS_AFFORDABILITY_MIN_HUD_MATCH_RATE = 0.999;
 
 export type SoulsAffordabilityOperation = 'BUY' | 'UPGRADE' | 'SELL';
 
@@ -22,7 +22,7 @@ export interface SoulsAffordabilityObservationV1 {
   note?: string;
 }
 
-export type SoulsAffordabilityVerdict = 'PASS' | 'FAIL' | 'INSUFFICIENT_EVIDENCE';
+type SoulsAffordabilityVerdict = 'PASS' | 'FAIL' | 'INSUFFICIENT_EVIDENCE';
 
 export interface SoulsAffordabilityReportV1 {
   contractVersion: typeof SOULS_AFFORDABILITY_CONTRACT_VERSION;

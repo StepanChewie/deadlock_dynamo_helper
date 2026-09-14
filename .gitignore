@@ -9,3 +9,6 @@ storage
 .idea
 .qwen
 /.worktrees/
+.codex/
+.zcode/
+graphify-out/

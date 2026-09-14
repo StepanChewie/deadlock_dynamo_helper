@@ -1,11 +1,11 @@
-export type AdaptiveBuildStatusV1 =
+type AdaptiveBuildStatusV1 =
   | 'IN_PROGRESS'
   | 'WAITING'
   | 'COMPLETE'
   | 'REPLAN_REQUIRED'
   | 'OUT_OF_DISTRIBUTION';
 
-export type AdaptiveStrategySessionStateV1 =
+type AdaptiveStrategySessionStateV1 =
   | 'PROVISIONAL'
   | 'COMMITTED'
   | 'DIVERGED'

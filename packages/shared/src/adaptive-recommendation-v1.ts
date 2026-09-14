@@ -19,9 +19,9 @@ export const ADAPTIVE_ACTION_TYPES_V1 = [
 export type AdaptiveActionTypeV1 = (typeof ADAPTIVE_ACTION_TYPES_V1)[number];
 
 export const ADAPTIVE_PLAN_STATUSES_V1 = ['OWNED', 'NEXT', 'PLANNED'] as const;
-export type AdaptivePlanStatusV1 = (typeof ADAPTIVE_PLAN_STATUSES_V1)[number];
+type AdaptivePlanStatusV1 = (typeof ADAPTIVE_PLAN_STATUSES_V1)[number];
 
-export const ADAPTIVE_PLAN_ACTION_STATUSES_V1 = [
+const ADAPTIVE_PLAN_ACTION_STATUSES_V1 = [
   'OWNED',
   'READY',
   'BLOCKED',
@@ -38,29 +38,29 @@ export const ADAPTIVE_EVIDENCE_FRESHNESS_V1 = [
 ] as const;
 export type AdaptiveEvidenceFreshnessV1 = (typeof ADAPTIVE_EVIDENCE_FRESHNESS_V1)[number];
 
-export type AdaptiveBuildPlanChangeTypeV1 = 'KEEP' | 'INSERT' | 'SKIP' | 'SELL' | 'REPLACE' | 'MOVE';
+type AdaptiveBuildPlanChangeTypeV1 = 'KEEP' | 'INSERT' | 'SKIP' | 'SELL' | 'REPLACE' | 'MOVE';
 
-export type AdaptiveStrategyBuildStatusV1 =
+type AdaptiveStrategyBuildStatusV1 =
   | 'IN_PROGRESS'
   | 'WAITING'
   | 'COMPLETE'
   | 'REPLAN_REQUIRED'
   | 'OUT_OF_DISTRIBUTION';
 
-export type AdaptiveStrategyCommitmentV1 = 'PROVISIONAL' | 'COMMITTED' | 'DIVERGED' | 'OOD';
+type AdaptiveStrategyCommitmentV1 = 'PROVISIONAL' | 'COMMITTED' | 'DIVERGED' | 'OOD';
 
-export interface AdaptiveStrategyProgressV1 {
+interface AdaptiveStrategyProgressV1 {
   satisfiedHardGoals: number;
   totalHardGoals: number;
 }
 
-export interface AdaptiveStrategyCurrentGoalV1 {
+interface AdaptiveStrategyCurrentGoalV1 {
   goalId: string;
   type: string;
   reasonCodes: readonly string[];
 }
 
-export interface AdaptiveStrategySlotTransitionV1 {
+interface AdaptiveStrategySlotTransitionV1 {
   targetGoalId: string;
   targetItemId?: number;
   requirement: 'NONE' | 'UPGRADE' | 'SELL_TEMPORARY' | 'REPLACE' | 'FLEX_UNLOCK' | 'BLOCKED';
@@ -69,7 +69,7 @@ export interface AdaptiveStrategySlotTransitionV1 {
   reasonCodes: readonly string[];
 }
 
-export interface AdaptiveStrategySlotPlanV1 {
+interface AdaptiveStrategySlotPlanV1 {
   currentUsedSlots: number;
   currentFlexUsed: number;
   unlockedFlexSlots?: number;
@@ -80,7 +80,7 @@ export interface AdaptiveStrategySlotPlanV1 {
   futureTransitions?: readonly AdaptiveStrategySlotTransitionV1[];
 }
 
-export interface AdaptiveStrategyInvestmentObjectiveV1 {
+interface AdaptiveStrategyInvestmentObjectiveV1 {
   objectiveId: string;
   type: 'weapon' | 'vitality' | 'spirit';
   state: 'LOCKED' | 'ACTIVE' | 'SATISFIED' | 'WAIVED';
@@ -90,7 +90,7 @@ export interface AdaptiveStrategyInvestmentObjectiveV1 {
   reasonCodes: readonly string[];
 }
 
-export interface AdaptiveStrategySituationalDecisionV1 {
+interface AdaptiveStrategySituationalDecisionV1 {
   windowId: string;
   purpose: string;
   targetItemId: number;
@@ -104,7 +104,7 @@ export interface AdaptiveStrategySituationalDecisionV1 {
   coreInterruptionSouls?: number;
 }
 
-export interface AdaptiveRecommendationStrategyV1 {
+interface AdaptiveRecommendationStrategyV1 {
   strategyId: string;
   commitment: AdaptiveStrategyCommitmentV1;
   selectedAtGameTimeSec?: number;
@@ -122,11 +122,6 @@ export interface AdaptiveRecommendationStrategyV1 {
   slotPlan: AdaptiveStrategySlotPlanV1;
   investmentObjectives: readonly AdaptiveStrategyInvestmentObjectiveV1[];
   situationalDecision?: AdaptiveStrategySituationalDecisionV1;
-}
-
-export interface AdaptiveRecommendationRequestV1 {
-  matchId: string;
-  localSteamId?: string;
 }
 
 export interface AdaptiveActionV1 {
@@ -167,7 +162,7 @@ export type AdaptivePlanRequirementV1 =
       evidence: 'OBSERVED' | 'RECONSTRUCTED' | 'UNKNOWN';
     };
 
-export type AdaptiveSituationalPurposeV1 =
+type AdaptiveSituationalPurposeV1 =
   | 'CATCH'
   | 'ANTI_CC'
   | 'CLEANSE'
@@ -179,7 +174,7 @@ export type AdaptiveSituationalPurposeV1 =
   | 'TEAM_UTILITY'
   | 'SURVIVAL';
 
-export type AdaptiveSituationalEvidenceKindV1 =
+type AdaptiveSituationalEvidenceKindV1 =
   | 'MATCHUP_STAT'
   | 'MECHANICAL_COUNTER'
   | 'ENEMY_ITEMIZATION'
@@ -232,7 +227,7 @@ export interface AdaptiveScoreComponentV1 {
   weighted: number;
 }
 
-export interface AdaptiveScoredActionV1 {
+interface AdaptiveScoredActionV1 {
   action: AdaptiveActionV1;
   score: number;
   confidence: number;
@@ -251,7 +246,7 @@ export interface AdaptivePlannedItemV1 {
   reasonCodes: readonly string[];
 }
 
-export interface AdaptiveBuildPlanChangeV1 {
+interface AdaptiveBuildPlanChangeV1 {
   type: AdaptiveBuildPlanChangeTypeV1;
   itemId?: number;
   sellItemId?: number;
@@ -261,7 +256,7 @@ export interface AdaptiveBuildPlanChangeV1 {
   reasonCodes: readonly string[];
 }
 
-export interface AdaptiveEvidenceFamilyProvenanceV1 {
+interface AdaptiveEvidenceFamilyProvenanceV1 {
   dataset: string;
   freshness: AdaptiveEvidenceFreshnessV1;
   snapshotId?: string;
@@ -270,7 +265,7 @@ export interface AdaptiveEvidenceFamilyProvenanceV1 {
   confidence: number;
 }
 
-export interface AdaptiveEvidenceProvenanceV1 {
+interface AdaptiveEvidenceProvenanceV1 {
   rulesetVersion: string;
   catalogSha256: string;
   statlockerPatchId?: string;

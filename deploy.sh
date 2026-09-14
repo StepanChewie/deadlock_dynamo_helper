@@ -13,6 +13,10 @@ rsync -avz --delete \
   --exclude 'storage' \
   --exclude '*.hprof' \
   --exclude 'apps/overwolf-client/dist' \
+  --exclude '.worktrees' \
+  --exclude 'graphify-out' \
+  --exclude '.codex' \
+  --exclude '.zcode' \
   "$SCRIPT_DIR/" my-vps:~/apps/deadlock_dynamo_helper/
 
 echo "=== Building Docker image on my-vps... ==="

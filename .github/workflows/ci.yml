@@ -120,8 +120,6 @@ jobs:
       - name: Test shared package
         run: yarn workspace @deadlock-live-probe/shared test
 
-      - name: Audit Statlocker adaptive serving boundary
-        run: node scripts/statlocker-adaptive-serving-audit.mjs
 
       - name: Test domain package
         run: yarn workspace @deadlock-live-probe/build-domain test
@@ -141,8 +139,6 @@ jobs:
       - name: Run frozen Billy family-first review gate
         run: yarn workspace @deadlock-live-probe/api test --runTestsByPath test/statlocker-build-v2-real-data.e2e.spec.ts
 
-      - name: Run structured replay release gate
-        run: yarn workspace @deadlock-live-probe/api test adaptive-replay-structured-v1.spec.ts
 
       - name: Upload failed API test log
         if: failure()

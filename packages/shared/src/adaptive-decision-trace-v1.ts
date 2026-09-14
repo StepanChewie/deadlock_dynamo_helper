@@ -4,16 +4,16 @@ import type {
   AdaptiveScoreComponentV1,
 } from './adaptive-recommendation-v1';
 
-export const ADAPTIVE_DECISION_TRACE_VERSION_V1 = 'adaptive-decision-trace-v1' as const;
+const ADAPTIVE_DECISION_TRACE_VERSION_V1 = 'adaptive-decision-trace-v1' as const;
 
-export type AdaptiveDecisionCandidateSourceV1 =
+type AdaptiveDecisionCandidateSourceV1 =
   | 'SKELETON'
   | 'BRANCH'
   | 'EXPLICIT_SITUATIONAL'
   | 'DISCOVERED'
   | 'WILDCARD';
 
-export interface AdaptiveDecisionTraceMatchupContributionV1 {
+interface AdaptiveDecisionTraceMatchupContributionV1 {
   enemyHeroId: number;
   rawDeltaWpa: number;
   count: number;
@@ -22,7 +22,7 @@ export interface AdaptiveDecisionTraceMatchupContributionV1 {
   weightedContribution: number;
 }
 
-export interface AdaptiveDecisionTraceMatchupV1 {
+interface AdaptiveDecisionTraceMatchupV1 {
   score?: number;
   confidence?: number;
   reasonCodes: readonly string[];
@@ -42,7 +42,7 @@ export interface AdaptiveDecisionTraceCandidateV1 {
   requiredThreshold?: number;
 }
 
-export interface AdaptiveDecisionTraceUtilityDeltaV1 {
+interface AdaptiveDecisionTraceUtilityDeltaV1 {
   skeletonAdherence: number;
   coreIntegrity: number;
   branchCoherence: number;
@@ -54,7 +54,7 @@ export interface AdaptiveDecisionTraceUtilityDeltaV1 {
   investmentContinuity: number;
 }
 
-export interface AdaptiveDecisionReplacementTraceV1 {
+interface AdaptiveDecisionReplacementTraceV1 {
   sellItemId: number;
   buyItemId: number;
   selected: boolean;
@@ -77,7 +77,7 @@ export interface AdaptiveDecisionReplacementTraceV1 {
   reasonCodes: readonly string[];
 }
 
-export interface AdaptiveDecisionPolicySnapshotV1 {
+interface AdaptiveDecisionPolicySnapshotV1 {
   policyVersion: string;
   heldItemCapacity: number;
   threatWeights: {

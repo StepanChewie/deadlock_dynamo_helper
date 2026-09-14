@@ -20,7 +20,7 @@ export interface CanonicalGepRosterPayloadV2 {
   heroHealing?: number;
 }
 
-export interface CanonicalGepEnvelopeV2<TCanonical> {
+interface CanonicalGepEnvelopeV2<TCanonical> {
   schemaVersion: typeof GEP_CANONICAL_SCHEMA_VERSION;
   normalizerVersion: 'gep-canonical-v2';
   rawPayload: unknown;

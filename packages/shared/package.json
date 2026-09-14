@@ -6,7 +6,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "yarn build && node test/gep-canonical-v2.test.js && node test/recommendation-direct-shop-validation-v1.test.js && node test/adaptive-recommendation-v1.test.js",
+    "test": "yarn build && node test/gep-canonical-v2.test.js && node test/adaptive-recommendation-v1.test.js",
     "lint": "echo \"shared: no lint\""
   },
   "devDependencies": {

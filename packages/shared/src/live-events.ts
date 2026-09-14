@@ -56,7 +56,7 @@ export interface MinimalMatchState {
   lastUpdatedAt: string;
 }
 
-export interface MinimalPlayerSnapshot {
+interface MinimalPlayerSnapshot {
   steamId: string;
   heroId?: number;
   teamId?: number;

@@ -2,7 +2,6 @@ export * from './live-events';
 export * from './gep-canonical-v2';
 export * from './souls-affordability-contract';
 export * from './souls-affordability-evidence-v2';
-export * from './recommendation-direct-shop-validation-v1';
 export * from './adaptive-recommendation-v1';
 export * from './adaptive-recommendation-v2';
 export * from './adaptive-decision-trace-v1';
