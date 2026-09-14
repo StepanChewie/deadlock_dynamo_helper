@@ -19,6 +19,7 @@ export const BUILD_DEBUG_V2_CLIENT_JS = String.raw`(() => {
   let reconnectTimer;
   let reconnectAttempts = 0;
   let currentMatchId = '';
+  const matchSteamIds = new Map();
 
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -72,6 +73,7 @@ export const BUILD_DEBUG_V2_CLIENT_JS = String.raw`(() => {
       option.value = match.matchId;
       option.textContent = match.matchId + ' - revision ' + match.revision;
       matchSelect.appendChild(option);
+      if (typeof match.steamId === 'string') matchSteamIds.set(match.matchId, match.steamId);
     }
     if (previousSelection && matches.some((match) => match.matchId === previousSelection)) {
       matchSelect.value = previousSelection;
@@ -90,7 +92,8 @@ export const BUILD_DEBUG_V2_CLIENT_JS = String.raw`(() => {
   }
 
   async function loadSnapshot(matchId) {
-    const response = await fetch('/debug/build-v2/matches/' + encodeURIComponent(matchId));
+    const response = await fetch('/debug/build-v2/matches/' + encodeURIComponent(matchId) +
+      '?steamId=' + encodeURIComponent(matchSteamIds.get(matchId) || ''));
     if (response.status === 401) {
       status.textContent = 'Session expired. Authenticate again.';
       return false;
@@ -108,7 +111,8 @@ export const BUILD_DEBUG_V2_CLIENT_JS = String.raw`(() => {
 
   function connectStream(matchId) {
     if (currentMatchId !== matchId) return;
-    const source = new EventSource('/debug/build-v2/matches/' + encodeURIComponent(matchId) + '/stream');
+    const source = new EventSource('/debug/build-v2/matches/' + encodeURIComponent(matchId) +
+      '/stream?steamId=' + encodeURIComponent(matchSteamIds.get(matchId) || ''));
     stream = source;
 
     source.onopen = () => {

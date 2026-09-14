@@ -8,12 +8,14 @@ import { BuildDebugTraceStoreV2Service } from '../src/statlocker-adaptive/build-
 import { BuildDecisionTraceV2 } from '../src/statlocker-adaptive/build-decision-trace-v2';
 
 const MATCH_ID = 'match-debug-v2';
+const STEAM_ID = 'steam-111';
 const PASSWORD = 'debug-password-test';
 const SESSION_SECRET = 'debug-session-secret-test';
 
 function trace(revision = 1): BuildDecisionTraceV2 {
   return {
     matchId: MATCH_ID,
+    steamId: STEAM_ID,
     revision,
     stateRevision: `state-${revision}`,
     generatedAt: new Date(1_700_000_000_000 + revision * 1000).toISOString(),
@@ -34,6 +36,7 @@ function trace(revision = 1): BuildDecisionTraceV2 {
 function renderFixtureTrace(revision = 7): BuildDecisionTraceV2 {
   return {
     matchId: MATCH_ID,
+    steamId: STEAM_ID,
     revision,
     stateRevision: `fixture-state-${revision}`,
     generatedAt: new Date(1_700_001_000_000 + revision * 1000).toISOString(),
@@ -414,7 +417,7 @@ describe('Build debugger V2 HTTP API', () => {
       expect.objectContaining({ matchId: MATCH_ID, revision: 1, stateRevision: 'state-1' }),
     ]);
 
-    const snapshot = await fetch(`${baseUrl}/debug/build-v2/matches/${MATCH_ID}`, {
+    const snapshot = await fetch(`${baseUrl}/debug/build-v2/matches/${MATCH_ID}?steamId=${STEAM_ID}`, {
       headers: { cookie },
     });
     expect(snapshot.status).toBe(200);
@@ -429,7 +432,7 @@ describe('Build debugger V2 HTTP API', () => {
     traceStore.put(trace(2));
     const { cookie } = await login();
     const controller = new AbortController();
-    const response = await fetch(`${baseUrl}/debug/build-v2/matches/${MATCH_ID}/stream`, {
+    const response = await fetch(`${baseUrl}/debug/build-v2/matches/${MATCH_ID}/stream?steamId=${STEAM_ID}`, {
       headers: { cookie },
       signal: controller.signal,
     });

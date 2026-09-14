@@ -6,6 +6,7 @@ import { BuildDecisionTraceV2 } from '../src/statlocker-adaptive/build-decision-
 function trace(revision: number): BuildDecisionTraceV2 {
   return {
     matchId: 'prod-debug-match',
+    steamId: 'steam-111',
     revision,
     stateRevision: `state-${revision}`,
     generatedAt: new Date(1_700_000_000_000 + revision).toISOString(),
@@ -50,10 +51,10 @@ describe('Build debugger V2 production configuration', () => {
     store.put(trace(2));
     store.put(trace(3));
 
-    expect(store.revisions('prod-debug-match').map((entry) => entry.revision)).toEqual([2, 3]);
+    expect(store.revisions('prod-debug-match', 'steam-111').map((entry) => entry.revision)).toEqual([2, 3]);
 
     nowMs += 1001;
-    expect(store.get('prod-debug-match')).toBeUndefined();
+    expect(store.get('prod-debug-match', 'steam-111')).toBeUndefined();
   });
 
   it('passes debugger secrets and runtime settings into the production API container', () => {

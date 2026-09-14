@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -7,6 +8,7 @@ import {
   NotFoundException,
   Param,
   Post,
+  Query,
   Req,
   Res,
   Sse,
@@ -87,16 +89,18 @@ export class BuildDebugV2Controller {
 
   @Get('matches/:matchId')
   @UseGuards(BuildDebugAuthV2Guard)
-  snapshot(@Param('matchId') matchId: string) {
-    const trace = this.traces.get(matchId);
+  snapshot(@Param('matchId') matchId: string, @Query('steamId') steamId?: string) {
+    if (!steamId?.trim()) throw new BadRequestException('steamId is required');
+    const trace = this.traces.get(matchId, steamId.trim());
     if (!trace) throw new NotFoundException(`Build debug trace not found for match ${matchId}`);
     return trace;
   }
 
   @Sse('matches/:matchId/stream')
   @UseGuards(BuildDebugAuthV2Guard)
-  stream(@Param('matchId') matchId: string): Observable<MessageEvent> {
-    return this.traces.observe(matchId).pipe(
+  stream(@Param('matchId') matchId: string, @Query('steamId') steamId?: string): Observable<MessageEvent> {
+    if (!steamId?.trim()) throw new BadRequestException('steamId is required');
+    return this.traces.observe(matchId, steamId.trim()).pipe(
       map((trace) => ({ type: 'trace', data: trace })),
     );
   }
