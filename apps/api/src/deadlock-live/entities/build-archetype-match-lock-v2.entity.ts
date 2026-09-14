@@ -6,6 +6,9 @@ export class BuildArchetypeMatchLockV2Entity {
   @PrimaryColumn({ type: 'varchar', length: 128 })
   matchId!: string;
 
+  @PrimaryColumn({ type: 'varchar', length: 32 })
+  steamId!: string;
+
   @Column({ type: 'int' })
   heroId!: number;
 

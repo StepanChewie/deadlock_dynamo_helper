@@ -126,13 +126,33 @@ integrationDescribe('production database migration integration', () => {
       [[
         'CreateRecommendationRuntimeTables1788220800000',
         'CreateBuildArchetypeV2Runtime1789056000000',
+        'ScopeBuildArchetypeMatchLocksByPlayerV11789228800000',
       ]],
     )) as Array<{ name: string }>;
 
     expect(rows.map((row) => row.name)).toEqual([
       'CreateBuildArchetypeV2Runtime1789056000000',
       'CreateRecommendationRuntimeTables1788220800000',
+      'ScopeBuildArchetypeMatchLocksByPlayerV11789228800000',
     ]);
     expect(await dataSource.showMigrations()).toBe(false);
+  });
+
+  it('scopes archetype match locks by player', async () => {
+    const columns = (await dataSource.query(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'build_archetype_match_locks_v2'
+       ORDER BY ordinal_position`,
+    )) as Array<{ column_name: string }>;
+    expect(columns.map((row) => row.column_name)).toContain('steamId');
+
+    const keys = (await dataSource.query(
+      `SELECT a.attname AS column_name
+       FROM pg_index i
+       JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+       WHERE i.indrelid = 'build_archetype_match_locks_v2'::regclass AND i.indisprimary
+       ORDER BY a.attname`,
+    )) as Array<{ column_name: string }>;
+    expect(keys.map((row) => row.column_name)).toEqual(['matchId', 'steamId']);
   });
 });
