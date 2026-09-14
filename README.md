@@ -15,6 +15,8 @@ Yarn workspace monorepo capturing real-time *Deadlock* game events through Overw
 - **Build packages:** `yarn build`
 - **Run test suites:** `yarn test`
 
+For the system architecture, evidence model, and module map, see the [Architecture Overview](docs/architecture.md). Architecture decisions and their rationale are recorded as ADRs in [`docs/decisions/`](docs/decisions/).
+
 Database reset, backup, migration, and raw metadata reprocessing instructions are in [`docs/database-migrations.md`](docs/database-migrations.md).
 
 For setup, sideloading, and live validation, see the [Overwolf Deadlock Live Probe Runbook](docs/overwolf-deadlock-live-probe-runbook.md).
