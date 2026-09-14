@@ -77,3 +77,17 @@ Generate a future migration:
 ```bash
 yarn db:generate src/database/migrations/describe-change
 ```
+
+## Build iteration history retention
+
+`adaptive_build_iterations_v1` keeps per-iteration recommendation history for
+incident review only (ADR-007 forbids using it as a training corpus).
+
+- Retention: `ADAPTIVE_BUILD_ITERATION_TTL_DAYS` (default 30). The hourly
+  cleanup job deletes unpinned rows older than the cutoff in bounded passes of
+  5000 rows per pass, up to 20 passes per run, and returns the summed affected
+  row count. A pass that returns fewer than 5000 rows stops the loop early.
+- Pin a match under review so cleanup skips it:
+  `UPDATE adaptive_build_iterations_v1 SET pinned = true WHERE "matchId" = '<matchId>';`
+- Row size: `ADAPTIVE_BUILD_ITERATION_MAX_JSON_KB` (default 64) caps the `plan`
+  and `rejects` columns; a capped row stores `truncated = true`.

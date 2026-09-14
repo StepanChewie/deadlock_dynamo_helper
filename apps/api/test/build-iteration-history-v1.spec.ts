@@ -101,6 +101,72 @@ describe('BuildIterationHistoryV1Service', () => {
     expect(repo.rows.map((row: any) => row.kind)).toEqual(['NOT_READY', 'PLAN']);
   });
 
+  it('deletes only unpinned rows past the TTL, bounded by the pass limit', async () => {
+    const predicates: string[] = [];
+    const conditions: string[] = [];
+    let passes = 0;
+    const repo = repository();
+    repo.createQueryBuilder = jest.fn(() => ({
+      delete: () => ({
+        from: () => ({
+          where: (predicate: string) => ({
+            andWhere: (condition: unknown) => ({
+              andWhere: () => ({
+                setParameters: () => ({
+                  execute: async () => {
+                    passes += 1;
+                    predicates.push(predicate);
+                    conditions.push(JSON.stringify(condition));
+                    return { affected: 7 };
+                  },
+                }),
+              }),
+            }),
+          }),
+        }),
+      }),
+    }));
+    const service = new BuildIterationHistoryV1Service(repo);
+
+    const affected = await service.cleanupExpired();
+
+    expect(affected).toBe(7);
+    expect(passes).toBe(1);
+    expect(predicates).toEqual(['pinned = false']);
+    expect(conditions[0]).toContain('capturedAt');
+  });
+
+  it('sums affected rows across passes until a pass is not full', async () => {
+    const affectedPerPass = [2, 2, 1];
+    let passes = 0;
+    const repo = repository();
+    repo.createQueryBuilder = jest.fn(() => ({
+      delete: () => ({
+        from: () => ({
+          where: () => ({
+            andWhere: () => ({
+              andWhere: () => ({
+                setParameters: () => ({
+                  execute: async () => {
+                    const affected = affectedPerPass[passes] ?? 0;
+                    passes += 1;
+                    return { affected };
+                  },
+                }),
+              }),
+            }),
+          }),
+        }),
+      }),
+    }));
+    const service = new BuildIterationHistoryV1Service(repo);
+
+    const affected = await service.cleanupExpired(2);
+
+    expect(affected).toBe(5);
+    expect(passes).toBe(3);
+  });
+
   it('never throws when the insert fails', async () => {
     const repo = repository();
     repo.createQueryBuilder = jest.fn(() => {

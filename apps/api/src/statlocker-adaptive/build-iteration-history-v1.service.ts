@@ -14,7 +14,9 @@ import {
 } from './build-iteration-fingerprint-v1';
 
 const DEFAULT_MAX_JSON_KB = 64;
-const DEFAULT_MATCH_LENGTH_SEC = 3 * 60 * 60;
+const DEFAULT_CLEANUP_PASS_LIMIT = 5000;
+const MAX_CLEANUP_PASSES = 20;
+const BUILD_ITERATION_TABLE = 'adaptive_build_iterations_v1';
 
 export interface RecordBuildIterationV1Input {
   matchId: string;
@@ -48,21 +50,32 @@ export class BuildIterationHistoryV1Service {
   }
 
   @Cron('0 * * * *')
-  async cleanupExpired(passLimit = 5000): Promise<number> {
+  async cleanupExpired(passLimit = DEFAULT_CLEANUP_PASS_LIMIT): Promise<number> {
     const days = readPositiveInteger(process.env.ADAPTIVE_BUILD_ITERATION_TTL_DAYS, 30);
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const limit = readPositiveInteger(String(passLimit), DEFAULT_CLEANUP_PASS_LIMIT);
+    let deleted = 0;
     try {
-      const result = await this.repository
-        .createQueryBuilder()
-        .delete()
-        .from(AdaptiveBuildIterationV1Entity)
-        .where('pinned = false')
-        .andWhere({ capturedAt: LessThan(cutoff) })
-        .execute();
-      return result.affected ?? 0;
+      for (let pass = 0; pass < MAX_CLEANUP_PASSES; pass += 1) {
+        const result = await this.repository
+          .createQueryBuilder()
+          .delete()
+          .from(AdaptiveBuildIterationV1Entity)
+          .where('pinned = false')
+          .andWhere({ capturedAt: LessThan(cutoff) })
+          .andWhere(
+            `id IN (SELECT id FROM ${BUILD_ITERATION_TABLE} WHERE pinned = false AND "capturedAt" < :cutoff LIMIT :passLimit)`,
+          )
+          .setParameters({ cutoff, passLimit: limit })
+          .execute();
+        const affected = result.affected ?? 0;
+        deleted += affected;
+        if (affected < limit) break;
+      }
+      return deleted;
     } catch (error) {
       this.logger.warn(`Build iteration history cleanup failed: ${describeError(error)}`);
-      return 0;
+      return deleted;
     }
   }
 
