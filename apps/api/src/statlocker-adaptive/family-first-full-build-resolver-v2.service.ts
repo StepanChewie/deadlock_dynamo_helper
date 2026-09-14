@@ -8,7 +8,8 @@ import {
   DesiredFamilyStateV2,
 } from './build-desired-state-v2.service';
 import { BuildItemUtilityV2Service } from './build-item-utility-v2.service';
-import { FullBuildHysteresisV2Service } from './full-build-hysteresis-v2.service';
+import type { BuildPlanSearchTracePayloadV2 } from './build-decision-trace-v2';
+import { BuildPlanSwitchDecisionV2, FullBuildHysteresisV2Service } from './full-build-hysteresis-v2.service';
 import {
   FullBuildLifetimeResolverV2Input,
   FullBuildResolutionV2,
@@ -16,6 +17,7 @@ import {
   FullBuildResolverV2Service,
 } from './full-build-resolver-v2.service';
 import {
+  FullBuildStepV2,
   FullBuildTransitionIntentV2,
   ResolvedFullBuildPlanV2,
 } from './full-build-plan-v2';
@@ -201,20 +203,6 @@ export class FamilyFirstFullBuildResolverV2Service extends FullBuildResolverV2Se
     }
     for (const reasonCode of rejectedOutsideReasonCodes) degradedReasons.add(reasonCode);
 
-    input.trace?.record({
-      stage: 'PLAN_SEARCH',
-      reasonCodes: uniqueStrings([...transactionPlan.reasonCodes, ...rejectedOutsideReasonCodes]),
-      payload: {
-        branches: actions.map((action, index) => ({
-          sequence: index + 1,
-          targetItemId: action.buyItemId,
-          action: action.action,
-          disposition: 'SELECTED' as const,
-          reasonCodes: [...action.reasonCodes],
-        })),
-      },
-    });
-
     const simulation = simulateFullBuildInventoryV2({
       rulesetId: input.rulesetId,
       itemGraph: input.itemGraph,
@@ -263,6 +251,55 @@ export class FamilyFirstFullBuildResolverV2Service extends FullBuildResolverV2Se
     };
 
     const selected = this.applyPreviousPlanHysteresis(input, candidate);
+    const hysteresis = selected.decision
+      ? {
+          action: selected.decision.action,
+          improvement: selected.improvement ?? 0,
+          requiredImprovement: selected.decision.requiredImprovement,
+          reasonCodes: [...selected.decision.reasonCodes],
+        }
+      : undefined;
+    const selectedTraceKeys = new Set(
+      selected.plan.steps.map((step) => stepSemanticTraceKey(step)),
+    );
+    const suppressedBranches = hysteresis?.action === 'KEEP_PREVIOUS'
+      ? candidate.steps
+          .filter((step) => !selectedTraceKeys.has(stepSemanticTraceKey(step)))
+          .map((step, index) => ({
+            sequence: selected.plan.steps.length + index + 1,
+            targetItemId: step.buyItemId,
+            action: step.action,
+            disposition: 'SUPPRESSED_BY_HYSTERESIS' as const,
+            reasonCodes: [...(hysteresis?.reasonCodes ?? [])],
+          }))
+      : [];
+    const planSearchPayload: BuildPlanSearchTracePayloadV2 = {
+      branches: [
+        ...selected.plan.steps.map((step, index) => ({
+          sequence: index + 1,
+          targetItemId: step.buyItemId,
+          action: step.action,
+          disposition: 'SELECTED' as const,
+          reasonCodes: [
+            ...step.reasonCodes,
+            ...(hysteresis && hysteresis.action === 'SWITCH_TO_CANDIDATE'
+              ? ['PLAN_HYSTERESIS_MARGIN_CLEARED']
+              : []),
+          ],
+        })),
+        ...suppressedBranches,
+      ],
+      ...(hysteresis === undefined ? {} : { hysteresis }),
+    };
+    input.trace?.record({
+      stage: 'PLAN_SEARCH',
+      reasonCodes: uniqueStrings([
+        ...transactionPlan.reasonCodes,
+        ...rejectedOutsideReasonCodes,
+        ...(hysteresis?.reasonCodes ?? []),
+      ]),
+      payload: planSearchPayload,
+    });
     input.trace?.record({
       stage: 'FINAL_PLAN',
       reasonCodes: [...selected.reasonCodes, ...selected.plan.validation.reasonCodes],
@@ -280,7 +317,12 @@ export class FamilyFirstFullBuildResolverV2Service extends FullBuildResolverV2Se
   private applyPreviousPlanHysteresis(
     input: FamilyFirstFullBuildLifetimeResolverV2Input,
     candidate: ResolvedFullBuildPlanV2,
-  ): { plan: ResolvedFullBuildPlanV2; reasonCodes: readonly string[] } {
+  ): {
+    plan: ResolvedFullBuildPlanV2;
+    reasonCodes: readonly string[];
+    decision?: BuildPlanSwitchDecisionV2;
+    improvement?: number;
+  } {
     const previous = input.previousPlan;
     if (
       !previous ||
@@ -293,12 +335,13 @@ export class FamilyFirstFullBuildResolverV2Service extends FullBuildResolverV2Se
       return { plan: candidate, reasonCodes: [] };
     }
 
+    const improvement = desiredStateScore(candidate) - desiredStateScore(previous);
     const decision = this.hysteresis.choose(previous, candidate, {
-      improvement: desiredStateScore(candidate) - desiredStateScore(previous),
+      improvement,
       coreReplacement: false,
       recentPurchaseProtected: hasProtectedRecentPurchase(input),
     });
-    return { plan: decision.selected, reasonCodes: decision.reasonCodes };
+    return { plan: decision.selected, reasonCodes: decision.reasonCodes, decision, improvement };
   }
 }
 
@@ -447,6 +490,10 @@ function hasProtectedRecentPurchase(input: FullBuildLifetimeResolverV2Input): bo
 
 function uniqueStrings(values: readonly string[]): string[] {
   return [...new Set(values)];
+}
+
+function stepSemanticTraceKey(step: FullBuildStepV2): string {
+  return [step.action, step.buyItemId, step.sellItemId ?? '', step.recipeId ?? ''].join(':');
 }
 
 /**

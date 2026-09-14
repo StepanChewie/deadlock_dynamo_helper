@@ -1,6 +1,18 @@
-import { createRecommendationItemGraph } from '@deadlock-live-probe/build-domain';
+import {
+  RecommendationItemDefinition,
+  createRecommendationItemGraph,
+} from '@deadlock-live-probe/build-domain';
 import { AdaptiveRecommendationV2Service } from '../src/statlocker-adaptive/adaptive-recommendation-v2.service';
+import { BuildArchetypeFamilyV2, BuildArchetypeV2 } from '../src/statlocker-adaptive/build-archetype-v2';
 import { BuildDebugTraceStoreV2Service } from '../src/statlocker-adaptive/build-debug-trace-store-v2.service';
+import { BuildDecisionTraceCollectorV2 } from '../src/statlocker-adaptive/build-decision-trace-v2';
+import { BuildItemUtilityV2Service } from '../src/statlocker-adaptive/build-item-utility-v2.service';
+import {
+  FamilyFirstFullBuildLifetimeResolverV2Input,
+  FamilyFirstFullBuildResolverV2Service,
+} from '../src/statlocker-adaptive/family-first-full-build-resolver-v2.service';
+import { ResolvedFullBuildPlanV2 } from '../src/statlocker-adaptive/full-build-plan-v2';
+import { ThreatWeightedMatchupV1Service } from '../src/statlocker-adaptive/threat-weighted-matchup-v1.service';
 
 const MATCH_ID = 'match-previous-plan-wiring';
 const HERO_ID = 72;
@@ -189,5 +201,201 @@ describe('AdaptiveRecommendationV2Service previous-plan wiring', () => {
       2,
       expect.objectContaining({ previousPlan }),
     );
+  });
+});
+
+const HYSTERESIS_MATCH_ID = 'match-hysteresis-trace';
+const HYSTERESIS_HERO_ID = 72;
+const HYSTERESIS_TERMINAL_ITEM_ID = 999;
+const HYSTERESIS_PREVIOUS_ONLY_ITEM_ID = 4242;
+
+function hysteresisItem(itemId: number): RecommendationItemDefinition {
+  return {
+    itemId,
+    name: `item-${itemId}`,
+    slotType: 'weapon',
+    active: true,
+    availableRulesetIds: ['r1'],
+    directPurchaseCost: 500,
+    upgradeRecipes: [],
+    sellTransition: { soulsRefund: 250, returnedItemIds: [] },
+    maxCopies: 1,
+  };
+}
+
+function hysteresisArchetype(): BuildArchetypeV2 {
+  const family: BuildArchetypeFamilyV2 = {
+    familyId: HYSTERESIS_TERMINAL_ITEM_ID,
+    requirement: 'REQUIRED',
+    aggregateFrequencyTier: 'CORE',
+    sourceProfileCount: 5,
+    profileCoverage: 0.5,
+    purchaseRate: 0.5,
+    structuralPriority: 0.5,
+    progressionNodes: [{
+      itemId: HYSTERESIS_TERMINAL_ITEM_ID,
+      rawFrequencyTier: 'CORE',
+      progressionRole: 'DEFAULT_TERMINAL',
+      sourceProfileCount: 5,
+      profileCoverage: 0.5,
+      purchaseRate: 0.5,
+      timing: { medianBuyTimeS: 300, spreadS: 30, phase: 'EARLY' },
+    }],
+    progressionEdges: [],
+    terminalCandidates: [{
+      itemId: HYSTERESIS_TERMINAL_ITEM_ID,
+      kind: 'DEFAULT_TERMINAL',
+      sourceProfileCount: 5,
+      profileCoverage: 0.5,
+      purchaseRate: 0.5,
+      rawFrequencyTier: 'CORE',
+    }],
+  };
+  return {
+    archetypeId: 'archetype:hysteresis-trace',
+    heroId: HYSTERESIS_HERO_ID,
+    rulesetVersion: 'r1',
+    catalogSha256: 'a'.repeat(64),
+    statlockerPatchId: 'p1',
+    sourceProfileAccountIds: ['p1', 'p2', 'p3', 'p4', 'p5'],
+    families: [family],
+    items: [],
+    groups: [],
+    orderEdges: [],
+    relationships: [],
+    quality: { support: 1, coherence: 0.9, separation: 0.5, sourceProfileCount: 5 },
+  };
+}
+
+function hysteresisLifetimeInput(): FamilyFirstFullBuildLifetimeResolverV2Input {
+  return {
+    matchId: HYSTERESIS_MATCH_ID,
+    stateRevision: 'state-1',
+    heroId: HYSTERESIS_HERO_ID,
+    rulesetId: 'r1',
+    archetype: hysteresisArchetype(),
+    itemGraph: createRecommendationItemGraph([hysteresisItem(HYSTERESIS_TERMINAL_ITEM_ID)]),
+    capacity: 12,
+    gameTimeSec: 1_000,
+    currentInventoryItemIds: [],
+    enemyHeroIds: [1, 2, 3, 4, 5, 6],
+    enemyThreats: [],
+    vsHeroRows: [],
+  };
+}
+
+function hysteresisResolver(): FamilyFirstFullBuildResolverV2Service {
+  return new FamilyFirstFullBuildResolverV2Service(
+    new BuildItemUtilityV2Service(new ThreatWeightedMatchupV1Service()),
+  );
+}
+
+function baselinePlan(resolver: FamilyFirstFullBuildResolverV2Service): ResolvedFullBuildPlanV2 {
+  return resolver.resolve({ ...hysteresisLifetimeInput(), trace: new BuildDecisionTraceCollectorV2() });
+}
+
+function planSearchPayload(collector: BuildDecisionTraceCollectorV2): {
+  branches: readonly {
+    sequence: number;
+    targetItemId: number;
+    action?: string;
+    disposition: string;
+    reasonCodes: readonly string[];
+  }[];
+  hysteresis?: {
+    action: 'KEEP_PREVIOUS' | 'SWITCH_TO_CANDIDATE';
+    improvement: number;
+    requiredImprovement: number;
+    reasonCodes: readonly string[];
+  };
+} {
+  const entry = collector.stages().find((stage) => stage.stage === 'PLAN_SEARCH');
+  expect(entry).toBeDefined();
+  return (entry as unknown as { payload: ReturnType<typeof planSearchPayload> }).payload;
+}
+
+describe('FamilyFirstFullBuildResolverV2Service hysteresis trace', () => {
+  it('records KEEP_PREVIOUS with a suppressed candidate branch when the improvement margin is not cleared', () => {
+    const resolver = hysteresisResolver();
+    const baseline = baselinePlan(resolver);
+
+    const previousPlan: ResolvedFullBuildPlanV2 = {
+      ...baseline,
+      planRevision: 'previous-plan',
+      steps: [{
+        sequence: 1,
+        action: 'BUY',
+        buyItemId: HYSTERESIS_PREVIOUS_ONLY_ITEM_ID,
+        consumedItemIds: [],
+        inventoryBefore: [],
+        inventoryAfter: [HYSTERESIS_PREVIOUS_ONLY_ITEM_ID],
+        reasonCodes: ['PREVIOUS_PLAN_STEP'],
+      }],
+    };
+
+    const trace = new BuildDecisionTraceCollectorV2();
+    const plan = resolver.resolve({
+      ...hysteresisLifetimeInput(),
+      previousPlan,
+      trace,
+    });
+
+    expect(plan.planRevision).toBe('previous-plan');
+    const payload = planSearchPayload(trace);
+    expect(payload.hysteresis).toBeDefined();
+    expect(payload.hysteresis?.action).toBe('KEEP_PREVIOUS');
+    expect(payload.hysteresis?.reasonCodes).toContain('PLAN_HYSTERESIS_MARGIN_NOT_CLEARED');
+
+    expect(payload.branches.some((branch) =>
+      branch.targetItemId === HYSTERESIS_PREVIOUS_ONLY_ITEM_ID &&
+      branch.disposition === 'SELECTED',
+    )).toBe(true);
+
+    const suppressed = payload.branches.filter((branch) => branch.disposition === 'SUPPRESSED_BY_HYSTERESIS');
+    expect(suppressed.length).toBeGreaterThan(0);
+    expect(suppressed.every((branch) => branch.targetItemId === HYSTERESIS_TERMINAL_ITEM_ID)).toBe(true);
+    expect(suppressed[0].reasonCodes).toContain('PLAN_HYSTERESIS_MARGIN_NOT_CLEARED');
+  });
+
+  it('records SWITCH_TO_CANDIDATE and clears the margin without suppressing branches above the threshold', () => {
+    const resolver = hysteresisResolver();
+    const baseline = baselinePlan(resolver);
+
+    const previousPlan: ResolvedFullBuildPlanV2 = {
+      ...baseline,
+      planRevision: 'previous-plan',
+      desiredState: {
+        ...baseline.desiredState!,
+        families: baseline.desiredState!.families.map((family) => ({
+          ...family,
+          score: family.score - 1,
+        })),
+      },
+    };
+
+    const trace = new BuildDecisionTraceCollectorV2();
+    const plan = resolver.resolve({
+      ...hysteresisLifetimeInput(),
+      previousPlan,
+      trace,
+    });
+
+    expect(plan.planRevision).toBe(baseline.planRevision);
+    const payload = planSearchPayload(trace);
+    expect(payload.hysteresis?.action).toBe('SWITCH_TO_CANDIDATE');
+    expect(payload.branches.every((branch) => branch.disposition === 'SELECTED')).toBe(true);
+    expect(payload.branches.some((branch) =>
+      branch.reasonCodes.includes('PLAN_HYSTERESIS_MARGIN_CLEARED'),
+    )).toBe(true);
+  });
+
+  it('omits the hysteresis payload and selects every branch when there is no previous plan', () => {
+    const trace = new BuildDecisionTraceCollectorV2();
+    hysteresisResolver().resolve({ ...hysteresisLifetimeInput(), trace });
+
+    const payload = planSearchPayload(trace);
+    expect(payload.hysteresis).toBeUndefined();
+    expect(payload.branches.length).toBeGreaterThan(0);
+    expect(payload.branches.every((branch) => branch.disposition === 'SELECTED')).toBe(true);
   });
 });
