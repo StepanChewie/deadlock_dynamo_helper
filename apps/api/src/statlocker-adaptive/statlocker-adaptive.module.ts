@@ -3,6 +3,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import * as puppeteer from 'puppeteer-core';
 import { DeadlockLiveModule } from '../deadlock-live/deadlock-live.module';
+import { AdaptiveBuildIterationV1Entity } from '../deadlock-live/entities/adaptive-build-iteration-v1.entity';
 import { BuildArchetypeMatchLockV2Entity } from '../deadlock-live/entities/build-archetype-match-lock-v2.entity';
 import { BuildArchetypeSnapshotV2Entity } from '../deadlock-live/entities/build-archetype-snapshot-v2.entity';
 import { RecommendationEconomyRulesSnapshotV1Entity } from '../deadlock-live/entities/recommendation-economy-rules-snapshot-v1.entity';
@@ -69,6 +70,7 @@ import { ThreatWeightedMatchupV1Service } from './threat-weighted-matchup-v1.ser
       StatlockerVsHeroWpaRowV1Entity,
       BuildArchetypeSnapshotV2Entity,
       BuildArchetypeMatchLockV2Entity,
+      AdaptiveBuildIterationV1Entity,
     ]),
   ],
   controllers: [AdaptiveRecommendationV2Controller, AdaptiveStatusCompatibilityV1Controller],

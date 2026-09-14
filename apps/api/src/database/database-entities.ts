@@ -1,3 +1,4 @@
+import { AdaptiveBuildIterationV1Entity } from '../deadlock-live/entities/adaptive-build-iteration-v1.entity';
 import { BuildArchetypeMatchLockV2Entity } from '../deadlock-live/entities/build-archetype-match-lock-v2.entity';
 import { BuildArchetypeSnapshotV2Entity } from '../deadlock-live/entities/build-archetype-snapshot-v2.entity';
 import { GameRuleset } from '../deadlock-live/entities/game-ruleset.entity';
@@ -34,4 +35,5 @@ export const DATABASE_ENTITIES = [
   BuildArchetypeMatchLockV2Entity,
   BuildArchetypeSnapshotV2Entity,
   RecommendationEconomyRulesSnapshotV1Entity,
+  AdaptiveBuildIterationV1Entity,
 ];

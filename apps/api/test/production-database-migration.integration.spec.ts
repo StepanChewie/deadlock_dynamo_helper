@@ -17,6 +17,7 @@ const REQUIRED_NEW_TABLES = [
   'recommendation_item_catalog_recipes_v1',
   'build_archetype_snapshots_v2',
   'build_archetype_match_locks_v2',
+  'adaptive_build_iterations_v1',
 ] as const;
 
 const PREEXISTING_MIGRATIONS = [
@@ -127,15 +128,31 @@ integrationDescribe('production database migration integration', () => {
         'CreateRecommendationRuntimeTables1788220800000',
         'CreateBuildArchetypeV2Runtime1789056000000',
         'ScopeBuildArchetypeMatchLocksByPlayerV11789228800000',
+        'CreateAdaptiveBuildIterationsV11789315200000',
       ]],
     )) as Array<{ name: string }>;
 
     expect(rows.map((row) => row.name)).toEqual([
+      'CreateAdaptiveBuildIterationsV11789315200000',
       'CreateBuildArchetypeV2Runtime1789056000000',
       'CreateRecommendationRuntimeTables1788220800000',
       'ScopeBuildArchetypeMatchLocksByPlayerV11789228800000',
     ]);
     expect(await dataSource.showMigrations()).toBe(false);
+  });
+
+  it('creates the build iteration history indexes', async () => {
+    const indexes = (await dataSource.query(
+      `SELECT indexname FROM pg_indexes
+       WHERE schemaname = 'public' AND tablename = 'adaptive_build_iterations_v1'
+       ORDER BY indexname`,
+    )) as Array<{ indexname: string }>;
+    const names = indexes.map((row) => row.indexname);
+
+    expect(names).toContain('uq_build_iteration_plan_v1');
+    expect(names).toContain('uq_build_iteration_not_ready_v1');
+    expect(names).toContain('idx_build_iteration_match_v1');
+    expect(names).toContain('idx_build_iteration_player_v1');
   });
 
   it('scopes archetype match locks by player', async () => {
