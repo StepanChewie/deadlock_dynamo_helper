@@ -110,7 +110,7 @@ The broken debug page is not repaired here; the endpoints are changed so that th
 |---|---|---|
 | `id` | bigserial PK | read order |
 | `matchId` | varchar(128) NOT NULL | |
-| `steamId` | varchar(32) NOT NULL | sentinel `unknown` when the local player is unresolved; NOT NULL so the unique index can dedupe |
+| `steamId` | varchar(32) NOT NULL | sentinel `unknown` when the local player is unresolved; NOT NULL because the previous-state check and the last-row lookup are keyed on `(matchId, steamId)` |
 | `heroId` | integer NULL | |
 | `gameTimeSec` | integer NULL | |
 | `kind` | varchar(16) NOT NULL | `PLAN` or `NOT_READY` |
@@ -129,11 +129,12 @@ The broken debug page is not repaired here; the endpoints are changed so that th
 
 Indexes:
 
-- `UNIQUE (matchId, steamId, fingerprint) WHERE kind = 'PLAN'`
-- `UNIQUE (matchId, steamId, fingerprint) WHERE kind = 'NOT_READY'`
+- `idx_build_iteration_last_v1 (matchId, steamId, id DESC)` — the last-row lookup that the dedupe check (B3) uses
 - `(matchId, capturedAt)`
 - `(steamId, capturedAt DESC)`
 - partial `(capturedAt) WHERE pinned = false` for cleanup
+
+> Changed 2026-09-14/15: the two partial unique indexes `uq_build_iteration_plan_v1` and `uq_build_iteration_not_ready_v1` no longer exist and are replaced by the last-row search index above. Deduplication is now a comparison against the previous stored state, because the user requires that returning to a previous state is itself a change and must be recorded (A → B → A is three rows). See B3.
 
 Column comment on `rejects` and on the table must state: incident review only, never a training corpus (ADR-007).
 
@@ -144,19 +145,27 @@ Column comment on `rejects` and on the table must state: incident review only, n
 - `planFingerprint(steps)` — sha256 over the ordered `action|buyItemId|sellItemId|recipeId` list from `fullBuild.steps`. Order is significant; A → B → A produces three distinct fingerprints.
 - `blockerFingerprint(blockers)` — sha256 over the sorted, de-duplicated blocker list. Order is not significant.
 - `extractRejects(stages)` — from `BuildDecisionTraceV2.stages`, keeps only entries with `disposition` `REJECTED` or `SUPPRESSED_BY_HYSTERESIS`, per stage, preserving `reasonCodes` and identifiers (itemId / archetypeId / sell+buy pair).
-- Size limit: serialized `plan` and `rejects` are capped (default 64 KB each). Over the cap, the object is trimmed to the leading entries per stage and `truncated` is set. Configurable via `ADAPTIVE_BUILD_ITERATION_MAX_JSON_KB`.
+- Size limit: serialized `plan` and `rejects` are capped (default 64 KB each); `truncated` is set on the row when either cap bites. Over the cap, `plan` is stored as a compact projection (steps reduced to `sequence` / `action` / `buyItemId` / `sellItemId` / `recipeId` / `reasonCodes`, `semanticValidation.finalFamilyStates` emptied) and `rejects` drops half of the entries of every stage until it fits. Configurable via `ADAPTIVE_BUILD_ITERATION_MAX_JSON_KB`.
 
 ### B3. `BuildIterationHistoryV1Service.record()`
 
 ```
 record(input): void   // never throws to the caller
-  1. pick fingerprint source by kind (plan steps or blockers)
-  2. build the row
-  3. INSERT ... ON CONFLICT DO NOTHING  (partial unique index per kind)
-  4. on error: log warn, return
+  1. build the row (fingerprint source by kind: plan steps or blockers)
+  2. read the previous state for (matchId, steamId): in-process cache first, otherwise one `findOne` with order id DESC
+  3. if it has the same `kind` AND the same `fingerprint`, return without writing
+  4. otherwise INSERT the row and cache `{ kind, fingerprint }` for the pair
+  5. on error: log warn, return
 ```
 
-No in-memory dedup state: the digest is computed on every request and the insert is idempotent. `recommend` is already debounced (1500 ms) and payload-deduplicated on the client, so the write rate is a handful per player per minute.
+Deduplication is a comparison against the previous stored state, not a unique constraint. The comparison is made across kinds: a `PLAN` never collapses into a `NOT_READY` even when both would carry an equal fingerprint. In-memory state does exist, and it is bounded to one `{ kind, fingerprint }` entry per `(matchId, steamId)`; it only saves the `findOne`. After a process restart the cache is empty and the previous state is re-hydrated from the table by that one `findOne`, so an unchanged state still writes nothing.
+
+Two consequences, and these are the user's requirement rather than implementation detail:
+
+- A return to a previous state is a change: `A → B → A` writes three rows. The former unique-index scheme collapsed the second `A` into the first row and lost the oscillation.
+- Five unchanged ticks still write exactly one row.
+
+`recommend` is already debounced (1500 ms) and payload-deduplicated on the client, so the write rate is a handful per player per minute.
 
 ### B4. Capture object and the single write site
 
@@ -224,7 +233,7 @@ UPDATE adaptive_build_iterations_v1 SET pinned = true WHERE "matchId" = $1;
 | Level | Cases |
 |---|---|
 | pure functions | plan fingerprint: order significant, A → B → A distinct; blocker fingerprint: order insignificant; rejects extract: only `REJECTED` / `SUPPRESSED_BY_HYSTERESIS`; size cap sets `truncated` |
-| history service | identical state twice → one row; two players in one match → two rows; `PLAN → NOT_READY → PLAN` → three rows; insert failure does not throw |
+| history service | identical state twice → one row; five identical ticks → one row; `A → B → A` → three rows; two players in one match → two rows; `PLAN → NOT_READY → PLAN` → three rows; restart re-hydrates the previous state and appends only real changes; insert failure does not throw |
 | session service | two players, same match, different locks; same player race → unique violation path |
 | trace store | revisions counted per player; `observe` returns the requested player's trace |
 | recommendation e2e | two clients in one match receive different builds and both get history rows; the second player no longer receives `LOCKED_ARCHETYPE_HERO_MISMATCH`; hysteresis uses the same player's previous plan |
