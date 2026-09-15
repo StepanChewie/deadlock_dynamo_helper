@@ -8,10 +8,10 @@ const target = process.env.OVERWOLF_PUBLIC_TARGET || '/mnt/c/Users/Chewbacca/Des
 /**
  * True when the target game process is up.
  *
- * Writing into the live app folder while a match is running makes Overwolf
- * reload the app mid-session, which re-registers GEP required features in the
- * middle of a match. That is the one way a build can disturb live game data, so
- * refuse rather than risk it. Returns false when the check is unavailable, so
+ * Informational only. Overwolf reloads the app when these files change, and a
+ * reload mid-match re-registers GEP required features during a live session.
+ * The build is never blocked for it — the app gets relaunched anyway — but the
+ * reminder is worth printing. Returns false when the check is unavailable, so
  * non-Windows hosts still build.
  */
 function isGameRunning() {
@@ -48,11 +48,10 @@ if (!fs.existsSync(source)) {
   throw new Error(`Overwolf public source does not exist: ${source}`);
 }
 
-if (isGameRunning() && process.env.OVERWOLF_ALLOW_LIVE_SYNC !== '1') {
-  throw new Error(
-    'Deadlock is running. Syncing now would make Overwolf reload the app mid-match '
-    + 'and re-register GEP features during a live session.\n'
-    + 'Close Deadlock and build again, or set OVERWOLF_ALLOW_LIVE_SYNC=1 to override.',
+if (isGameRunning()) {
+  console.warn(
+    'Note: Deadlock is running — Overwolf reloads the app when these files change, '
+    + 'so relaunch it before the next match.',
   );
 }
 
