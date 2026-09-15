@@ -62,7 +62,7 @@ If running a Discord server is not wanted, Overwolf's requirement is a *communic
 
 ## Progress 2026-09-15
 
-Everything below was implemented and verified green: 27 client suites / 134 tests, 99 API suites / 452 tests, and a full `yarn build`.
+Everything below was implemented and verified green: 27 client suites / 139 tests, 99 API suites / 452 tests, and a full `yarn build`.
 
 | Task | Commit | Note |
 |---|---|---|
@@ -76,6 +76,8 @@ Everything below was implemented and verified green: 27 client suites / 134 test
 | Task 11 — post-match feedback | `9c386be8` | Includes a cross-package test that the client's reasons match the API allowlist |
 | Task 12 — kill switch | `a2042ae4` | Env-driven, re-read per call; fail-closed with no route |
 | Task 2b — package rename | `5a160a97` | 81 files, 94 specifiers. Data identifiers preserved — see below |
+| Task 9 — support surface | `f92b27c3` | Discord invite + in-app privacy note + Copy diagnostics. Policy/terms links still open |
+| — | — | Discord server `Dynamo Lab` created and structured (outside the repo); invite `https://discord.gg/yR4TNN2GDH` |
 
 Also fixed: `apps/api/test/statlocker-only-serving-cutover.spec.ts` asserted the pre-rename product name and had been failing since `bc4a05eb`. Corrected in `0d501b66`.
 
@@ -94,8 +96,10 @@ Not code, but the longest lead times. Start these before Phase 1 and run them in
 
 - [ ] **Submit the app idea** via the Overwolf App proposal form (`https://dev.overwolf.com/app-idea-form`). It must be a **public** app — Overwolf does not approve private apps, and apps without an approved proposal are considered non-compliant and may not use Overwolf APIs.
 - [ ] **Raise the monetization question in the proposal.** State that launch is unmonetized with an ad slot reserved, and ask DevRel to confirm whether that is approvable. Record the answer in the Decisions table above. See the risk note.
-- [ ] **Choose the communication channel.** Discord server, or the email + GitHub Discussions alternative. Required before submission by Task 9.
+- [x] **Choose the communication channel.** Discord server, or the email + GitHub Discussions alternative. Required before submission by Task 9.
+  **DONE 2026-09-16 — Discord.** Server `Dynamo Lab` (guild `1549527863483437187`), permanent invite `https://discord.gg/yR4TNN2GDH`, structure built and linked from the app in `f92b27c3`. Channels: `INFORMATION` (`#welcome`, `#how-to-use`, `#changelog`, read-only for `@everyone`), `SUPPORT` (`#support`, `#bug-reports`, `#recommendation-feedback`), `VOICE` (`General`). The invite is now the store listing's support URL.
 - [ ] **Publish the privacy policy and terms.** They need a public URL; if there is no domain yet, a GitHub Pages or equivalent host is sufficient for submission. Required by Task 9.
+  **Still open.** Neither document exists in the repo, and no URL has been chosen. Verified 2026-09-16 that `StepanChewie/deadlock_dynamo_helper` is a **public** repository, so a hosted page there is a working option today — GitHub Pages is not yet enabled (`has_pages: false`), so it would need turning on, or the docs can be linked as rendered GitHub blob URLs. Whichever is chosen, the links belong in the `#support` block next to `Join Discord`, and the same URLs go in the Developer Console listing. The in-app privacy note shipped in `f92b27c3` is a summary, not a replacement for these pages.
 - [ ] **Verify Deadlock / Valve third-party compliance** separately. Overwolf defers to the game's EULA and ToS; an approved Overwolf app can still violate a game's terms.
 
 Deferred out of Phase 0 by decision 2 — the production domain is no longer a prerequisite for development, only for the final OPK submission. It is now a gate in the Final Review Gate section instead.
@@ -598,7 +602,7 @@ Overwolf's game compliance rules require that "the app should have a communicati
 - Modify: `apps/overwolf-client/public/manifest.json` (if a support URL field is accepted by the schema)
 - Modify: `apps/overwolf-client/src/player-surface-contract.spec.ts`
 
-- [ ] **Step 1: Add failing assertions**
+- [x] **Step 1: Add failing assertions**
 
 ```ts
 it('links to the support channel', () => {
@@ -607,11 +611,18 @@ it('links to the support channel', () => {
 });
 ```
 
-- [ ] **Step 2: Witness RED, then add the surfaces**
+- [x] **Step 2: Witness RED, then add the surfaces**
 
 Add a support section to the desktop window with: `Join Discord`, a link to the privacy policy and terms, and a `Copy diagnostics` action (Task 10). Set the support URL in the Developer Console store listing to the same invite.
 
-- [ ] **Step 3: Verify and commit**
+**DONE (`f92b27c3`) — except the two policy links.** The section now carries `Join Discord` (invite `https://discord.gg/yR4TNN2GDH`), `Copy diagnostics`, and an in-app privacy note stating exactly what leaves the machine: raw game events, match id and Steam ID to the recommendation API, plus feedback stored without any player identifier. The note is grounded in the real outbound calls, not boilerplate.
+
+Two findings worth keeping:
+
+- The link **cannot** be a plain `<a href>`. Every window sets `block_top_window_navigation: true` (Task 4), so in-app navigation is blocked by design. The button routes through `ui.openExternal()`, which prefers `overwolf.utils.openUrlInDefaultBrowser` and falls back to `window.open`.
+- **A link to the privacy policy and terms is still missing**, because neither document exists yet and no public URL has been chosen. The in-app note satisfies the "privacy" assertion but is not a substitute for the two pages Phase 0 requires. Drafting and hosting them is tracked under Phase 0.
+
+- [x] **Step 3: Verify and commit**
 
 ```bash
 yarn workspace @deadlock-live-probe/overwolf-client test player-surface-contract.spec.ts
