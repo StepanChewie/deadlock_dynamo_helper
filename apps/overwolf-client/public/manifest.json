@@ -53,12 +53,12 @@
         "use_os_windowing": true,
         "show_in_taskbar": true,
         "size": {
-          "width": 600,
-          "height": 600
+          "width": 1100,
+          "height": 760
         },
         "min_size": {
-          "width": 600,
-          "height": 400
+          "width": 860,
+          "height": 560
         }
       },
       "in_game": {
