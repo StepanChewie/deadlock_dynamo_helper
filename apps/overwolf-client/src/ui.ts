@@ -164,6 +164,30 @@ export function dismissPostMatchFeedback(): void {
   setHidden('post-match-feedback', true);
 }
 
+/**
+ * Opens an external link in the player's real browser.
+ *
+ * A plain `<a href>` cannot be used: every window declares
+ * `block_top_window_navigation`, so in-app navigation is blocked on purpose.
+ * Overwolf's own helper is the supported route out.
+ */
+export function openExternal(url: string): void {
+  try {
+    const overwolf = (globalThis as { overwolf?: any }).overwolf;
+    if (typeof overwolf?.utils?.openUrlInDefaultBrowser === 'function') {
+      overwolf.utils.openUrlInDefaultBrowser(url);
+      return;
+    }
+
+    (globalThis as { open?: (u: string, target?: string) => unknown }).open?.(
+      url,
+      '_blank',
+    );
+  } catch {
+    // No browser handoff available; the URL is also visible in the panel text.
+  }
+}
+
 let hasAdaptiveRecommendation = false;
 
 export const RECOMMENDATIONS_DISABLED_BLOCKER = 'RECOMMENDATIONS_DISABLED';

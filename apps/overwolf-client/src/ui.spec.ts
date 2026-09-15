@@ -6,6 +6,7 @@ import {
   dismissHotkeyHint,
   dismissPostMatchFeedback,
   hideSituationalPanel,
+  openExternal,
   revealPostMatchReasons,
   setRefreshPending,
   showAdaptiveError,
@@ -560,5 +561,41 @@ describe('Dynamo Lab maintenance state', () => {
 
     expect(elements.get('guide-active')?.style.display).toBe('flex');
     expect(elements.get('rec-plan')?.children ?? []).toHaveLength(5);
+  });
+});
+
+describe('Dynamo Lab external link handling', () => {
+  const originalOverwolf = (globalThis as any).overwolf;
+  const originalOpen = (globalThis as any).open;
+
+  afterEach(() => {
+    (globalThis as any).overwolf = originalOverwolf;
+    (globalThis as any).open = originalOpen;
+  });
+
+  it('hands the URL to Overwolf so it opens outside the app', () => {
+    const openUrlInDefaultBrowser = jest.fn();
+    (globalThis as any).overwolf = { utils: { openUrlInDefaultBrowser } };
+
+    openExternal('https://discord.gg/yR4TNN2GDH');
+
+    expect(openUrlInDefaultBrowser).toHaveBeenCalledWith('https://discord.gg/yR4TNN2GDH');
+  });
+
+  it('falls back to a window open when the Overwolf helper is missing', () => {
+    const open = jest.fn();
+    (globalThis as any).overwolf = undefined;
+    (globalThis as any).open = open;
+
+    openExternal('https://discord.gg/yR4TNN2GDH');
+
+    expect(open).toHaveBeenCalledWith('https://discord.gg/yR4TNN2GDH', '_blank');
+  });
+
+  it('stays silent when nothing can open the link', () => {
+    (globalThis as any).overwolf = undefined;
+    (globalThis as any).open = undefined;
+
+    expect(() => openExternal('https://discord.gg/yR4TNN2GDH')).not.toThrow();
   });
 });

@@ -284,8 +284,14 @@
         line-height: 1.6;
       }
 
-      .support-button {
+      .support-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
         margin: 10px 14px 0;
+      }
+
+      .support-button {
         padding: 6px 14px;
         border: 1px solid var(--line);
         border-radius: 3px;
@@ -297,6 +303,31 @@
 
       .support-button:hover,
       .support-button:focus-visible { border-color: var(--amber); color: var(--amber); }
+
+      .support-primary {
+        border-color: var(--amber);
+        background: var(--amber);
+        color: #041b25;
+      }
+
+      .support-primary:hover,
+      .support-primary:focus-visible { background: #efb566; color: #041b25; }
+
+      .support-privacy {
+        margin: 0 14px 14px;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.65;
+      }
+
+      .support-privacy strong { color: var(--text); }
+
+      .support-privacy code {
+        padding: 1px 4px;
+        border: 1px solid var(--line-soft);
+        border-radius: 2px;
+        font: 400 10px/1.4 var(--mono);
+      }
 
       .diagnostic-summary {
         margin: 10px 14px 14px;
@@ -695,9 +726,19 @@
 
         <details id="support" class="support">
           <summary>Support</summary>
-          <p class="support-copy">If a recommendation looks wrong, copy the diagnostics below and include them in your report.</p>
-          <button type="button" class="support-button" onclick="overwolf.windows.getMainWindow().copyDiagnostics?.()">Copy diagnostics</button>
+
+          <p class="support-copy">If a recommendation looks wrong, tell us on Discord. Copy the diagnostics below and include them in your report.</p>
+
+          <div class="support-actions">
+            <button type="button" class="support-button support-primary" onclick="overwolf.windows.getMainWindow().openExternal?.('https://discord.gg/yR4TNN2GDH')">Join Discord</button>
+            <button type="button" class="support-button" onclick="overwolf.windows.getMainWindow().copyDiagnostics?.()">Copy diagnostics</button>
+          </div>
+
           <pre id="diagnostic-summary" class="diagnostic-summary" aria-label="Diagnostic summary"></pre>
+
+          <p class="support-privacy">
+            <strong>Privacy.</strong> Dynamo Lab sends the current match state to its server so it can build a purchase route: the raw game events Overwolf reports, the match id, and your Steam ID. The post-match feedback you send is stored without any account or player identifier, and it is never used to train the recommendation model. There is no account and no sign-in. Item artwork is loaded from <code>unpkg.com</code>, a third-party CDN. The diagnostics block above is only copied when you press the button.
+          </p>
         </details>
       </main>
     </div>

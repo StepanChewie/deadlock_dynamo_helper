@@ -119,6 +119,7 @@ function initializeBackgroundWindow(): void {
   mainWindow.copyDiagnostics = (): void => {
     void ui.copyDiagnostics();
   };
+  mainWindow.openExternal = ui.openExternal;
   mainWindow.revealPostMatchReasons = ui.revealPostMatchReasons;
   mainWindow.dismissPostMatchFeedback = ui.dismissPostMatchFeedback;
   mainWindow.answerPostMatchFeedback = (useful: boolean, reason?: string): void => {

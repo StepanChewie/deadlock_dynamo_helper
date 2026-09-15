@@ -51,6 +51,16 @@ describe('Dynamo Lab desktop surface contract', () => {
     expect(desktop).toContain('id="diagnostic-summary"');
     expect(desktop).toContain('copyDiagnostics');
   });
+
+  it('links to the support channel', () => {
+    expect(desktop).toMatch(/discord\.gg\//);
+    expect(desktop).toMatch(/privacy/i);
+  });
+
+  it('states what leaves the machine without over-claiming', () => {
+    expect(desktop).toMatch(/Steam ID/i);
+    expect(desktop).toMatch(/no account|without an account/i);
+  });
 });
 
 describe('Dynamo Lab overlay surface contract', () => {
