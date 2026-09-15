@@ -77,6 +77,7 @@ Everything below was implemented and verified green: 27 client suites / 139 test
 | Task 12 — kill switch | `a2042ae4` | Env-driven, re-read per call; fail-closed with no route |
 | Task 2b — package rename | `5a160a97` | 81 files, 94 specifiers. Data identifiers preserved — see below |
 | Task 9 — support surface | `f92b27c3` | Discord invite + in-app privacy note + Copy diagnostics. Policy/terms links still open |
+| Privacy policy and terms | `d5e13822` | Written and linked; **not public until the branch is pushed** (origin is 45 commits behind) |
 | — | — | Discord server `Dynamo Lab` created and structured (outside the repo); invite `https://discord.gg/yR4TNN2GDH` |
 
 Also fixed: `apps/api/test/statlocker-only-serving-cutover.spec.ts` asserted the pre-rename product name and had been failing since `bc4a05eb`. Corrected in `0d501b66`.
@@ -99,7 +100,10 @@ Not code, but the longest lead times. Start these before Phase 1 and run them in
 - [x] **Choose the communication channel.** Discord server, or the email + GitHub Discussions alternative. Required before submission by Task 9.
   **DONE 2026-09-16 — Discord.** Server `Dynamo Lab` (guild `1549527863483437187`), permanent invite `https://discord.gg/yR4TNN2GDH`, structure built and linked from the app in `f92b27c3`. Channels: `INFORMATION` (`#welcome`, `#how-to-use`, `#changelog`, read-only for `@everyone`), `SUPPORT` (`#support`, `#bug-reports`, `#recommendation-feedback`), `VOICE` (`General`). The invite is now the store listing's support URL.
 - [ ] **Publish the privacy policy and terms.** They need a public URL; if there is no domain yet, a GitHub Pages or equivalent host is sufficient for submission. Required by Task 9.
-  **Still open.** Neither document exists in the repo, and no URL has been chosen. Verified 2026-09-16 that `StepanChewie/deadlock_dynamo_helper` is a **public** repository, so a hosted page there is a working option today — GitHub Pages is not yet enabled (`has_pages: false`), so it would need turning on, or the docs can be linked as rendered GitHub blob URLs. Whichever is chosen, the links belong in the `#support` block next to `Join Discord`, and the same URLs go in the Developer Console listing. The in-app privacy note shipped in `f92b27c3` is a summary, not a replacement for these pages.
+  **WRITTEN (`d5e13822`), NOT YET PUBLIC — this is the last blocking step.**
+  Both documents now exist as `docs/privacy.md` and `docs/terms.md`, and the app links them from the `#support` block. Their content is grounded in verified behaviour, not boilerplate: the three outbound calls, the Steam ID and why it is needed, the no-player-identifier feedback design, the `unpkg.com` CDN, and the real retention numbers (newest 32 raw log files; 30-day recommendation-history TTL from `ADAPTIVE_BUILD_ITERATION_TTL_DAYS`). Controller is `StepanChewbacca`, contact is the Discord `#support` channel, governing law is Ukraine.
+  **The links resolve to `github.com/StepanChewie/deadlock_dynamo_helper/blob/main/docs/...`, which 404s until the branch is pushed.** `origin/main` is 45 commits behind and last moved on 2026-09-14. Pushing is required before these URLs are usable in the Developer Console listing; verify with `curl -o /dev/null -w "%{http_code}" https://raw.githubusercontent.com/StepanChewie/deadlock_dynamo_helper/main/docs/privacy.md`.
+  Optional polish afterwards: enable GitHub Pages (`has_pages: false` today) for a `stepanchewie.github.io` URL instead of a `blob/main` path, or move both pages to the production domain once Task 5 supplies one.
 - [ ] **Verify Deadlock / Valve third-party compliance** separately. Overwolf defers to the game's EULA and ToS; an approved Overwolf app can still violate a game's terms.
 
 Deferred out of Phase 0 by decision 2 — the production domain is no longer a prerequisite for development, only for the final OPK submission. It is now a gate in the Final Review Gate section instead.
@@ -620,7 +624,7 @@ Add a support section to the desktop window with: `Join Discord`, a link to the 
 Two findings worth keeping:
 
 - The link **cannot** be a plain `<a href>`. Every window sets `block_top_window_navigation: true` (Task 4), so in-app navigation is blocked by design. The button routes through `ui.openExternal()`, which prefers `overwolf.utils.openUrlInDefaultBrowser` and falls back to `window.open`.
-- **A link to the privacy policy and terms is still missing**, because neither document exists yet and no public URL has been chosen. The in-app note satisfies the "privacy" assertion but is not a substitute for the two pages Phase 0 requires. Drafting and hosting them is tracked under Phase 0.
+- **A link to the privacy policy and terms** was added afterwards in `d5e13822`, pointing at `docs/privacy.md` and `docs/terms.md`. Those pages are written but **not yet public** — see the Phase 0 note; the links 404 until the branch is pushed.
 
 - [x] **Step 3: Verify and commit**
 
