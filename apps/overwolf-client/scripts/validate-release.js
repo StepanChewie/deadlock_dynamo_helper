@@ -78,6 +78,18 @@ for (const [windowName, windowConfig] of Object.entries(manifest.data?.windows |
       fs.existsSync(path.join(publicDir, windowConfig.file)),
     `Window ${windowName} references a missing file.`,
   );
+  assert(
+    windowConfig.block_top_window_navigation === true,
+    `Window ${windowName} must set block_top_window_navigation: true.`,
+  );
+  assert(
+    windowConfig.popup_blocker === true,
+    `Window ${windowName} must set popup_blocker: true.`,
+  );
+  assert(
+    windowConfig.mute === true,
+    `Window ${windowName} must set mute: true.`,
+  );
 }
 
 const desktopSize = manifest.data?.windows?.desktop?.size;

@@ -47,6 +47,9 @@
     "windows": {
       "desktop": {
         "file": "desktop.html",
+        "block_top_window_navigation": true,
+        "popup_blocker": true,
+        "mute": true,
         "transparent": false,
         "resizable": true,
         "desktop_only": true,
@@ -63,6 +66,9 @@
       },
       "in_game": {
         "file": "in_game.html",
+        "block_top_window_navigation": true,
+        "popup_blocker": true,
+        "mute": true,
         "transparent": true,
         "resizable": true,
         "clickthrough": false,
@@ -83,6 +89,9 @@
       },
       "dynamo_warning": {
         "file": "dynamo_warning.html",
+        "block_top_window_navigation": true,
+        "popup_blocker": true,
+        "mute": true,
         "transparent": true,
         "resizable": true,
         "clickthrough": false,
