@@ -48,8 +48,56 @@ function extractMatchIdFromInfo(info: unknown): string | undefined {
     ?? matchIdFromValue(record.match_info?.matchId);
 }
 
-function isTerminalMatchSnapshot(info: unknown): boolean {
+let lastSnapshotShape = '';
+let lastPhase: string | undefined;
+
+/**
+ * Describes the shape of a GEP snapshot using key NAMES only, never values.
+ *
+ * When `match_info` stops arriving, nothing throws: the match id simply never
+ * appears, so the overlay is never restored and no recommendation is ever
+ * requested. Both symptoms look identical to "still loading". Recording the
+ * shape makes the missing category visible in the diagnostics block.
+ */
+function describeSnapshot(info: unknown): string {
   if (!info || typeof info !== 'object') {
+    return 'none';
+  }
+
+  const parts: string[] = [];
+  for (const [category, categoryData] of Object.entries(info as Record<string, unknown>)) {
+    if (!categoryData || typeof categoryData !== 'object') {
+      continue;
+    }
+
+    const keys = Object.keys(categoryData as Record<string, unknown>).sort();
+    parts.push(`${category}(${keys.length > 0 ? keys.join(',') : 'empty'})`);
+  }
+
+  return parts.length > 0 ? parts.sort().join(' ') : 'empty';
+}
+
+function recordSnapshot(info: unknown): void {
+  lastSnapshotShape = describeSnapshot(info);
+
+  const rawPhase = (info as Record<string, any> | undefined)?.game_info?.phase;
+  const phase = matchIdFromValue(rawPhase);
+  if (phase) {
+    lastPhase = phase;
+  }
+}
+
+/** Shape of the most recent GEP snapshot, key names only. */
+export function readGepSnapshotShape(): string {
+  return lastSnapshotShape;
+}
+
+/** Last observed `game_info.phase`, e.g. `GameInProgress`. */
+export function readGepPhase(): string | undefined {
+  return lastPhase;
+}
+
+function isTerminalMatchSnapshot(info: unknown): boolean {  if (!info || typeof info !== 'object') {
     return false;
   }
 
@@ -213,6 +261,7 @@ function emitInfoEntries(
     return;
   }
 
+  recordSnapshot(info);
   matchContext.currentMatchId = extractMatchIdFromInfo(info) ?? matchContext.currentMatchId;
 
   for (const [category, categoryData] of Object.entries(info)) {

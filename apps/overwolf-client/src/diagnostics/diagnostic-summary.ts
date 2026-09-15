@@ -18,6 +18,14 @@ export interface DiagnosticSummaryInput {
   readonly catalogSha256?: string;
   readonly lastRequestId?: string;
   readonly lastError?: string;
+  /**
+   * Key NAMES only — never values. These two lines exist because the GEP
+   * snapshot is the only place that shows whether `match_info` is being
+   * delivered at all, and a missing `match_info` silently disables both the
+   * overlay and the recommendation without any error anywhere.
+   */
+  readonly gepPhase?: string;
+  readonly gepSnapshot?: string;
 }
 
 const MAX_VALUE_LENGTH = 160;
@@ -34,6 +42,8 @@ const FIELDS: ReadonlyArray<readonly [string, keyof DiagnosticSummaryInput]> = [
   ['Catalog sha256', 'catalogSha256'],
   ['Last request id', 'lastRequestId'],
   ['Last error', 'lastError'],
+  ['GEP phase', 'gepPhase'],
+  ['GEP snapshot', 'gepSnapshot'],
 ];
 
 function normalize(value: unknown): string | null {

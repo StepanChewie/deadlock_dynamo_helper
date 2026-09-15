@@ -1,5 +1,9 @@
 import { LiveEventBuffer } from './overwolf/live-event-buffer';
-import { listenOverwolfEvents } from './overwolf/listen-overwolf-events';
+import {
+  listenOverwolfEvents,
+  readGepPhase,
+  readGepSnapshotShape,
+} from './overwolf/listen-overwolf-events';
 import { setRequiredFeatures } from './overwolf/set-required-features';
 import { isSuccessfulOverwolfResult } from './overwolf/window-result';
 import { InGameOverlayLifecycle } from './overwolf/in-game-overlay-lifecycle';
@@ -258,6 +262,10 @@ function initializeBackgroundWindow(): void {
       listenOverwolfEvents((event) => {
         const eventDetails = `Source: ${event.source} | Key: ${event.key || 'n/a'} | Cat: ${event.category || 'n/a'}`;
         ui.updateLastEvent(eventDetails);
+        ui.updateDiagnosticContext({
+          gepPhase: readGepPhase(),
+          gepSnapshot: readGepSnapshotShape(),
+        });
 
         const previousMatchId = currentMatchId;
         const context = extractAdaptiveContext(event);

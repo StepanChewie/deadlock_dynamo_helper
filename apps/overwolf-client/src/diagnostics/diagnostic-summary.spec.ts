@@ -67,3 +67,25 @@ it('bounds a long error message', () => {
   expect(errorLine!.length).toBeLessThan(200);
   expect(errorLine).toContain('…');
 });
+
+it('reports the GEP snapshot shape and phase', () => {
+  const summary = buildDiagnosticSummary({
+    appVersion: '0.1.15',
+    recommendationStatus: 'NOT_READY',
+    gepPhase: 'GameInProgress',
+    gepSnapshot: 'game_info(steam_id) match_info(none)',
+  });
+
+  expect(summary).toContain('GEP phase: GameInProgress');
+  expect(summary).toContain('GEP snapshot: game_info(steam_id) match_info(none)');
+});
+
+it('drops the GEP lines when nothing has been observed yet', () => {
+  const summary = buildDiagnosticSummary({
+    appVersion: '0.1.15',
+    recommendationStatus: 'NOT_READY',
+  });
+
+  expect(summary).not.toContain('GEP phase');
+  expect(summary).not.toContain('GEP snapshot');
+});
