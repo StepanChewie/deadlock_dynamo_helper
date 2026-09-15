@@ -592,6 +592,14 @@ describe('Dynamo Lab degraded game events notice', () => {
     expect(elements.get('guide-empty-copy')?.textContent).toMatch(/restart Overwolf/i);
   });
 
+  it('names the reinstall, because a restart alone does not fix a dead game plugin', () => {
+    setGameEventsDegraded(true);
+
+    const copy = elements.get('guide-empty-copy')?.textContent ?? '';
+    expect(copy).toMatch(/reinstall/i);
+    expect(copy).toMatch(/repair|re-fetch/i);
+  });
+
   it('goes back to the normal waiting copy once data resumes', () => {
     setGameEventsDegraded(true);
     setGameEventsDegraded(false);

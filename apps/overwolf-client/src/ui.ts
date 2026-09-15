@@ -316,7 +316,9 @@ export function hideSituationalPanel(): void {
     setText('guide-empty-title', 'Overwolf is not passing game data');
     setText(
       'guide-empty-copy',
-      'Deadlock is running but Overwolf is not sending its game events, so there is nothing to build from. Restart Overwolf, then reopen Dynamo Lab.',
+      'Deadlock is running but Overwolf is not sending its game events, so there is nothing to build from. '
+      + 'Restart Overwolf, then reopen Dynamo Lab. If that does not help, reinstall Overwolf: '
+      + 'its game plugin can fail to attach, and a repair is the only thing that re-fetches it.',
     );
   } else {
     setText('guide-empty-title', 'Waiting for match data');
