@@ -3,6 +3,7 @@ import {
   listenOverwolfEvents,
   readGepPhase,
   readGepSnapshotShape,
+  readGepVersion,
 } from './overwolf/listen-overwolf-events';
 import { setRequiredFeatures } from './overwolf/set-required-features';
 import { isSuccessfulOverwolfResult } from './overwolf/window-result';
@@ -256,7 +257,10 @@ function initializeBackgroundWindow(): void {
       ui.updateStatus('Connecting', 'init');
       await setRequiredFeatures();
       ui.updateStatus('Ready', 'connected');
-      ui.updateDiagnosticContext({ gepStatus: 'REGISTERED' });
+      // Clear any earlier registration failure. Without this, an app that was
+      // started before the game keeps reporting "Not in a game" long after it
+      // recovered, which reads like a live fault.
+      ui.updateDiagnosticContext({ gepStatus: 'REGISTERED', lastError: undefined });
       ui.logConsole('Successfully registered GEP required features: game_info, match_info');
 
       listenOverwolfEvents((event) => {
@@ -265,6 +269,7 @@ function initializeBackgroundWindow(): void {
         ui.updateDiagnosticContext({
           gepPhase: readGepPhase(),
           gepSnapshot: readGepSnapshotShape(),
+          gepVersion: readGepVersion(),
         });
 
         const previousMatchId = currentMatchId;

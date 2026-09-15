@@ -118,6 +118,13 @@ describe('listenOverwolfEvents', () => {
             phase: 'GameInProgress',
             steam_id: '76561198000000001',
           },
+          gep_internal: {
+            version_info: JSON.stringify({
+              local_version: '244.0.0',
+              public_version: '260.0.0',
+              is_updated: true,
+            }),
+          },
         },
       });
     });
@@ -134,8 +141,9 @@ describe('listenOverwolfEvents', () => {
 
     mod.listenOverwolfEvents(jest.fn());
 
-    expect(mod.readGepSnapshotShape()).toBe('game_info(phase,steam_id)');
+    expect(mod.readGepSnapshotShape()).toBe('game_info(phase,steam_id) gep_internal(version_info)');
     expect(mod.readGepPhase()).toBe('GameInProgress');
+    expect(mod.readGepVersion()).toBe('local 244.0.0 / public 260.0.0');
 
     jest.clearAllTimers();
     jest.useRealTimers();

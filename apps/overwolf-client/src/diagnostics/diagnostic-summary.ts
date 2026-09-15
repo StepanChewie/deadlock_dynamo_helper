@@ -26,6 +26,12 @@ export interface DiagnosticSummaryInput {
    */
   readonly gepPhase?: string;
   readonly gepSnapshot?: string;
+  /**
+   * Overwolf's own GEP version, reported by `gep_internal.version_info`. Worth
+   * surfacing because a game can require a newer GEP than the client ships,
+   * and the mismatch shows up only as silently missing features.
+   */
+  readonly gepVersion?: string;
 }
 
 const MAX_VALUE_LENGTH = 160;
@@ -44,6 +50,7 @@ const FIELDS: ReadonlyArray<readonly [string, keyof DiagnosticSummaryInput]> = [
   ['Last error', 'lastError'],
   ['GEP phase', 'gepPhase'],
   ['GEP snapshot', 'gepSnapshot'],
+  ['GEP version', 'gepVersion'],
 ];
 
 function normalize(value: unknown): string | null {

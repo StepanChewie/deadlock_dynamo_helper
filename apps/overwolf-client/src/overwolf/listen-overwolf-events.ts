@@ -50,6 +50,7 @@ function extractMatchIdFromInfo(info: unknown): string | undefined {
 
 let lastSnapshotShape = '';
 let lastPhase: string | undefined;
+let lastGepVersion: string | undefined;
 
 /**
  * Describes the shape of a GEP snapshot using key NAMES only, never values.
@@ -80,10 +81,20 @@ function describeSnapshot(info: unknown): string {
 function recordSnapshot(info: unknown): void {
   lastSnapshotShape = describeSnapshot(info);
 
-  const rawPhase = (info as Record<string, any> | undefined)?.game_info?.phase;
-  const phase = matchIdFromValue(rawPhase);
+  const record = info as Record<string, any> | undefined;
+
+  const phase = matchIdFromValue(record?.game_info?.phase);
   if (phase) {
     lastPhase = phase;
+  }
+
+  const versionInfo = parseJsonSafely(record?.gep_internal?.version_info);
+  if (versionInfo && typeof versionInfo === 'object') {
+    const local = matchIdFromValue((versionInfo as Record<string, unknown>).local_version);
+    const published = matchIdFromValue((versionInfo as Record<string, unknown>).public_version);
+    if (local || published) {
+      lastGepVersion = `local ${local ?? '?'} / public ${published ?? '?'}`;
+    }
   }
 }
 
@@ -95,6 +106,11 @@ export function readGepSnapshotShape(): string {
 /** Last observed `game_info.phase`, e.g. `GameInProgress`. */
 export function readGepPhase(): string | undefined {
   return lastPhase;
+}
+
+/** Overwolf's reported GEP version, from `gep_internal.version_info`. */
+export function readGepVersion(): string | undefined {
+  return lastGepVersion;
 }
 
 function isTerminalMatchSnapshot(info: unknown): boolean {  if (!info || typeof info !== 'object') {

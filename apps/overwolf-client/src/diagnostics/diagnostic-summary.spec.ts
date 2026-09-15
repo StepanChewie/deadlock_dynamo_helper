@@ -74,10 +74,12 @@ it('reports the GEP snapshot shape and phase', () => {
     recommendationStatus: 'NOT_READY',
     gepPhase: 'GameInProgress',
     gepSnapshot: 'game_info(steam_id) match_info(none)',
+    gepVersion: 'local 244.0.0 / public 260.0.0',
   });
 
   expect(summary).toContain('GEP phase: GameInProgress');
   expect(summary).toContain('GEP snapshot: game_info(steam_id) match_info(none)');
+  expect(summary).toContain('GEP version: local 244.0.0 / public 260.0.0');
 });
 
 it('drops the GEP lines when nothing has been observed yet', () => {
@@ -88,4 +90,5 @@ it('drops the GEP lines when nothing has been observed yet', () => {
 
   expect(summary).not.toContain('GEP phase');
   expect(summary).not.toContain('GEP snapshot');
+  expect(summary).not.toContain('GEP version');
 });
