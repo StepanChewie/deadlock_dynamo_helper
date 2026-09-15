@@ -29,15 +29,14 @@ describe('Dynamo Lab desktop surface contract', () => {
       'status', 'indicator-dot', 'indicator-text', 'refresh-build',
       'build-title', 'guide-empty', 'guide-empty-title', 'guide-empty-copy',
       'guide-active', 'situational-recommendation-panel', 'rec-update-note',
-      'rec-plan', 'overlay-preview-plan', 'console',
+      'rec-plan', 'ow-ad-container', 'console',
     ]) {
       expect(desktop.match(new RegExp(`id="${id}"`, 'g'))).toHaveLength(1);
     }
     expect(desktop).toMatch(/<pre\b[^>]*id="console"[^>]*hidden/);
     expect(desktop).toMatch(/id="rec-plan"[^>]*aria-label="Full build route"[^>]*data-route-limit="all"/);
-    expect(desktop).toMatch(/id="overlay-preview-plan"[^>]*data-route-limit="5"/);
     expect(desktop).toContain('Full build');
-    expect(desktop).toContain('1 current + 4 next');
+    expect(desktop).not.toMatch(/overlay-preview-plan|1 current \+ 4 next/i);
   });
 
   it('wires Refresh and loads item artwork before the application bundle', () => {
