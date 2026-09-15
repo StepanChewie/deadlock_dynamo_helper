@@ -4,11 +4,14 @@ import {
   copyDiagnostics,
   dismissFirstRunGuide,
   dismissHotkeyHint,
+  dismissPostMatchFeedback,
   hideSituationalPanel,
+  revealPostMatchReasons,
   setRefreshPending,
   showAdaptiveError,
   showAdaptiveRecommendation,
   showFirstRunGuide,
+  showPostMatchFeedback,
   updateDiagnosticContext,
 } from './ui';
 
@@ -83,6 +86,8 @@ const elementIds = [
   'first-run-step-1',
   'first-run-step-2',
   'diagnostic-summary',
+  'post-match-feedback',
+  'post-match-feedback-reasons',
 ];
 
 function recommendation(overrides: Record<string, unknown> = {}): any {
@@ -448,5 +453,53 @@ describe('Dynamo Lab diagnostic summary state', () => {
     await expect(copyDiagnostics()).resolves.toBeUndefined();
     expect(elements.get('diagnostic-summary')?.textContent)
       .toContain('Recommendation status');
+  });
+});
+
+describe('Dynamo Lab post-match feedback state', () => {
+  let elements: Map<string, FakeElement>;
+  const originalDocument = globalThis.document;
+
+  beforeEach(() => {
+    elements = new Map(elementIds.map((id) => [id, new FakeElement()]));
+    globalThis.document = {
+      getElementById: (id: string) => elements.get(id) || null,
+      createElement: (tagName: string) => new FakeElement(tagName.toUpperCase()),
+    } as unknown as Document;
+  });
+
+  afterAll(() => {
+    globalThis.document = originalDocument;
+  });
+
+  it('renders the post-match usefulness prompt', () => {
+    showPostMatchFeedback();
+
+    expect(elements.get('post-match-feedback')?.hidden).toBe(false);
+  });
+
+  it('keeps the reasons collapsed until the player answers no', () => {
+    showPostMatchFeedback();
+    expect(elements.get('post-match-feedback-reasons')?.hidden).toBe(true);
+
+    revealPostMatchReasons();
+    expect(elements.get('post-match-feedback-reasons')?.hidden).toBe(false);
+  });
+
+  it('collapses the reasons again the next time it opens', () => {
+    revealPostMatchReasons();
+    showPostMatchFeedback();
+
+    expect(elements.get('post-match-feedback-reasons')?.hidden).toBe(true);
+  });
+
+  it('closes the prompt when it is answered or dismissed', () => {
+    showPostMatchFeedback();
+    dismissPostMatchFeedback();
+    expect(elements.get('post-match-feedback')?.hidden).toBe(true);
+
+    showPostMatchFeedback();
+    dismissPostMatchFeedback();
+    expect(elements.get('post-match-feedback')?.hidden).toBe(true);
   });
 });

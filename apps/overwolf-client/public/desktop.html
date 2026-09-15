@@ -312,6 +312,26 @@
         user-select: text;
       }
 
+      .feedback-reasons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      .feedback-reason {
+        padding: 6px 12px;
+        border: 1px solid var(--line);
+        border-radius: 3px;
+        background: transparent;
+        color: var(--text);
+        font: 400 11.5px/1.4 var(--sans);
+        cursor: pointer;
+      }
+
+      .feedback-reason:hover,
+      .feedback-reason:focus-visible { border-color: var(--amber); color: var(--amber); }
+
       .connection-state {
         display: inline-flex;
         align-items: center;
@@ -705,6 +725,32 @@
             <button type="button" class="first-run-primary" onclick="overwolf.windows.getMainWindow().dismissFirstRunGuide?.()">Start</button>
           </div>
         </section>
+      </div>
+    </div>
+
+    <div id="post-match-feedback" class="first-run" role="dialog" aria-modal="true" aria-labelledby="post-match-feedback-title" hidden>
+      <div class="first-run-card">
+        <h2 id="post-match-feedback-title">Were today's build recommendations useful?</h2>
+
+        <div id="post-match-feedback-answer">
+          <div class="first-run-actions">
+            <button type="button" class="first-run-secondary" onclick="overwolf.windows.getMainWindow().dismissPostMatchFeedback?.()">Skip</button>
+            <button type="button" class="first-run-secondary" onclick="overwolf.windows.getMainWindow().revealPostMatchReasons?.()">No</button>
+            <button type="button" class="first-run-primary" onclick="overwolf.windows.getMainWindow().answerPostMatchFeedback?.(true)">Yes</button>
+          </div>
+        </div>
+
+        <div id="post-match-feedback-reasons" hidden>
+          <p class="first-run-copy">What went wrong?</p>
+          <div class="feedback-reasons">
+            <button type="button" class="feedback-reason" onclick="overwolf.windows.getMainWindow().answerPostMatchFeedback?.(false, 'Bad item recommendation')">Bad item recommendation</button>
+            <button type="button" class="feedback-reason" onclick="overwolf.windows.getMainWindow().answerPostMatchFeedback?.(false, 'Bad order')">Bad order</button>
+            <button type="button" class="feedback-reason" onclick="overwolf.windows.getMainWindow().answerPostMatchFeedback?.(false, 'Recommendation changed too much')">Recommendation changed too much</button>
+            <button type="button" class="feedback-reason" onclick="overwolf.windows.getMainWindow().answerPostMatchFeedback?.(false, 'Recommendation was too late')">Recommendation was too late</button>
+            <button type="button" class="feedback-reason" onclick="overwolf.windows.getMainWindow().answerPostMatchFeedback?.(false, 'App didn\'t detect my state correctly')">App didn't detect my state correctly</button>
+            <button type="button" class="feedback-reason" onclick="overwolf.windows.getMainWindow().answerPostMatchFeedback?.(false, 'Other')">Other</button>
+          </div>
+        </div>
       </div>
     </div>
 

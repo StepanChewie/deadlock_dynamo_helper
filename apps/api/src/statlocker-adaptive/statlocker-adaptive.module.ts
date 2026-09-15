@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import * as puppeteer from 'puppeteer-core';
 import { DeadlockLiveModule } from '../deadlock-live/deadlock-live.module';
 import { AdaptiveBuildIterationV1Entity } from '../deadlock-live/entities/adaptive-build-iteration-v1.entity';
+import { AdaptiveFeedbackV1Entity } from '../deadlock-live/entities/adaptive-feedback-v1.entity';
 import { BuildArchetypeMatchLockV2Entity } from '../deadlock-live/entities/build-archetype-match-lock-v2.entity';
 import { BuildArchetypeSnapshotV2Entity } from '../deadlock-live/entities/build-archetype-snapshot-v2.entity';
 import { RecommendationEconomyRulesSnapshotV1Entity } from '../deadlock-live/entities/recommendation-economy-rules-snapshot-v1.entity';
@@ -14,6 +15,7 @@ import { StatlockerEvidenceSnapshotV1Entity } from '../deadlock-live/entities/st
 import { StatlockerVsHeroWpaRawSnapshotV1Entity } from '../deadlock-live/entities/statlocker-vs-hero-wpa-raw-snapshot-v1.entity';
 import { StatlockerVsHeroWpaRowV1Entity } from '../deadlock-live/entities/statlocker-vs-hero-wpa-row-v1.entity';
 import { AdaptiveDecisionStateV1Service } from './adaptive-decision-state-v1.service';
+import { AdaptiveFeedbackV1Controller } from './adaptive-feedback-v1.controller';
 import { AdaptiveRecommendationObservabilityV1Service } from './adaptive-recommendation-observability-v1.service';
 import { AdaptiveRecommendationV2Controller } from './adaptive-recommendation-v2.controller';
 import { AdaptiveRecommendationV2Service } from './adaptive-recommendation-v2.service';
@@ -72,9 +74,14 @@ import { ThreatWeightedMatchupV1Service } from './threat-weighted-matchup-v1.ser
       BuildArchetypeSnapshotV2Entity,
       BuildArchetypeMatchLockV2Entity,
       AdaptiveBuildIterationV1Entity,
+      AdaptiveFeedbackV1Entity,
     ]),
   ],
-  controllers: [AdaptiveRecommendationV2Controller, AdaptiveStatusCompatibilityV1Controller],
+  controllers: [
+    AdaptiveRecommendationV2Controller,
+    AdaptiveStatusCompatibilityV1Controller,
+    AdaptiveFeedbackV1Controller,
+  ],
   providers: [
     {
       provide: STATLOCKER_BROWSER_LAUNCHER_V1,

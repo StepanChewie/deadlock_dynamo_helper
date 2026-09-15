@@ -6,6 +6,7 @@ import { InGameOverlayLifecycle } from './overwolf/in-game-overlay-lifecycle';
 import * as ui from './ui';
 import { AdaptiveRecommendationClient } from './adaptive-recommendation-client';
 import { didAdaptiveMatchChange } from './adaptive-match-transition';
+import { APP_VERSION } from './app-version';
 import {
   OVERLAY_MAX_HEIGHT,
   OVERLAY_MIN_HEIGHT,
@@ -118,6 +119,27 @@ function initializeBackgroundWindow(): void {
   mainWindow.copyDiagnostics = (): void => {
     void ui.copyDiagnostics();
   };
+  mainWindow.revealPostMatchReasons = ui.revealPostMatchReasons;
+  mainWindow.dismissPostMatchFeedback = ui.dismissPostMatchFeedback;
+  mainWindow.answerPostMatchFeedback = (useful: boolean, reason?: string): void => {
+    ui.hidePostMatchFeedback();
+    if (!feedbackMatchId) {
+      return;
+    }
+
+    void fetch(`${apiBaseUrl}/deadlock/adaptive/v1/feedback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        appVersion: APP_VERSION,
+        matchId: feedbackMatchId,
+        useful,
+        reason,
+      }),
+    }).catch((error) => {
+      ui.logConsole(`Feedback submission failed: ${error?.message || error}`);
+    });
+  };
   ui.applyStoredPreferences();
 
   registerWindowHotkeys(mainWindow);
@@ -149,6 +171,7 @@ function initializeBackgroundWindow(): void {
   const adaptiveClient = new AdaptiveRecommendationClient(apiBaseUrl, customFetch, 1500);
   let currentMatchId = readString((globalThis as any).__deadlockLiveMatchId);
   let currentLocalSteamId = '';
+  let feedbackMatchId = '';
   const inGameOverlayLifecycle = new InGameOverlayLifecycle(restoreInGameOverlayWindow);
   inGameOverlayLifecycle.sync(currentMatchId);
 
@@ -255,6 +278,10 @@ function initializeBackgroundWindow(): void {
         }
 
         if (context.matchEnded) {
+          if (currentMatchId) {
+            feedbackMatchId = currentMatchId;
+            ui.showPostMatchFeedback();
+          }
           currentMatchId = '';
           currentLocalSteamId = '';
           mainWindow.__deadlockLiveMatchId = undefined;

@@ -112,7 +112,6 @@ export function dismissFirstRunGuide(): void {
 }
 
 let diagnosticContext: DiagnosticSummaryInput = {};
-
 /** Records the current client state that the diagnostic summary reports. */
 export function updateDiagnosticContext(patch: DiagnosticSummaryInput): void {
   diagnosticContext = { ...diagnosticContext, ...patch };
@@ -140,6 +139,29 @@ export async function copyDiagnostics(): Promise<void> {
   } catch {
     // Clipboard unavailable — the rendered block is the fallback.
   }
+}
+
+/**
+ * Shows the post-match usefulness prompt, always with the reason list collapsed
+ * so the common case stays a single click.
+ */
+export function showPostMatchFeedback(): void {
+  setHidden('post-match-feedback-reasons', true);
+  setHidden('post-match-feedback', false);
+}
+
+export function hidePostMatchFeedback(): void {
+  setHidden('post-match-feedback', true);
+}
+
+/** Reveals the "what went wrong" reasons after a negative vote. */
+export function revealPostMatchReasons(): void {
+  setHidden('post-match-feedback-reasons', false);
+}
+
+/** Closes the prompt without recording a vote. */
+export function dismissPostMatchFeedback(): void {
+  setHidden('post-match-feedback', true);
 }
 
 let hasAdaptiveRecommendation = false;
