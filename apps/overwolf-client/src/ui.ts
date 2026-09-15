@@ -68,6 +68,42 @@ export function applyStoredPreferences(): void {
   if (readDismissed(HOTKEY_HINT_KEY)) {
     setHidden('hotkey-hint', true);
   }
+  if (readDismissed(FIRST_RUN_KEY)) {
+    setHidden('first-run', true);
+  } else {
+    showFirstRunGuide();
+  }
+}
+
+const FIRST_RUN_KEY = 'first-run-guide';
+let firstRunStep = 1;
+
+function renderFirstRunStep(): void {
+  setHidden('first-run-step-1', firstRunStep !== 1);
+  setHidden('first-run-step-2', firstRunStep !== 2);
+}
+
+/**
+ * Opens the first-run guide, always starting on the opening screen. Overwolf
+ * lists FTUE in its pre-submission checklist, so a new player must be told what
+ * the app does before it silently starts sending match state.
+ */
+export function showFirstRunGuide(): void {
+  firstRunStep = 1;
+  renderFirstRunStep();
+  setHidden('first-run', false);
+}
+
+/** Moves the guide from the opening screen to the closing screen. */
+export function advanceFirstRunGuide(): void {
+  firstRunStep = 2;
+  renderFirstRunStep();
+}
+
+/** Closes the guide and remembers the dismissal so it appears only once. */
+export function dismissFirstRunGuide(): void {
+  persistDismissed(FIRST_RUN_KEY);
+  setHidden('first-run', true);
 }
 
 let hasAdaptiveRecommendation = false;

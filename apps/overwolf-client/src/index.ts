@@ -113,6 +113,8 @@ function initializeBackgroundWindow(): void {
   mainWindow.latestAdaptiveRecommendation = mainWindow.latestAdaptiveRecommendation || null;
   mainWindow.latestAdaptiveError = mainWindow.latestAdaptiveError || null;
   mainWindow.dismissHotkeyHint = ui.dismissHotkeyHint;
+  mainWindow.advanceFirstRunGuide = ui.advanceFirstRunGuide;
+  mainWindow.dismissFirstRunGuide = ui.dismissFirstRunGuide;
   ui.applyStoredPreferences();
 
   registerWindowHotkeys(mainWindow);

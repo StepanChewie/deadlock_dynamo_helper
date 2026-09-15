@@ -1,10 +1,13 @@
 import {
+  advanceFirstRunGuide,
   applyStoredPreferences,
+  dismissFirstRunGuide,
   dismissHotkeyHint,
   hideSituationalPanel,
   setRefreshPending,
   showAdaptiveError,
   showAdaptiveRecommendation,
+  showFirstRunGuide,
 } from './ui';
 
 class FakeElement {
@@ -74,6 +77,9 @@ const elementIds = [
   'overlay-preview-plan',
   'rec-update-note',
   'hotkey-hint',
+  'first-run',
+  'first-run-step-1',
+  'first-run-step-2',
 ];
 
 function recommendation(overrides: Record<string, unknown> = {}): any {
@@ -321,5 +327,75 @@ describe('Dynamo Lab hotkey reminder state', () => {
     expect(() => dismissHotkeyHint()).not.toThrow();
     expect(elements.get('hotkey-hint')?.hidden).toBe(true);
     expect(() => applyStoredPreferences()).not.toThrow();
+  });
+});
+
+describe('Dynamo Lab first-run guide state', () => {
+  let elements: Map<string, FakeElement>;
+  const originalDocument = globalThis.document;
+  const originalLocalStorage = (globalThis as any).localStorage;
+  let store: Map<string, string>;
+
+  beforeEach(() => {
+    elements = new Map(elementIds.map((id) => [id, new FakeElement()]));
+    globalThis.document = {
+      getElementById: (id: string) => elements.get(id) || null,
+      createElement: (tagName: string) => new FakeElement(tagName.toUpperCase()),
+    } as unknown as Document;
+    store = new Map();
+    (globalThis as any).localStorage = {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => void store.set(key, value),
+    };
+  });
+
+  afterAll(() => {
+    globalThis.document = originalDocument;
+    (globalThis as any).localStorage = originalLocalStorage;
+  });
+
+  it('shows the first-run guide only until it is dismissed', () => {
+    showFirstRunGuide();
+    expect(elements.get('first-run')?.hidden).toBe(false);
+
+    dismissFirstRunGuide();
+    expect(elements.get('first-run')?.hidden).toBe(true);
+  });
+
+  it('reveals the guide on a first launch and stays on the opening screen', () => {
+    applyStoredPreferences();
+
+    expect(elements.get('first-run')?.hidden).toBe(false);
+    expect(elements.get('first-run-step-1')?.hidden).toBe(false);
+    expect(elements.get('first-run-step-2')?.hidden).toBe(true);
+  });
+
+  it('advances to the second screen without ending the guide', () => {
+    showFirstRunGuide();
+    advanceFirstRunGuide();
+
+    expect(elements.get('first-run')?.hidden).toBe(false);
+    expect(elements.get('first-run-step-1')?.hidden).toBe(true);
+    expect(elements.get('first-run-step-2')?.hidden).toBe(false);
+  });
+
+  it('never shows the guide again once it has been dismissed', () => {
+    dismissFirstRunGuide();
+
+    elements.get('first-run')!.hidden = false;
+    applyStoredPreferences();
+
+    expect(elements.get('first-run')?.hidden).toBe(true);
+  });
+
+  it('restarts on the opening screen when shown again', () => {
+    showFirstRunGuide();
+    advanceFirstRunGuide();
+    dismissFirstRunGuide();
+
+    showFirstRunGuide();
+
+    expect(elements.get('first-run-step-1')?.hidden).toBe(false);
+    expect(elements.get('first-run-step-2')?.hidden).toBe(true);
   });
 });

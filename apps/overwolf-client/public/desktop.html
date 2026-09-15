@@ -186,6 +186,78 @@
       .hotkey-hint-dismiss:hover,
       .hotkey-hint-dismiss:focus-visible { border-color: var(--amber); color: var(--amber); }
 
+      .first-run {
+        position: fixed;
+        inset: 0;
+        z-index: 40;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background: rgba(3, 14, 21, 0.84);
+      }
+
+      .first-run[hidden] { display: none; }
+
+      .first-run-card {
+        width: min(460px, 100%);
+        padding: 22px 24px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--surface);
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+      }
+
+      .first-run-card section[hidden] { display: none; }
+
+      .first-run-card h2 {
+        margin: 0 0 12px;
+        font-size: 16px;
+        font-weight: 700;
+      }
+
+      .first-run-steps {
+        margin: 0;
+        padding-left: 20px;
+        font-size: 12.5px;
+        line-height: 1.9;
+      }
+
+      .first-run-steps kbd {
+        padding: 1px 5px;
+        border: 1px solid var(--line);
+        border-radius: 3px;
+        font: 700 10px/1.4 var(--mono);
+      }
+
+      .first-run-copy {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12.5px;
+        line-height: 1.7;
+      }
+
+      .first-run-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 20px;
+      }
+
+      .first-run-primary,
+      .first-run-secondary {
+        padding: 7px 18px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        font: 600 11.5px/1.4 var(--sans);
+        cursor: pointer;
+      }
+
+      .first-run-secondary { background: transparent; color: var(--muted); }
+      .first-run-primary { border-color: var(--amber); background: var(--amber); color: #041b25; }
+      .first-run-secondary:hover { border-color: var(--amber); color: var(--amber); }
+      .first-run-primary:hover { background: #efb566; }
+
       .connection-state {
         display: inline-flex;
         align-items: center;
@@ -547,6 +619,32 @@
           </div>
         </section>
       </main>
+    </div>
+
+    <div id="first-run" class="first-run" role="dialog" aria-modal="true" aria-labelledby="first-run-title-1" hidden>
+      <div class="first-run-card">
+        <section id="first-run-step-1">
+          <h2 id="first-run-title-1">How Dynamo Lab works</h2>
+          <ol class="first-run-steps">
+            <li>Launch Deadlock.</li>
+            <li>Enter a match.</li>
+            <li>Dynamo Lab detects your hero and inventory automatically.</li>
+            <li>Press <kbd>Ctrl+Tab</kbd> to toggle the in-game overlay.</li>
+          </ol>
+          <div class="first-run-actions">
+            <button type="button" class="first-run-secondary" onclick="overwolf.windows.getMainWindow().dismissFirstRunGuide?.()">Skip</button>
+            <button type="button" class="first-run-primary" onclick="overwolf.windows.getMainWindow().advanceFirstRunGuide?.()">Next</button>
+          </div>
+        </section>
+
+        <section id="first-run-step-2" hidden>
+          <h2 id="first-run-title-2">What Dynamo Lab sends</h2>
+          <p class="first-run-copy">Dynamo Lab sends the current match state to its server so it can build a purchase route from your live hero and inventory. Recommendations are computed from that match state, and nothing else is uploaded.</p>
+          <div class="first-run-actions">
+            <button type="button" class="first-run-primary" onclick="overwolf.windows.getMainWindow().dismissFirstRunGuide?.()">Start</button>
+          </div>
+        </section>
+      </div>
     </div>
 
     <pre id="console" hidden></pre>
