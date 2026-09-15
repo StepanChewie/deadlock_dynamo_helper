@@ -57,6 +57,11 @@ describe('Dynamo Lab desktop surface contract', () => {
     expect(desktop).toMatch(/privacy/i);
   });
 
+  it('links to the published privacy policy and terms', () => {
+    expect(desktop).toMatch(/docs\/privacy\.md/);
+    expect(desktop).toMatch(/docs\/terms\.md/);
+  });
+
   it('states what leaves the machine without over-claiming', () => {
     expect(desktop).toMatch(/Steam ID/i);
     expect(desktop).toMatch(/no account|without an account/i);

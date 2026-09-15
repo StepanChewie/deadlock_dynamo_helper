@@ -329,6 +329,29 @@
         font: 400 10px/1.4 var(--mono);
       }
 
+      .support-legal {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        margin: 0 14px 14px;
+        color: var(--line);
+        font-size: 11px;
+      }
+
+      .support-link {
+        padding: 0;
+        border: 0;
+        background: none;
+        color: var(--muted);
+        font: 600 11px/1.4 var(--sans);
+        text-decoration: underline;
+        cursor: pointer;
+      }
+
+      .support-link:hover,
+      .support-link:focus-visible { color: var(--amber); }
+
       .diagnostic-summary {
         margin: 10px 14px 14px;
         padding: 10px;
@@ -738,6 +761,12 @@
 
           <p class="support-privacy">
             <strong>Privacy.</strong> Dynamo Lab sends the current match state to its server so it can build a purchase route: the raw game events Overwolf reports, the match id, and your Steam ID. The post-match feedback you send is stored without any account or player identifier, and it is never used to train the recommendation model. There is no account and no sign-in. Item artwork is loaded from <code>unpkg.com</code>, a third-party CDN. The diagnostics block above is only copied when you press the button.
+          </p>
+
+          <p class="support-legal">
+            <button type="button" class="support-link" onclick="overwolf.windows.getMainWindow().openExternal?.('https://github.com/StepanChewie/deadlock_dynamo_helper/blob/main/docs/privacy.md')">Privacy Policy</button>
+            <span aria-hidden="true">·</span>
+            <button type="button" class="support-link" onclick="overwolf.windows.getMainWindow().openExternal?.('https://github.com/StepanChewie/deadlock_dynamo_helper/blob/main/docs/terms.md')">Terms of Use</button>
           </p>
         </details>
       </main>
