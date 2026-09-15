@@ -1,6 +1,7 @@
 import {
   advanceFirstRunGuide,
   applyStoredPreferences,
+  copyDiagnostics,
   dismissFirstRunGuide,
   dismissHotkeyHint,
   hideSituationalPanel,
@@ -8,6 +9,7 @@ import {
   showAdaptiveError,
   showAdaptiveRecommendation,
   showFirstRunGuide,
+  updateDiagnosticContext,
 } from './ui';
 
 class FakeElement {
@@ -80,6 +82,7 @@ const elementIds = [
   'first-run',
   'first-run-step-1',
   'first-run-step-2',
+  'diagnostic-summary',
 ];
 
 function recommendation(overrides: Record<string, unknown> = {}): any {
@@ -397,5 +400,53 @@ describe('Dynamo Lab first-run guide state', () => {
 
     expect(elements.get('first-run-step-1')?.hidden).toBe(false);
     expect(elements.get('first-run-step-2')?.hidden).toBe(true);
+  });
+});
+
+describe('Dynamo Lab diagnostic summary state', () => {
+  let elements: Map<string, FakeElement>;
+  const originalDocument = globalThis.document;
+  const originalNavigator = (globalThis as any).navigator;
+
+  beforeEach(() => {
+    elements = new Map(elementIds.map((id) => [id, new FakeElement()]));
+    globalThis.document = {
+      getElementById: (id: string) => elements.get(id) || null,
+      createElement: (tagName: string) => new FakeElement(tagName.toUpperCase()),
+    } as unknown as Document;
+  });
+
+  afterAll(() => {
+    globalThis.document = originalDocument;
+    (globalThis as any).navigator = originalNavigator;
+  });
+
+  it('renders the summary into the page so it can still be copied by hand', async () => {
+    updateDiagnosticContext({
+      backendStatus: 'HTTP 200',
+      gepStatus: 'REGISTERED',
+      matchId: 'match-1',
+      heroId: '72',
+      recommendationStatus: 'READY',
+      archetype: 'weapon-spirit',
+      rulesetVersion: '2026-09-14',
+      catalogSha256: 'abc',
+    });
+
+    await copyDiagnostics();
+
+    const rendered = elements.get('diagnostic-summary')?.textContent ?? '';
+    expect(rendered).toContain('Recommendation status: READY');
+    expect(rendered).toContain('Match id: match-1');
+    expect(rendered).toContain('Archetype: weapon-spirit');
+    expect(rendered).not.toContain('sourceProfileAccountIds');
+  });
+
+  it('still renders when the clipboard API is unavailable', async () => {
+    delete (globalThis as any).navigator;
+
+    await expect(copyDiagnostics()).resolves.toBeUndefined();
+    expect(elements.get('diagnostic-summary')?.textContent)
+      .toContain('Recommendation status');
   });
 });

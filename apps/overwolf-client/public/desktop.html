@@ -258,6 +258,60 @@
       .first-run-secondary:hover { border-color: var(--amber); color: var(--amber); }
       .first-run-primary:hover { background: #efb566; }
 
+      .support {
+        flex: none;
+        margin: 0 18px 16px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        background: var(--surface);
+      }
+
+      .support > summary {
+        padding: 9px 14px;
+        color: var(--muted);
+        font-size: 11.5px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+
+      .support[open] > summary { border-bottom: 1px solid var(--line); }
+
+      .support-copy {
+        margin: 12px 14px 0;
+        color: var(--muted);
+        font-size: 11.5px;
+        line-height: 1.6;
+      }
+
+      .support-button {
+        margin: 10px 14px 0;
+        padding: 6px 14px;
+        border: 1px solid var(--line);
+        border-radius: 3px;
+        background: transparent;
+        color: var(--text);
+        font: 600 11px/1.4 var(--sans);
+        cursor: pointer;
+      }
+
+      .support-button:hover,
+      .support-button:focus-visible { border-color: var(--amber); color: var(--amber); }
+
+      .diagnostic-summary {
+        margin: 10px 14px 14px;
+        padding: 10px;
+        max-height: 160px;
+        overflow: auto;
+        border: 1px solid var(--line-soft);
+        border-radius: 3px;
+        background: rgba(4, 27, 37, 0.6);
+        color: var(--text);
+        font: 400 11px/1.6 var(--mono);
+        white-space: pre-wrap;
+        user-select: text;
+      }
+
       .connection-state {
         display: inline-flex;
         align-items: center;
@@ -618,6 +672,13 @@
             </section>
           </div>
         </section>
+
+        <details id="support" class="support">
+          <summary>Support</summary>
+          <p class="support-copy">If a recommendation looks wrong, copy the diagnostics below and include them in your report.</p>
+          <button type="button" class="support-button" onclick="overwolf.windows.getMainWindow().copyDiagnostics?.()">Copy diagnostics</button>
+          <pre id="diagnostic-summary" class="diagnostic-summary" aria-label="Diagnostic summary"></pre>
+        </details>
       </main>
     </div>
 

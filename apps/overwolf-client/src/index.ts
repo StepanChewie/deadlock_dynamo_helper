@@ -115,6 +115,9 @@ function initializeBackgroundWindow(): void {
   mainWindow.dismissHotkeyHint = ui.dismissHotkeyHint;
   mainWindow.advanceFirstRunGuide = ui.advanceFirstRunGuide;
   mainWindow.dismissFirstRunGuide = ui.dismissFirstRunGuide;
+  mainWindow.copyDiagnostics = (): void => {
+    void ui.copyDiagnostics();
+  };
   ui.applyStoredPreferences();
 
   registerWindowHotkeys(mainWindow);
@@ -128,14 +131,17 @@ function initializeBackgroundWindow(): void {
       if (response.ok) {
         ui.incrementSends();
         ui.updateIndicator('Connected', true);
+        ui.updateDiagnosticContext({ backendStatus: `HTTP ${response.status}` });
       } else {
         ui.logConsole(`Ingest error: HTTP ${response.status}`);
         ui.updateIndicator('Connection issue', false);
+        ui.updateDiagnosticContext({ backendStatus: `HTTP ${response.status}` });
       }
       return response;
     } catch (error: any) {
       ui.logConsole(`Network error: ${error?.message || error}`);
       ui.updateIndicator('Offline', false);
+      ui.updateDiagnosticContext({ backendStatus: 'unreachable' });
       throw error;
     }
   };
@@ -157,6 +163,16 @@ function initializeBackgroundWindow(): void {
       ui.hideSituationalPanel();
     }
 
+    ui.updateDiagnosticContext({
+      matchId: data?.lock?.matchId ?? currentMatchId ?? undefined,
+      heroId: data?.heroId != null ? String(data.heroId) : undefined,
+      recommendationStatus: data ? (data.ready ? 'READY' : 'NOT_READY') : 'NO_MATCH',
+      archetype: data?.lock?.archetypeId,
+      rulesetVersion: data?.evidence?.rulesetVersion,
+      catalogSha256: data?.evidence?.catalogSha256,
+      lastError: undefined,
+    });
+
     mainWindow.inGameAdaptiveUpdate?.(data);
   };
 
@@ -165,6 +181,7 @@ function initializeBackgroundWindow(): void {
     const message = error.message || 'Adaptive recommendation unavailable';
     mainWindow.latestAdaptiveError = message;
     ui.showAdaptiveError(message);
+    ui.updateDiagnosticContext({ recommendationStatus: 'ERROR', lastError: message });
     mainWindow.inGameAdaptiveError?.(message);
   };
 
@@ -211,6 +228,7 @@ function initializeBackgroundWindow(): void {
       ui.updateStatus('Connecting', 'init');
       await setRequiredFeatures();
       ui.updateStatus('Ready', 'connected');
+      ui.updateDiagnosticContext({ gepStatus: 'REGISTERED' });
       ui.logConsole('Successfully registered GEP required features: game_info, match_info');
 
       listenOverwolfEvents((event) => {
@@ -254,6 +272,7 @@ function initializeBackgroundWindow(): void {
       });
     } catch (error: any) {
       ui.updateStatus('Unavailable', 'error');
+      ui.updateDiagnosticContext({ gepStatus: 'FAILED', lastError: String(error?.message || error) });
       ui.logConsole(
         `GEP feature registration failed: ${error?.message || error}. Retrying in 5s...`,
       );

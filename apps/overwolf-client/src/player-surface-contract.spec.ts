@@ -45,6 +45,12 @@ describe('Dynamo Lab desktop surface contract', () => {
     expect(desktop).toContain('<img src="dynamo.png" alt=""');
     expect(desktop).toMatch(/<script type="module" src="https:\/\/unpkg.com\/@deadlock-api\/ui-core@\d+\.\d+\.\d+\/dist\/main\/main.esm.js"><\/script>\s*<script src="dist\/index.js"><\/script>/);
   });
+
+  it('offers a diagnostics copy action without exposing raw telemetry', () => {
+    expect(desktop).toContain('id="support"');
+    expect(desktop).toContain('id="diagnostic-summary"');
+    expect(desktop).toContain('copyDiagnostics');
+  });
 });
 
 describe('Dynamo Lab overlay surface contract', () => {

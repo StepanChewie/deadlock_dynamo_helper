@@ -8,6 +8,11 @@ import {
   buildAdaptiveRecommendationPresentation,
 } from './adaptive-recommendation-presentation';
 import { persistDismissed, readDismissed } from './player-preferences';
+import { APP_VERSION } from './app-version';
+import {
+  buildDiagnosticSummary,
+  type DiagnosticSummaryInput,
+} from './diagnostics/diagnostic-summary';
 
 export function updateStatus(text: string, statusClass?: 'connected' | 'error' | 'init'): void {
   const el = document.getElementById('status');
@@ -104,6 +109,37 @@ export function advanceFirstRunGuide(): void {
 export function dismissFirstRunGuide(): void {
   persistDismissed(FIRST_RUN_KEY);
   setHidden('first-run', true);
+}
+
+let diagnosticContext: DiagnosticSummaryInput = {};
+
+/** Records the current client state that the diagnostic summary reports. */
+export function updateDiagnosticContext(patch: DiagnosticSummaryInput): void {
+  diagnosticContext = { ...diagnosticContext, ...patch };
+}
+
+/**
+ * Renders the player-safe diagnostic block and copies it to the clipboard.
+ *
+ * The block is also written into the page, so a player can still select it by
+ * hand when the clipboard API is unavailable or blocked.
+ */
+export async function copyDiagnostics(): Promise<void> {
+  const summary = buildDiagnosticSummary({
+    appVersion: APP_VERSION,
+    ...diagnosticContext,
+  });
+
+  const el = document.getElementById('diagnostic-summary');
+  if (el) {
+    el.textContent = summary;
+  }
+
+  try {
+    await globalThis.navigator?.clipboard?.writeText(summary);
+  } catch {
+    // Clipboard unavailable — the rendered block is the fallback.
+  }
 }
 
 let hasAdaptiveRecommendation = false;
