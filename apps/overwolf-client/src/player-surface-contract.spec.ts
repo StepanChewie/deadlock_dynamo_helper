@@ -43,7 +43,7 @@ describe('Dynamo Lab desktop surface contract', () => {
   it('wires Refresh and loads item artwork before the application bundle', () => {
     expect(desktop).toContain('onclick="overwolf.windows.getMainWindow().refreshBuild?.()"');
     expect(desktop).toContain('<img src="dynamo.png" alt=""');
-    expect(desktop).toMatch(/<script type="module" src="https:\/\/unpkg.com\/@deadlock-api\/ui-core\/dist\/main\/main.esm.js"><\/script>\s*<script src="dist\/index.js"><\/script>/);
+    expect(desktop).toMatch(/<script type="module" src="https:\/\/unpkg.com\/@deadlock-api\/ui-core@\d+\.\d+\.\d+\/dist\/main\/main.esm.js"><\/script>\s*<script src="dist\/index.js"><\/script>/);
   });
 });
 
@@ -63,7 +63,7 @@ describe('Dynamo Lab overlay surface contract', () => {
     ]) {
       expect(overlay.match(new RegExp(`id="${id}"`, 'g'))).toHaveLength(1);
     }
-    expect(overlay).toMatch(/<script type="module" src="https:\/\/unpkg.com\/@deadlock-api\/ui-core\/dist\/main\/main.esm.js"><\/script>\s*<script src="dist\/index.js"><\/script>/);
+    expect(overlay).toMatch(/<script type="module" src="https:\/\/unpkg.com\/@deadlock-api\/ui-core@\d+\.\d+\.\d+\/dist\/main\/main.esm.js"><\/script>\s*<script src="dist\/index.js"><\/script>/);
   });
 
   it('keeps the overlay on a 340px grid with prominent prices and 52px artwork', () => {
@@ -97,5 +97,20 @@ describe('Dynamo Lab release manifest contract', () => {
     expect(manifest.permissions).toEqual(['GameInfo', 'Hotkeys']);
     expect(Object.keys(manifest.data.hotkeys))
       .toEqual(['toggle_overlay', 'show_desktop_build', 'reset_desktop_build']);
+  });
+});
+
+describe('Dynamo Lab third-party runtime dependency contract', () => {
+  it('pins the Deadlock UI dependency to an exact version', () => {
+    for (const surface of [desktop, overlay]) {
+      const match = surface.match(/unpkg\.com\/@deadlock-api\/ui-core@([^/]+)\//);
+      expect(match?.[1]).toMatch(/^\d+\.\d+\.\d+$/);
+    }
+  });
+
+  it('loads the same pinned version on both player surfaces', () => {
+    const versionOf = (surface: string): string | undefined =>
+      surface.match(/unpkg\.com\/@deadlock-api\/ui-core@([^/]+)\//)?.[1];
+    expect(versionOf(desktop)).toBe(versionOf(overlay));
   });
 });
