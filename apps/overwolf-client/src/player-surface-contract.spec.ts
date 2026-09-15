@@ -62,6 +62,20 @@ describe('Dynamo Lab desktop surface contract', () => {
     expect(desktop).toMatch(/docs\/terms\.md/);
   });
 
+  it('insets the support panel to the same column as the build plane', () => {
+    const horizontal = (shorthand: string | undefined): string => {
+      const parts = (shorthand ?? '').trim().split(/\s+/).filter(Boolean);
+      return parts[1] ?? parts[0] ?? '';
+    };
+
+    const workspaceRule = desktop.match(/\.build-workspace\s*\{[^}]*\}/)?.[0] ?? '';
+    const supportRule = desktop.match(/\.support\s*\{[^}]*\}/)?.[0] ?? '';
+
+    expect(horizontal(workspaceRule.match(/padding:\s*([^;]+);/)?.[1]))
+      .toBe(horizontal(supportRule.match(/margin:\s*([^;]+);/)?.[1]));
+    expect(horizontal(workspaceRule.match(/padding:\s*([^;]+);/)?.[1])).not.toBe('');
+  });
+
   it('states what leaves the machine without over-claiming', () => {
     expect(desktop).toMatch(/Steam ID/i);
     expect(desktop).toMatch(/no account|without an account/i);
