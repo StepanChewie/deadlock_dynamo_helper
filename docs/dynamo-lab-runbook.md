@@ -1,6 +1,6 @@
-# Overwolf Deadlock Live Probe Runbook
+# Dynamo Lab Runbook
 
-This guide walks through starting the Deadlock Live Probe telemetry bridge, loading the Overwolf client, and verifying real-time game telemetry and adaptive build recommendations from a Deadlock session.
+This guide walks through starting the Dynamo Lab telemetry bridge, loading the Overwolf client, and verifying real-time game telemetry and adaptive build recommendations from a Deadlock session.
 
 ---
 
@@ -56,7 +56,7 @@ Verify that the server has booted and is listening on `http://localhost:3000`.
 2. Go to **Settings** > **Support** > **Development Options**.
 3. Click **Load unpacked extension...**.
 4. Select `apps/overwolf-client/public`, which contains `manifest.json`.
-5. Confirm that the client (manifest `meta.name`, currently `Deadlock Live Probe` v0.1.15) opens and reaches `REGISTERED` after Deadlock starts.
+5. Confirm that the client (manifest `meta.name`, currently `Dynamo Lab` v0.1.15) opens and reaches `REGISTERED` after Deadlock starts.
 6. Reload the unpacked extension after every new Overwolf client build.
 
 ---

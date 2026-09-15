@@ -1,6 +1,6 @@
-# Deadlock Live Probe
+# Dynamo Lab
 
-Yarn workspace monorepo that captures real-time *Deadlock* game events through Overwolf and serves **Statlocker-adaptive build recommendations** from a NestJS API: raw event persistence, live match-state reduction, the archetype-based v2 recommendation pipeline, and the in-game HUD / desktop presentation.
+Yarn workspace monorepo that captures real-time *Deadlock* game events through Overwolf and serves **adaptive build recommendations** from a NestJS API: raw event persistence, live match-state reduction, the archetype-based v2 recommendation pipeline, and the in-game HUD / desktop presentation.
 
 ## 📁 Repository Structure
 
@@ -22,6 +22,6 @@ For the system architecture, evidence model, and module map, see the [Architectu
 
 Database reset, backup, migration, and raw metadata reprocessing instructions are in [`docs/database-migrations.md`](docs/database-migrations.md).
 
-For setup, sideloading, and live validation, see the [Overwolf Deadlock Live Probe Runbook](docs/overwolf-deadlock-live-probe-runbook.md).
+For setup, sideloading, and live validation, see the [Dynamo Lab Runbook](docs/dynamo-lab-runbook.md).
 
 For API deployment, unpacked Overwolf build, Developer Mode loading, live verification, and rollback, see the [Overwolf Sideload Rollout Runbook](docs/overwolf-production-release.md).

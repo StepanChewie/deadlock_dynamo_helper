@@ -1,4 +1,4 @@
-# Deadlock Live Probe — Architecture Overview
+# Dynamo Lab — Architecture Overview
 
 Yarn workspace monorepo that captures real-time *Deadlock* game events through Overwolf, persists raw events, and produces adaptive in-game build recommendations. The production pipeline is **evidence-bounded**: when a critical input is missing, stale, or invalid, the system returns an explicit "unavailable" result instead of a stale or fabricated recommendation.
 
@@ -98,7 +98,7 @@ Database reset, backup, migration, and metadata reprocessing: `docs/database-mig
 |---|---|
 | `docs/architecture.md` | This overview |
 | `docs/decisions/` | ADR-001…ADR-007 — architecture decisions with rationale |
-| `docs/overwolf-deadlock-live-probe-runbook.md` | Setup, sideloading, live validation |
+| `docs/dynamo-lab-runbook.md` | Setup, sideloading, live validation |
 | `docs/overwolf-production-release.md` | API deployment, unpacked Overwolf build, developer-mode loading, rollback |
 | `docs/database-migrations.md` | DB reset/backup/migration procedures |
 | `docs/versioned-item-catalogs.md`, `docs/historical-catalogs-and-ruleset-windows.md` | Catalog versioning and ruleset windows |
