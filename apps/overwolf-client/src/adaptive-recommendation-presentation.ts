@@ -37,7 +37,10 @@ export interface AdaptivePresentedPlanItem {
   readonly replacedItem?: AdaptivePresentedItem;
   readonly situationalPurposeLabel?: string;
   readonly againstLabel?: string;
+  readonly isCurrent: boolean;
 }
+
+export interface AdaptivePurchaseRouteRow extends AdaptivePresentedPlanItem {}
 
 export interface AdaptivePresentedAlternative {
   readonly actionLabel: string;
@@ -62,6 +65,7 @@ export interface AdaptiveRecommendationPresentation {
   readonly primaryRequirements: readonly string[];
   readonly situationalPurposeLabel?: string;
   readonly againstLabel?: string;
+  readonly currentPlanActionId?: string;
   readonly plan: {
     readonly items: readonly AdaptivePresentedPlanItem[];
     readonly remainingCount: number;
@@ -166,6 +170,7 @@ export function buildAdaptiveRecommendationPresentation(
     primaryRequirements: primaryPlanAction?.requirements.map(presentRequirement) ?? [],
     situationalPurposeLabel: presentSituationalPurpose(primarySituational),
     againstLabel: presentAgainst(primarySituational),
+    currentPlanActionId: primaryPlanAction?.planActionId,
     plan: {
       items: semanticPlan,
       remainingCount: 0,
@@ -177,10 +182,62 @@ export function buildAdaptiveRecommendationPresentation(
   };
 }
 
+export function buildAdaptivePurchaseRoute(
+  view: AdaptiveRecommendationPresentation,
+  limit = 5,
+): readonly AdaptivePurchaseRouteRow[] {
+  const purchasable = view.plan.items.filter(
+    (item) => item.status !== 'OWNED' && item.status !== 'COMPLETED',
+  );
+  const current = purchasable.find((item) => item.isCurrent);
+  const currentRow = current ?? (view.primaryItem ? {
+    planActionId: view.currentPlanActionId ?? `current:${view.primaryItem.id}`,
+    item: view.primaryItem,
+    position: 0,
+    status: 'READY' as const,
+    statusLabel: 'Ready',
+    actionLabel: view.actionLabel,
+    requirements: view.primaryRequirements,
+    sourceItems: [],
+    replacedItem: view.replacedItem,
+    situationalPurposeLabel: view.situationalPurposeLabel,
+    againstLabel: view.againstLabel,
+    isCurrent: true,
+  } : undefined);
+  if (!currentRow) {
+    return Number.isFinite(limit) ? purchasable.slice(0, Math.max(0, limit)) : purchasable;
+  }
+  const currentIndex = view.plan.items.indexOf(currentRow);
+  const subsequent = currentIndex < 0
+    ? purchasable
+    : view.plan.items.slice(currentIndex + 1).filter(
+      (item) => item.status !== 'OWNED' && item.status !== 'COMPLETED',
+    );
+  const rows = [currentRow, ...subsequent];
+  return Number.isFinite(limit) ? rows.slice(0, Math.max(0, limit)) : rows;
+}
+
 function buildPresentedSemanticPlan(
   recommendation: AdaptiveRecommendationResultV1,
   primaryPlanAction: AdaptivePlanActionV1 | undefined,
 ): readonly AdaptivePresentedPlanItem[] {
+  const semantic = recommendation.planActions;
+  if (semantic && semantic.length > 0) {
+    const seen = new Set<string>();
+    return [...semantic]
+      .sort((left, right) => left.sequence - right.sequence || left.planActionId.localeCompare(right.planActionId))
+      .filter((action) => {
+        if (seen.has(action.planActionId)) return false;
+        seen.add(action.planActionId);
+        return true;
+      })
+      .map((action) => presentPlanAction(
+        action,
+        primaryPlanAction?.planActionId === action.planActionId,
+      ))
+      .filter((entry): entry is AdaptivePresentedPlanItem => entry !== undefined);
+  }
+
   if (recommendation.recommendedBuild.length > 0) {
     const seenItemIds = new Set<number>();
     return [...recommendation.recommendedBuild]
@@ -197,22 +254,7 @@ function buildPresentedSemanticPlan(
       ));
   }
 
-  const semantic = recommendation.planActions;
-  if (!semantic || semantic.length === 0) return [];
-
-  const seen = new Set<string>();
-  return [...semantic]
-    .sort((left, right) => left.sequence - right.sequence || left.planActionId.localeCompare(right.planActionId))
-    .filter((action) => {
-      if (seen.has(action.planActionId)) return false;
-      seen.add(action.planActionId);
-      return true;
-    })
-    .map((action) => presentPlanAction(
-      action,
-      primaryPlanAction?.planActionId === action.planActionId,
-    ))
-    .filter((entry): entry is AdaptivePresentedPlanItem => entry !== undefined);
+  return [];
 }
 
 function presentRecommendedBuildItem(
@@ -251,6 +293,7 @@ function presentRecommendedBuildItem(
     replacedItem,
     situationalPurposeLabel: presentSituationalPurpose(currentAction?.situational),
     againstLabel: presentAgainst(currentAction?.situational),
+    isCurrent: plannedItem.status === 'NEXT',
   };
 }
 
@@ -280,6 +323,7 @@ function presentPlanAction(
     replacedItem,
     situationalPurposeLabel: presentSituationalPurpose(action.situational),
     againstLabel: presentAgainst(action.situational),
+    isCurrent: isCurrentAction,
   };
 }
 

@@ -2,6 +2,14 @@ const fs = require('fs');
 const path = require('path');
 
 const DEFAULT_API_BASE_URL = 'https://aboba-telegramovich.duckdns.org';
+// Origins the shipped app must keep reachable: the Deadlock UI artwork module,
+// its asset API, and the fonts used by the standalone warning window.
+const RETAINED_ORIGIN_PATTERNS = [
+  /fonts\.googleapis\.com/,
+  /fonts\.gstatic\.com/,
+  /unpkg\.com/,
+  /api\.deadlock-api\.com/,
+];
 const appRoot = path.resolve(__dirname, '..');
 const publicDir = path.join(appRoot, 'public');
 const distDir = path.join(publicDir, 'dist');
@@ -35,7 +43,7 @@ const existingMatches = Array.isArray(manifest.data?.externally_connectable?.mat
 const retainedMatches = existingMatches.filter(
   (value) =>
     typeof value === 'string' &&
-    (value.includes('fonts.googleapis.com') || value.includes('fonts.gstatic.com')),
+    RETAINED_ORIGIN_PATTERNS.some((pattern) => pattern.test(value)),
 );
 manifest.data.externally_connectable = {
   matches: [apiOrigin, ...retainedMatches],

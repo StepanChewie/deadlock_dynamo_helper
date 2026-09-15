@@ -1,6 +1,42 @@
-import { buildAdaptiveRecommendationPresentation } from './adaptive-recommendation-presentation';
+import type {
+  AdaptiveActionTypeV1,
+  AdaptivePlanActionStatusV1,
+  AdaptivePlanActionV1,
+  AdaptiveRecommendationResultV1,
+} from '@deadlock-live-probe/shared';
+import {
+  buildAdaptivePurchaseRoute,
+  buildAdaptiveRecommendationPresentation,
+} from './adaptive-recommendation-presentation';
 
-function recommendation(overrides: Record<string, unknown> = {}): any {
+function planAction(
+  planActionId: string,
+  sequence: number,
+  itemId: number,
+  status: AdaptivePlanActionStatusV1,
+  actionType: AdaptiveActionTypeV1 = 'BUY',
+): AdaptivePlanActionV1 {
+  return {
+    planActionId,
+    sequence,
+    status,
+    action: {
+      actionKey: `${actionType}:${itemId}`,
+      type: actionType,
+      buyItemId: itemId,
+      targetItemId: itemId,
+      reasonCodes: [],
+    },
+    targetItemId: itemId,
+    sourceItemIds: [],
+    requirements: [],
+    reasonCodes: [],
+  };
+}
+
+function recommendation(
+  overrides: Partial<AdaptiveRecommendationResultV1> = {},
+): AdaptiveRecommendationResultV1 {
   return {
     ready: true,
     blockers: [],
@@ -59,10 +95,10 @@ describe('adaptive recommendation presentation', () => {
 
   it('renders the full recommended build when planActions are absent', () => {
     const itemIds = [3862866912, 968099481, 1342610602, 1437614329, 7409189, 26002154, 84321454, 98582110];
-    const recommendedBuild = itemIds.map((itemId, index) => ({
+    const recommendedBuild: AdaptiveRecommendationResultV1['recommendedBuild'] = itemIds.map((itemId, index) => ({
       itemId,
       position: itemIds.length - index,
-      status: index === 6 ? 'NEXT' : index % 2 === 0 ? 'OWNED' : 'PLANNED',
+      status: (index === 6 ? 'NEXT' : index % 2 === 0 ? 'OWNED' : 'PLANNED') as 'OWNED' | 'NEXT' | 'PLANNED',
       score: 0.5,
       confidence: 0.5,
       skeletonStrength: 0.5,
@@ -100,7 +136,7 @@ describe('adaptive recommendation presentation', () => {
   });
 
   it('does not collapse two legitimate transactions that use the same item id', () => {
-    const action = (id: string, sequence: number, type: string) => ({
+    const action = (id: string, sequence: number, type: AdaptiveActionTypeV1): AdaptivePlanActionV1 => ({
       planActionId: id,
       sequence,
       status: 'PLANNED',
@@ -114,6 +150,174 @@ describe('adaptive recommendation presentation', () => {
 
     expect(view.plan.items).toHaveLength(2);
     expect(view.plan.items.map((item) => item.planActionId)).toEqual(['buy-first', 'buy-again']);
+  });
+
+  it('projects one current action plus four ordered future actions', () => {
+    const view = buildAdaptiveRecommendationPresentation(recommendation({
+      planActions: [
+        planAction('current-buy', 1, 3862866912, 'READY'),
+        planAction('next-1', 2, 968099481, 'PLANNED'),
+        planAction('next-2', 3, 1342610602, 'PLANNED'),
+        planAction('next-3', 4, 1437614329, 'PLANNED'),
+        planAction('next-4', 5, 7409189, 'PLANNED'),
+        planAction('later', 6, 26002154, 'PLANNED'),
+      ],
+    }));
+
+    expect(view.currentPlanActionId).toBe('current-buy');
+    expect(buildAdaptivePurchaseRoute(view).map((row) => row.planActionId))
+      .toEqual(['current-buy', 'next-1', 'next-2', 'next-3', 'next-4']);
+    expect(buildAdaptivePurchaseRoute(view)[0].isCurrent).toBe(true);
+  });
+
+  it('returns every remaining purchase when the caller asks for the whole build', () => {
+    const view = buildAdaptiveRecommendationPresentation(recommendation({
+      planActions: [
+        planAction('current-buy', 1, 3862866912, 'READY'),
+        planAction('next-1', 2, 968099481, 'PLANNED'),
+        planAction('next-2', 3, 1342610602, 'PLANNED'),
+        planAction('next-3', 4, 1437614329, 'PLANNED'),
+        planAction('next-4', 5, 7409189, 'PLANNED'),
+        planAction('next-5', 6, 26002154, 'PLANNED'),
+        planAction('next-6', 7, 64550694, 'PLANNED'),
+      ],
+    }));
+
+    expect(buildAdaptivePurchaseRoute(view)).toHaveLength(5);
+    expect(
+      buildAdaptivePurchaseRoute(view, Number.POSITIVE_INFINITY).map((row) => row.planActionId),
+    ).toEqual([
+      'current-buy', 'next-1', 'next-2', 'next-3', 'next-4', 'next-5', 'next-6',
+    ]);
+  });
+
+  it('prefers semantic plan actions when both projections are present', () => {
+    const view = buildAdaptiveRecommendationPresentation(recommendation({
+      recommendedBuild: [
+        {
+          itemId: 3862866912,
+          position: 1,
+          status: 'NEXT',
+          score: 1,
+          confidence: 1,
+          skeletonStrength: 1,
+          contextualSupport: 1,
+          reasonCodes: [],
+        },
+        {
+          itemId: 3862866912,
+          position: 2,
+          status: 'PLANNED',
+          score: 0.9,
+          confidence: 0.9,
+          skeletonStrength: 0.9,
+          contextualSupport: 0.9,
+          reasonCodes: [],
+        },
+      ],
+      planActions: [
+        planAction('semantic-first', 1, 3862866912, 'READY'),
+        planAction('semantic-again', 2, 3862866912, 'PLANNED'),
+      ],
+    }));
+
+    expect(view.plan.items.map((item) => item.planActionId))
+      .toEqual(['semantic-first', 'semantic-again']);
+    expect(buildAdaptivePurchaseRoute(view).map((row) => row.planActionId))
+      .toEqual(['semantic-first', 'semantic-again']);
+  });
+
+  it('uses semantic status and action labels when projections conflict', () => {
+    const view = buildAdaptiveRecommendationPresentation(recommendation({
+      nextAction: {
+        actionKey: 'HOLD:3862866912',
+        type: 'HOLD',
+        targetItemId: 3862866912,
+        reasonCodes: [],
+      },
+      recommendedBuild: [
+        {
+          itemId: 3862866912,
+          position: 1,
+          status: 'NEXT',
+          score: 1,
+          confidence: 1,
+          skeletonStrength: 1,
+          contextualSupport: 1,
+          reasonCodes: [],
+        },
+        {
+          itemId: 968099481,
+          position: 2,
+          status: 'NEXT',
+          score: 0.9,
+          confidence: 0.9,
+          skeletonStrength: 0.9,
+          contextualSupport: 0.9,
+          reasonCodes: [],
+        },
+      ],
+      planActions: [
+        planAction('blocked-upgrade', 1, 3862866912, 'BLOCKED', 'UPGRADE'),
+        planAction('ready-buy', 2, 968099481, 'READY'),
+      ],
+    }));
+
+    expect(view.plan.items.map((item) => item.statusLabel))
+      .toEqual(['Blocked', 'Ready']);
+    expect(view.plan.items[0].actionLabel).toBe('Upgrade');
+  });
+
+  it('excludes purchasable rows before the current action from subsequent rows', () => {
+    const view = buildAdaptiveRecommendationPresentation(recommendation({
+      planActions: [
+        planAction('earlier', 1, 968099481, 'PLANNED'),
+        planAction('current-buy', 2, 3862866912, 'READY'),
+        planAction('next', 3, 1342610602, 'PLANNED'),
+      ],
+    }));
+
+    expect(buildAdaptivePurchaseRoute(view).map((row) => row.planActionId))
+      .toEqual(['current-buy', 'next']);
+  });
+
+  it('excludes owned and completed actions from the purchase route', () => {
+    const view = buildAdaptiveRecommendationPresentation(recommendation({
+      planActions: [
+        planAction('current-buy', 1, 3862866912, 'READY'),
+        planAction('owned', 2, 968099481, 'OWNED'),
+        planAction('completed', 3, 1342610602, 'COMPLETED'),
+        planAction('next', 4, 1437614329, 'PLANNED'),
+      ],
+    }));
+
+    expect(buildAdaptivePurchaseRoute(view).map((row) => row.planActionId))
+      .toEqual(['current-buy', 'next']);
+  });
+
+  it('keeps two different transactions for the same item in the purchase route', () => {
+    const view = buildAdaptiveRecommendationPresentation(recommendation({
+      planActions: [
+        planAction('buy-first', 1, 3862866912, 'READY'),
+        planAction('buy-again', 2, 3862866912, 'PLANNED'),
+      ],
+    }));
+
+    expect(buildAdaptivePurchaseRoute(view).map((row) => row.planActionId))
+      .toEqual(['buy-first', 'buy-again']);
+  });
+
+  it('uses the authoritative primary item when both build projections are empty', () => {
+    const view = buildAdaptiveRecommendationPresentation(recommendation({
+      planActions: [],
+      recommendedBuild: [],
+    }));
+
+    expect(buildAdaptivePurchaseRoute(view)).toMatchObject([{
+      planActionId: 'current:3862866912',
+      item: { id: 3862866912 },
+      isCurrent: true,
+    }]);
   });
 
   it('shows upgrade source components inside the target item card', () => {
@@ -190,13 +394,13 @@ describe('adaptive recommendation presentation', () => {
   });
 
   it('limits alternatives to three and omits the primary action', () => {
-    const rankedImmediateCandidates = [
-      { action: { actionKey: 'UPGRADE:3862866912', type: 'UPGRADE', itemId: 3862866912, reasonCodes: [] }, score: 0.95, confidence: 0.9 },
-      { action: { actionKey: 'BUY:968099481', type: 'BUY', buyItemId: 968099481, reasonCodes: [] }, score: 0.84, confidence: 0.8 },
-      { action: { actionKey: 'REPLACE:1:968099481', type: 'REPLACE', sellItemId: 1437614329, buyItemId: 968099481, reasonCodes: [] }, score: 0.8, confidence: 0.75 },
-      { action: { actionKey: 'BUY:1342610602', type: 'BUY', buyItemId: 1342610602, reasonCodes: [] }, score: 0.74, confidence: 0.7 },
-      { action: { actionKey: 'BUY:1437614329', type: 'BUY', buyItemId: 1437614329, reasonCodes: [] }, score: 0.64, confidence: 0.6 },
-      { action: { actionKey: 'BUY:7409189', type: 'BUY', buyItemId: 7409189, reasonCodes: [] }, score: 0.54, confidence: 0.5 },
+    const rankedImmediateCandidates: AdaptiveRecommendationResultV1['rankedImmediateCandidates'] = [
+      { action: { actionKey: 'UPGRADE:3862866912', type: 'UPGRADE', itemId: 3862866912, reasonCodes: [] }, score: 0.95, confidence: 0.9, components: [], reasonCodes: [] },
+      { action: { actionKey: 'BUY:968099481', type: 'BUY', buyItemId: 968099481, reasonCodes: [] }, score: 0.84, confidence: 0.8, components: [], reasonCodes: [] },
+      { action: { actionKey: 'REPLACE:1:968099481', type: 'REPLACE', sellItemId: 1437614329, buyItemId: 968099481, reasonCodes: [] }, score: 0.8, confidence: 0.75, components: [], reasonCodes: [] },
+      { action: { actionKey: 'BUY:1342610602', type: 'BUY', buyItemId: 1342610602, reasonCodes: [] }, score: 0.74, confidence: 0.7, components: [], reasonCodes: [] },
+      { action: { actionKey: 'BUY:1437614329', type: 'BUY', buyItemId: 1437614329, reasonCodes: [] }, score: 0.64, confidence: 0.6, components: [], reasonCodes: [] },
+      { action: { actionKey: 'BUY:7409189', type: 'BUY', buyItemId: 7409189, reasonCodes: [] }, score: 0.54, confidence: 0.5, components: [], reasonCodes: [] },
     ];
 
     const view = buildAdaptiveRecommendationPresentation(recommendation({ rankedImmediateCandidates }));

@@ -84,8 +84,8 @@ describe('adaptive recommendation full-build V2 client pipeline', () => {
     expect(presented?.plan.items.map((row) => row.position)).toEqual([1, 2, 3, 4, 5]);
     expect(presented?.plan.items).toHaveLength(5);
     expect(presented?.plan.items[0]).toMatchObject({
-      statusLabel: 'Next',
-      actionLabel: 'Hold',
+      statusLabel: 'Ready',
+      actionLabel: 'Buy now',
     });
     expect(presented?.plan.items.slice(1).every((row) => row.actionLabel === 'Planned')).toBe(true);
   });

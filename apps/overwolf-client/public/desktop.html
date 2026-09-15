@@ -2,115 +2,567 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Deadlock Statlocker Adaptive</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <meta name="color-scheme" content="dark" />
+    <title>Dynamo Lab</title>
     <style>
-      :root { --bg:#090a0e; --surface:#15161c; --soft:rgba(255,255,255,.045); --line:rgba(255,255,255,.1); --text:#f8f7f5; --muted:#aaa9b1; --dim:#74737c; --accent:#ff7658; --live:#62d49a; --warning:#f5bd64; --weapon:#e5a83b; --vitality:#58bd74; --spirit:#a978df; }
-      * { box-sizing:border-box; }
-      html,body { width:100%; height:100%; margin:0; overflow:hidden; }
-      body { display:flex; flex-direction:column; gap:12px; padding:18px; color:var(--text); background:radial-gradient(circle at 85% 0,rgba(255,118,88,.1),transparent 36%),var(--bg); font-family:"Outfit","Segoe UI",sans-serif; }
-      header { display:flex; align-items:center; justify-content:space-between; padding-bottom:11px; border-bottom:1px solid var(--line); }
-      .brand { display:flex; align-items:center; gap:10px; }
-      .brand-mark { width:31px; height:31px; display:grid; place-items:center; border:1px solid rgba(255,118,88,.36); border-radius:9px; color:var(--accent); background:rgba(255,118,88,.12); font:700 14px/1 "JetBrains Mono",monospace; }
-      h1 { margin:0; font-size:16px; }
-      .kicker { margin-top:2px; color:var(--muted); font:500 8px/1 "JetBrains Mono",monospace; letter-spacing:.11em; text-transform:uppercase; }
-      #status { color:var(--muted); font:600 9px/1 "JetBrains Mono",monospace; text-transform:uppercase; }
-      #status.connected { color:var(--live); } #status.error { color:#ff8e79; }
+      :root {
+        --canvas: #041b25;
+        --nav: #062631;
+        --surface: #08222b;
+        --line: #28505a;
+        --line-soft: rgba(40, 80, 90, 0.6);
+        --text: #e7eff0;
+        --muted: #91aeb4;
+        --amber: #e4a24d;
+        --weapon: #d99a3a;
+        --vitality: #63b77a;
+        --spirit: #a778d4;
+        --grid-columns: 32px 64px minmax(180px, 1fr) 96px 104px;
+        --sans: "Arial Narrow", "Roboto Condensed", "Segoe UI", system-ui, sans-serif;
+        --mono: ui-monospace, "Cascadia Mono", "Consolas", monospace;
+      }
 
-      .status-row { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; }
-      .status-card { padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:var(--soft); }
-      .status-label { color:var(--dim); font:500 7px/1 "JetBrains Mono",monospace; letter-spacing:.08em; text-transform:uppercase; }
-      .status-value { margin-top:4px; overflow:hidden; font-size:9px; text-overflow:ellipsis; white-space:nowrap; }
-      #indicator-dot { color:var(--dim); } #indicator-dot.active { color:var(--live); }
+      * { box-sizing: border-box; }
+      html, body { width: 100%; height: 100%; margin: 0; }
+      body {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        color: var(--text);
+        background: var(--canvas);
+        font-family: var(--sans);
+      }
 
-      #guide-empty { flex:1; min-height:220px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:9px; padding:24px; border:1px dashed var(--line); border-radius:13px; color:var(--muted); background:rgba(255,255,255,.018); text-align:center; }
-      .waiting-pulse { width:40px; height:40px; border:1px solid rgba(255,118,88,.32); border-radius:50%; background:radial-gradient(circle,rgba(255,118,88,.28),transparent 66%); box-shadow:0 0 26px rgba(255,118,88,.15); }
-      .waiting-title { color:var(--text); font-size:17px; font-weight:650; }
-      .waiting-copy { max-width:390px; font-size:11px; line-height:1.5; }
-      #guide-active { display:none; flex:1; min-height:0; overflow-y:auto; padding-right:2px; flex-direction:column; }
-      #situational-recommendation-panel { display:none; flex:0 0 auto; min-height:0; flex-direction:column; gap:8px; }
-      .rec-update-note { display:none; padding:7px 9px; border:1px solid rgba(245,189,100,.22); border-radius:8px; color:#f7cf8e; background:rgba(245,189,100,.08); font-size:9px; }
+      /* Flex child: any injected element shrinks the shell instead of clipping it. */
+      .app-shell {
+        display: grid;
+        grid-template-columns: 220px minmax(0, 1fr);
+        flex: 1;
+        min-height: 0;
+      }
 
-      .primary-card { --slot:var(--accent); padding:12px 13px; border:1px solid var(--line); border-left:3px solid var(--slot); border-radius:11px; background:linear-gradient(135deg,rgba(255,255,255,.065),rgba(255,255,255,.025)); }
-      #situational-recommendation-panel[data-slot="weapon"] .primary-card { --slot:var(--weapon); } #situational-recommendation-panel[data-slot="vitality"] .primary-card { --slot:var(--vitality); } #situational-recommendation-panel[data-slot="spirit"] .primary-card { --slot:var(--spirit); }
-      .rec-ribbon { display:flex; align-items:center; gap:7px; margin-bottom:10px; }
-      #rec-action-label { padding:3px 7px; border-radius:5px; color:#0b0b0d; background:var(--accent); font:700 8px/1.25 "JetBrains Mono",monospace; letter-spacing:.06em; text-transform:uppercase; }
-      .planner-badge { padding:2px 6px; border-radius:5px; font:700 7.5px/1.2 "JetBrains Mono",monospace; letter-spacing:.05em; text-transform:uppercase; border:1px solid rgba(255,255,255,.12); }
-      .planner-badge-strategy { color:#58bd74; background:rgba(88,189,116,.14); border-color:rgba(88,189,116,.4); }
-      .planner-badge-legacy { color:#f5bd64; background:rgba(245,189,100,.14); border-color:rgba(245,189,100,.4); }
-      #rec-game-state,#rec-health { font:600 8px/1.2 "JetBrains Mono",monospace; text-transform:uppercase; } #rec-game-state { color:var(--muted); } #rec-health { margin-left:auto; }
-      #rec-health::before { content:""; display:inline-block; width:5px; height:5px; margin-right:5px; border-radius:50%; background:currentColor; box-shadow:0 0 8px currentColor; }
-      #rec-health.health-live { color:var(--live); } #rec-health.health-degraded,#rec-health.health-waiting { color:var(--warning); } #rec-game-state.state-ahead { color:var(--live); } #rec-game-state.state-behind { color:#ff8e79; }
-      .primary-main { display:flex; align-items:center; gap:11px; }
-      #rec-item-glyph { width:43px; height:43px; display:grid; place-items:center; border:1px solid var(--slot); border-radius:9px; color:var(--slot); background:rgba(255,255,255,.03); font:700 16px/1 "JetBrains Mono",monospace; }
-      .primary-copy { flex:1; min-width:0; } #rec-headline { color:var(--muted); font-size:10px; } #rec-item-name { margin-top:2px; overflow:hidden; font-size:20px; font-weight:700; text-overflow:ellipsis; white-space:nowrap; } #rec-item-meta { margin-top:3px; color:var(--dim); font:500 8px/1.2 "JetBrains Mono",monospace; text-transform:uppercase; }
-      .confidence-block { width:160px; margin-left:auto; }
-      .confidence-copy { display:flex; justify-content:space-between; color:var(--dim); font:500 7px/1.2 "JetBrains Mono",monospace; text-transform:uppercase; } #rec-confidence-label { color:var(--muted); }
-      .confidence-track { height:3px; margin-top:6px; overflow:hidden; border-radius:2px; background:rgba(255,255,255,.075); } #rec-confidence-fill { width:4%; height:100%; background:linear-gradient(90deg,var(--accent),#ffad65); }
+      /* Navigation ------------------------------------------------------- */
+      .app-nav {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        min-width: 0;
+        padding: 16px 14px;
+        border-right: 1px solid var(--line);
+        background: var(--nav);
+      }
 
-      .adaptive-secondary { display:grid; grid-template-columns:1fr 1.35fr; gap:8px; }
-      .section-card { min-width:0; padding:9px; border:1px solid var(--line); border-radius:9px; background:var(--soft); }
-      .section-header { display:flex; justify-content:space-between; margin-bottom:7px; } .section-title { color:var(--muted); font:600 8px/1.2 "JetBrains Mono",monospace; letter-spacing:.1em; text-transform:uppercase; } #rec-plan-more { color:var(--dim); font:500 8px/1.2 "JetBrains Mono",monospace; }
-      #rec-reasons { display:grid; gap:5px; margin:0; padding:0; list-style:none; } #rec-reasons li { position:relative; padding-left:11px; color:#d4d2d2; font-size:10px; line-height:1.3; } #rec-reasons li::before { content:""; position:absolute; left:0; top:5px; width:4px; height:4px; border-radius:50%; background:var(--accent); }
-      #rec-plan { display:grid; grid-template-columns:1fr 1fr; gap:5px; }
-      .plan-item { --slot:var(--dim); min-width:0; display:flex; align-items:center; gap:7px; padding:6px 7px; border:1px solid var(--line); border-left:2px solid var(--slot); border-radius:7px; background:rgba(5,6,9,.24); } .slot-weapon { --slot:var(--weapon); } .slot-vitality { --slot:var(--vitality); } .slot-spirit { --slot:var(--spirit); } .status-next { background:rgba(255,118,88,.075); border-color:rgba(255,118,88,.26); } .status-owned { opacity:.6; }
-      .plan-position { color:var(--slot); font:600 8px/1 "JetBrains Mono",monospace; } .plan-details { display:flex; min-width:0; flex-direction:column; gap:2px; } .plan-details strong { overflow:hidden; font-size:9px; text-overflow:ellipsis; white-space:nowrap; } .plan-details small { overflow:hidden; color:var(--dim); font:500 7px/1.1 "JetBrains Mono",monospace; text-overflow:ellipsis; white-space:nowrap; text-transform:uppercase; }
-      #rec-alternatives-section { grid-column:1/-1; } #rec-alternatives { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; } .alternative-row { display:flex; justify-content:space-between; gap:7px; padding-left:8px; border-left:2px solid var(--slot,var(--dim)); color:#d7d5d6; font-size:9px; } .alternative-row small { color:var(--dim); font:500 7px/1.2 "JetBrains Mono",monospace; } .empty-row { grid-column:1/-1; color:var(--dim); font-size:9px; }
-      .adaptive-footer { display:flex; justify-content:space-between; padding:0 2px; color:var(--dim); font:500 7.5px/1.2 "JetBrains Mono",monospace; text-transform:uppercase; } .source-dot { width:4px; height:4px; display:inline-block; margin-right:5px; border-radius:50%; background:var(--live); }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+        color: var(--text);
+        text-decoration: none;
+      }
 
-      .decision-debug { display:none; margin-top:10px; padding:10px; border:1px solid rgba(169,120,223,.25); border-radius:10px; background:rgba(169,120,223,.045); }
-      .debug-heading { margin-bottom:8px; color:#cba9ef; font:700 9px/1.2 "JetBrains Mono",monospace; letter-spacing:.1em; text-transform:uppercase; }
-      .debug-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
-      .debug-section { min-width:0; padding:7px; border:1px solid var(--line); border-radius:7px; background:rgba(0,0,0,.14); }
-      .debug-section h3 { margin:0 0 6px; color:var(--muted); font-size:10px; }
-      .debug-empty { color:var(--dim); font-size:8px; }
-      .debug-row { margin:4px 0; padding:5px 6px; border:1px solid rgba(255,255,255,.07); border-radius:5px; color:#d8d6dc; font-size:8px; }
-      .debug-row.selected { border-color:rgba(98,212,154,.34); background:rgba(98,212,154,.06); }
-      .debug-row summary,.debug-details summary { cursor:pointer; font:600 8px/1.3 "JetBrains Mono",monospace; }
-      .debug-details { margin-top:7px; padding:7px; border:1px solid var(--line); border-radius:7px; background:rgba(0,0,0,.12); }
-      .debug-replacement { margin-top:7px; padding:7px; border-left:2px solid var(--warning); background:rgba(255,255,255,.025); }
-      .debug-replacement.verdict-accept { border-left-color:var(--live); }
-      .debug-kv { display:flex; justify-content:space-between; gap:8px; padding-top:3px; color:var(--dim); font-size:7px; }
-      .debug-kv code { color:#d8d6dc; font:500 7px/1.25 "JetBrains Mono",monospace; text-align:right; word-break:break-word; }
-      #console { display:none; }
+      .brand img {
+        width: 34px;
+        height: 34px;
+        flex: none;
+        object-fit: cover;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        filter: saturate(0.85) contrast(1.05);
+      }
+
+      .brand span {
+        overflow: hidden;
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: 0.09em;
+        text-overflow: ellipsis;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+
+      .app-nav nav { display: flex; flex-direction: column; gap: 3px; }
+
+      .nav-item {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+        width: 100%;
+        min-height: 38px;
+        padding: 8px 10px;
+        border: 1px solid transparent;
+        border-radius: 3px;
+        color: var(--muted);
+        background: transparent;
+        font: 600 12.5px/1.2 var(--sans);
+        letter-spacing: 0.07em;
+        text-align: left;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+
+      .nav-item small {
+        color: var(--muted);
+        font-size: 9px;
+        font-weight: 500;
+        letter-spacing: 0.09em;
+        opacity: 0.7;
+      }
+
+      .nav-item.is-active {
+        border-color: var(--line);
+        color: var(--text);
+        background: rgba(228, 162, 77, 0.08);
+        box-shadow: inset 2px 0 0 var(--amber);
+      }
+
+      .nav-item[disabled] {
+        cursor: not-allowed;
+        opacity: 0.5;
+      }
+
+      .nav-item:focus-visible,
+      .refresh-button:focus-visible {
+        outline: 2px solid var(--amber);
+        outline-offset: 2px;
+      }
+
+      .nav-note {
+        margin-top: auto;
+        color: var(--muted);
+        font: 500 9px/1.4 var(--mono);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        opacity: 0.75;
+      }
+
+      /* Workspace -------------------------------------------------------- */
+      .workspace {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        min-height: 0;
+        background: var(--canvas);
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        min-height: 52px;
+        padding: 8px 18px;
+        border-bottom: 1px solid var(--line);
+        background: #071c29;
+      }
+
+      .topbar-actions { display: flex; align-items: center; gap: 16px; min-width: 0; }
+
+      .connection-state {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--muted);
+        font: 600 10px/1 var(--sans);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+
+      #indicator-dot {
+        width: 7px;
+        height: 7px;
+        flex: none;
+        border-radius: 50%;
+        background: var(--muted);
+      }
+
+      #indicator-dot.active {
+        background: var(--vitality);
+        box-shadow: 0 0 8px var(--vitality);
+      }
+
+      /* The indicator is the visible connection state; #status stays an announced live region. */
+      #status {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+
+      #status.connected { color: var(--vitality); }
+      #status.error { color: var(--amber); }
+
+      .refresh-button {
+        min-height: 34px;
+        padding: 0 16px;
+        border: 1px solid var(--amber);
+        border-radius: 3px;
+        color: var(--text);
+        background: #0a2634;
+        font: 700 12px/1 var(--sans);
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+
+      .refresh-button:hover:not([disabled]) { background: #0d3140; }
+      .refresh-button[disabled] { cursor: progress; opacity: 0.6; }
+
+      .build-workspace {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 248px;
+        gap: 16px;
+        padding: 16px 18px;
+        overflow: auto;
+      }
+
+      .build-plane {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        min-height: 0;
+        border: 1px solid var(--line);
+        background: var(--surface);
+      }
+
+      .build-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        min-height: 48px;
+        padding: 0 16px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .build-head h1 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .build-head span {
+        color: var(--muted);
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      #guide-empty {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 9px;
+        padding: 28px;
+        color: var(--muted);
+        text-align: center;
+      }
+
+      .waiting-pulse {
+        width: 38px;
+        height: 38px;
+        border: 1px solid var(--line);
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(228, 162, 77, 0.24), transparent 66%);
+      }
+
+      .waiting-title {
+        margin: 0;
+        color: var(--text);
+        font-size: 16px;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+
+      .waiting-copy {
+        max-width: 380px;
+        margin: 0;
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      #guide-active {
+        flex: 1;
+        min-height: 0;
+        display: none;
+        flex-direction: column;
+        overflow: auto;
+      }
+
+      #situational-recommendation-panel {
+        flex: 1;
+        min-height: 0;
+        display: none;
+        flex-direction: column;
+      }
+
+      #rec-update-note {
+        display: none;
+        align-items: center;
+        padding: 8px 12px;
+        border-bottom: 1px solid rgba(228, 162, 77, 0.35);
+        color: var(--amber);
+        background: rgba(228, 162, 77, 0.08);
+        font-size: 11px;
+        letter-spacing: 0.04em;
+      }
+
+      #rec-plan {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        align-content: start;
+      }
+
+      /* Purchase rows ---------------------------------------------------- */
+      .purchase-row {
+        --kind: var(--muted);
+        display: grid;
+        grid-template-columns: var(--grid-columns);
+        align-items: center;
+        gap: 12px;
+        min-height: 56px;
+        padding: 8px 14px;
+        border-bottom: 1px solid var(--line-soft);
+      }
+
+      .purchase-row.slot-weapon { --kind: var(--weapon); }
+      .purchase-row.slot-vitality { --kind: var(--vitality); }
+      .purchase-row.slot-spirit { --kind: var(--spirit); }
+
+      .purchase-row.is-current {
+        background: rgba(228, 162, 77, 0.07);
+        box-shadow: inset 0 0 0 1px rgba(228, 162, 77, 0.72);
+      }
+
+      .purchase-position {
+        justify-self: center;
+        width: 24px;
+        height: 24px;
+        display: grid;
+        place-items: center;
+        border: 1px solid var(--line);
+        border-radius: 50%;
+        color: var(--muted);
+        font: 700 11px/1 var(--mono);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .purchase-row.is-current .purchase-position {
+        border-color: var(--amber);
+        color: #041b25;
+        background: var(--amber);
+      }
+
+      .item-art {
+        position: relative;
+        justify-self: center;
+        width: 48px;
+        height: 48px;
+        display: grid;
+        place-items: center;
+        border: 1px solid var(--line);
+        background: #102b39;
+      }
+
+      .item-art-fallback {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        color: var(--kind);
+        font: 700 16px/1 var(--mono);
+      }
+
+      .item-art dl-item-card {
+        position: relative;
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      .purchase-copy {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+
+      .purchase-copy strong {
+        overflow: hidden;
+        font-size: 15px;
+        font-weight: 700;
+        line-height: 1.15;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .purchase-copy small {
+        color: var(--muted);
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .purchase-price {
+        justify-self: end;
+        font: 700 18px/1 var(--mono);
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+
+      .purchase-category {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        color: var(--kind);
+        font: 700 10px/1 var(--sans);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+
+      .purchase-category::before {
+        content: "";
+        width: 7px;
+        height: 7px;
+        flex: none;
+        background: var(--kind);
+      }
+
+      /* Overlay preview -------------------------------------------------- */
+      .overlay-preview {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        align-self: start;
+        min-width: 0;
+        padding: 10px;
+        border: 1px solid var(--line);
+        background: var(--surface);
+      }
+
+      .overlay-preview header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        color: var(--muted);
+        font: 600 10px/1 var(--sans);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      #overlay-preview-plan { display: grid; }
+
+      #overlay-preview-plan .purchase-row {
+        grid-template-columns: 18px 40px minmax(0, 1fr) auto;
+        gap: 8px;
+        min-height: 44px;
+        padding: 6px 4px;
+      }
+
+      #overlay-preview-plan .purchase-position { width: 18px; height: 18px; font-size: 9px; }
+      #overlay-preview-plan .item-art { width: 36px; height: 36px; }
+      #overlay-preview-plan .item-art-fallback { font-size: 12px; }
+      #overlay-preview-plan .purchase-copy strong { font-size: 11px; }
+      #overlay-preview-plan .purchase-copy small { display: none; }
+      #overlay-preview-plan .purchase-price { font-size: 13px; }
+      #overlay-preview-plan .purchase-category { display: none; }
+
+      #console { display: none; }
+
+      /* Responsive ------------------------------------------------------- */
+      @media (max-width: 1100px) {
+        .build-workspace { grid-template-columns: minmax(0, 1fr); }
+        .overlay-preview { display: none; }
+      }
+
+      @media (max-width: 980px) {
+        .app-shell { grid-template-columns: 168px minmax(0, 1fr); }
+      }
+
+      @media (max-width: 760px) {
+        .app-shell { grid-template-columns: 66px minmax(0, 1fr); }
+        .app-nav { padding: 12px 8px; }
+        .brand span,
+        .nav-item span,
+        .nav-item small,
+        .nav-note { display: none; }
+        .nav-item { align-items: center; padding: 8px 4px; }
+        .nav-item.is-active { background: rgba(228, 162, 77, 0.14); }
+        .build-workspace { padding: 10px; }
+        .purchase-row { grid-template-columns: 24px 44px minmax(0, 1fr) minmax(64px, auto); }
+        .purchase-category { grid-column: 4; justify-self: end; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        * { animation: none !important; transition: none !important; }
+      }
     </style>
   </head>
-  <body>
-    <header>
-      <div class="brand"><div class="brand-mark">S</div><div><h1>Statlocker Adaptive</h1><div class="kicker">Live build intelligence</div></div></div>
-      <div id="status">INITIALIZING…</div>
-    </header>
-    <section class="status-row">
-      <div class="status-card"><div class="status-label">Connection</div><div class="status-value"><span id="indicator-dot">●</span> <span id="indicator-text">Waiting</span></div></div>
-      <div class="status-card"><div class="status-label">Last event</div><div class="status-value" id="last-event">None</div></div>
-      <div class="status-card"><div class="status-label">API sends</div><div class="status-value" id="last-send">0</div></div>
-    </section>
+  <body class="desktop-surface">
+    <div class="app-shell">
+      <aside class="app-nav">
+        <a class="brand" aria-label="Dynamo Lab home"><img src="dynamo.png" alt="" /><span>Dynamo Lab</span></a>
+        <nav aria-label="Dynamo Lab navigation">
+          <button type="button" class="nav-item" aria-disabled="true" disabled aria-label="Overview, coming soon"><span>Overview</span><small>Coming soon</small></button>
+          <button type="button" class="nav-item is-active" aria-current="page"><span>Live Build</span><small>Active</small></button>
+          <button type="button" class="nav-item" aria-disabled="true" disabled aria-label="Matches, coming soon"><span>Matches</span><small>Coming soon</small></button>
+          <button type="button" class="nav-item" aria-disabled="true" disabled aria-label="Match Analysis, coming soon"><span>Match Analysis</span><small>Coming soon</small></button>
+          <button type="button" class="nav-item" aria-disabled="true" disabled aria-label="Settings, coming soon"><span>Settings</span><small>Coming soon</small></button>
+        </nav>
+        <p class="nav-note">Live build guidance</p>
+      </aside>
 
-    <section id="guide-empty"><div class="waiting-pulse"></div><div id="guide-empty-title" class="waiting-title">Waiting for match data</div><div id="guide-empty-copy" class="waiting-copy">Your Statlocker recommendation will appear automatically when the match is detected.</div></section>
-    <section id="guide-active">
-      <div id="situational-recommendation-panel">
-        <div id="rec-update-note" class="rec-update-note"></div>
-        <article class="primary-card">
-          <div class="rec-ribbon">
-            <span id="rec-action-label">Stand by</span>
-            <span id="rec-planner-badge" class="planner-badge planner-badge-strategy">Strategy-First</span>
-            <span id="rec-game-state">Game state updating</span>
-            <span id="rec-health" class="health-waiting">Waiting</span>
+      <main class="workspace">
+        <header class="topbar">
+          <span class="connection-state" aria-live="polite"><span id="indicator-dot" aria-hidden="true"></span><span id="indicator-text">Connecting</span></span>
+          <div class="topbar-actions">
+            <span id="status" class="connection-state" aria-live="polite"></span>
+            <button id="refresh-build" type="button" class="refresh-button" onclick="overwolf.windows.getMainWindow().refreshBuild?.()">Refresh</button>
           </div>
-          <div class="primary-main"><div id="rec-item-glyph">•</div><div class="primary-copy"><div id="rec-headline">Adaptive recommendation</div><div id="rec-item-name">Waiting…</div><div id="rec-item-meta"></div></div><div class="confidence-block"><div class="confidence-copy"><span>Confidence</span><span id="rec-confidence-label">—</span></div><div class="confidence-track"><div id="rec-confidence-fill"></div></div></div></div>
-        </article>
-        <div class="adaptive-secondary">
-          <section class="section-card"><div class="section-header"><span class="section-title">Why this move</span></div><ul id="rec-reasons"></ul></section>
-          <section class="section-card"><div class="section-header"><span class="section-title">Build path</span><span id="rec-plan-more"></span></div><div id="rec-plan"></div></section>
-          <section id="rec-alternatives-section" class="section-card"><div class="section-header"><span class="section-title">Also viable</span></div><div id="rec-alternatives"></div></section>
-        </div>
-        <section id="decision-debug" class="decision-debug" aria-label="Decision trace"></section>
-        <footer class="adaptive-footer"><span><span class="source-dot"></span><span id="rec-source">Statlocker Adaptive</span></span><span id="rec-evidence">Evidence updating</span></footer>
-      </div>
-    </section>
-    <pre id="console"></pre>
+        </header>
+
+        <section class="build-workspace">
+          <div class="build-plane">
+            <header class="build-head"><h1 id="build-title">Full build</h1><span>Route</span></header>
+
+            <section id="guide-empty">
+              <div class="waiting-pulse"></div>
+              <h2 id="guide-empty-title" class="waiting-title">Waiting for match data</h2>
+              <p id="guide-empty-copy" class="waiting-copy">Your Dynamo Lab build route will appear automatically when the match is detected.</p>
+            </section>
+
+            <section id="guide-active">
+              <div id="situational-recommendation-panel">
+                <div id="rec-update-note"></div>
+                <div id="rec-plan" aria-label="Full build route" data-route-limit="all"></div>
+              </div>
+            </section>
+          </div>
+
+          <aside class="overlay-preview" aria-label="In-game overlay preview">
+            <header><strong>Overlay</strong><span>1 current + 4 next</span></header>
+            <div id="overlay-preview-plan" data-route-limit="5"></div>
+          </aside>
+        </section>
+      </main>
+    </div>
+
+    <pre id="console" hidden></pre>
+    <script type="module" src="https://unpkg.com/@deadlock-api/ui-core/dist/main/main.esm.js"></script>
     <script src="dist/index.js"></script>
   </body>
 </html>

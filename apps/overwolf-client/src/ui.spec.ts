@@ -1,5 +1,6 @@
 import {
   hideSituationalPanel,
+  setRefreshPending,
   showAdaptiveError,
   showAdaptiveRecommendation,
 } from './ui';
@@ -8,9 +9,23 @@ class FakeElement {
   textContent = '';
   className = '';
   title = '';
+  disabled = false;
   style: Record<string, string> = {};
   children: FakeElement[] = [];
   attributes = new Map<string, string>();
+
+  constructor(readonly tagName = 'DIV') {}
+
+  classList = {
+    toggle: (token: string, force?: boolean): boolean => {
+      const tokens = new Set(this.className.split(/\s+/).filter(Boolean));
+      const enabled = force ?? !tokens.has(token);
+      if (enabled) tokens.add(token);
+      else tokens.delete(token);
+      this.className = [...tokens].join(' ');
+      return enabled;
+    },
+  };
 
   appendChild(child: FakeElement): FakeElement {
     this.children.push(child);
@@ -33,31 +48,27 @@ class FakeElement {
     this.attributes.delete(name);
     if (name === 'title') this.title = '';
   }
+
+  toggleAttribute(name: string, force?: boolean): boolean {
+    const enabled = force ?? !this.attributes.has(name);
+    if (enabled) this.attributes.set(name, '');
+    else this.attributes.delete(name);
+    return enabled;
+  }
 }
 
 const elementIds = [
+  'status',
+  'indicator-dot',
+  'indicator-text',
+  'refresh-build',
   'guide-empty',
   'guide-empty-title',
   'guide-empty-copy',
   'guide-active',
   'situational-recommendation-panel',
-  'rec-item-name',
-  'rec-headline',
-  'rec-source',
-  'rec-planner-badge',
-  'rec-game-state',
-  'rec-health',
-  'rec-action-label',
-  'rec-confidence-label',
-  'rec-evidence',
-  'rec-item-meta',
-  'rec-item-glyph',
-  'rec-confidence-fill',
-  'rec-reasons',
   'rec-plan',
-  'rec-plan-more',
-  'rec-alternatives',
-  'rec-alternatives-section',
+  'overlay-preview-plan',
   'rec-update-note',
 ];
 
@@ -72,6 +83,7 @@ function recommendation(overrides: Record<string, unknown> = {}): any {
       actionKey: 'BUY:3862866912',
       type: 'BUY',
       buyItemId: 3862866912,
+      targetItemId: 3862866912,
       reasonCodes: ['CORE_TARGET_PENDING'],
     },
     recommendedBuild: [],
@@ -93,31 +105,69 @@ function recommendation(overrides: Record<string, unknown> = {}): any {
   };
 }
 
-function plannedItem(itemId: number, position: number, status: 'OWNED' | 'NEXT' | 'PLANNED'): any {
-  return {
-    itemId,
-    position,
-    status,
-    score: 0.5,
-    confidence: 0.5,
-    skeletonStrength: 0.5,
-    contextualSupport: 0.5,
-    reasonCodes: [],
-  };
+function fiveItemRecommendation(): any {
+  const itemIds = [3862866912, 968099481, 1342610602, 1437614329, 7409189];
+  return recommendation({
+    planActions: itemIds.map((itemId, index) => ({
+      planActionId: `decision-a:${index + 1}`,
+      sequence: index + 1,
+      status: index === 0 ? 'READY' : 'PLANNED',
+      action: {
+        actionKey: `BUY:${itemId}`,
+        type: 'BUY',
+        buyItemId: itemId,
+        targetItemId: itemId,
+        reasonCodes: [],
+      },
+      targetItemId: itemId,
+      sourceItemIds: [],
+      requirements: [],
+      reasonCodes: [],
+    })),
+  });
+}
+
+function nineItemRecommendation(): any {
+  const itemIds = [3862866912, 968099481, 1342610602, 1437614329, 7409189, 26002154, 64550694, 668299740, 3633614685];
+  return recommendation({
+    planActions: itemIds.map((itemId, index) => ({
+      planActionId: `decision-a:${index + 1}`,
+      sequence: index + 1,
+      status: index === 0 ? 'READY' : 'PLANNED',
+      action: {
+        actionKey: `BUY:${itemId}`,
+        type: 'BUY',
+        buyItemId: itemId,
+        targetItemId: itemId,
+        reasonCodes: [],
+      },
+      targetItemId: itemId,
+      sourceItemIds: [],
+      requirements: [],
+      reasonCodes: [],
+    })),
+  });
+}
+
+function flatText(element: FakeElement): string {
+  return [element.textContent, ...element.children.map(flatText)].join(' ');
+}
+
+function findByTagName(element: FakeElement, tagName: string): FakeElement | undefined {
+  return element.tagName === tagName
+    ? element
+    : element.children.map((child) => findByTagName(child, tagName)).find(Boolean);
 }
 
 describe('adaptive recommendation UI state', () => {
   let elements: Map<string, FakeElement>;
-  let inGameOverlay = false;
   const originalDocument = globalThis.document;
 
   beforeEach(() => {
     elements = new Map(elementIds.map((id) => [id, new FakeElement()]));
-    inGameOverlay = false;
     globalThis.document = {
       getElementById: (id: string) => elements.get(id) || null,
-      createElement: () => new FakeElement(),
-      querySelector: (selector: string) => selector === '.hud-container' && inGameOverlay ? new FakeElement() : null,
+      createElement: (tagName: string) => new FakeElement(tagName.toUpperCase()),
     } as unknown as Document;
     hideSituationalPanel();
   });
@@ -126,53 +176,96 @@ describe('adaptive recommendation UI state', () => {
     globalThis.document = originalDocument;
   });
 
-  it('keeps the last successful card visible during a transient failure and recovers', () => {
-    showAdaptiveRecommendation(recommendation());
+  it('renders five aligned purchase rows with item artwork, price, and category', () => {
+    showAdaptiveRecommendation(fiveItemRecommendation());
+
+    const rows = elements.get('rec-plan')?.children ?? [];
+    expect(rows).toHaveLength(5);
+    expect(rows[0].attributes.get('data-plan-action-id')).toBe('decision-a:1');
+    expect(rows[0].attributes.get('data-current')).toBe('true');
+    expect(findByTagName(rows[0], 'DL-ITEM-CARD')).toBeDefined();
+    expect(flatText(rows[0])).toContain('Restorative Shot');
+    expect(flatText(rows[0])).toContain('800');
+    expect(flatText(rows[0])).toContain('WEAPON');
+    expect(elements.get('overlay-preview-plan')?.children).toHaveLength(5);
+  });
+
+  it('renders the whole build when the desktop container asks for every step', () => {
+    elements.get('rec-plan')?.setAttribute('data-route-limit', 'all');
+
+    showAdaptiveRecommendation(nineItemRecommendation());
+
+    expect(elements.get('rec-plan')?.children).toHaveLength(9);
+    expect(elements.get('overlay-preview-plan')?.children).toHaveLength(5);
+  });
+
+  it('keeps the compact five-row route when the container does not ask for all steps', () => {
+    showAdaptiveRecommendation(nineItemRecommendation());
+
+    expect(elements.get('rec-plan')?.children).toHaveLength(5);
+    expect(elements.get('overlay-preview-plan')?.children).toHaveLength(5);
+  });
+
+  it('renders the route when the optional desktop preview is absent', () => {
+    elements.delete('overlay-preview-plan');
+
+    expect(() => showAdaptiveRecommendation(fiveItemRecommendation())).not.toThrow();
+    expect(elements.get('rec-plan')?.children).toHaveLength(5);
+  });
+
+  it('exposes refresh busy state without clearing the route', () => {
+    showAdaptiveRecommendation(fiveItemRecommendation());
+
+    setRefreshPending(true);
+
+    expect(elements.get('refresh-build')?.disabled).toBe(true);
+    expect(elements.get('refresh-build')?.textContent).toBe('Refreshing');
+    expect(elements.get('refresh-build')?.attributes.get('aria-busy')).toBe('true');
+    expect(elements.get('rec-plan')?.children).toHaveLength(5);
+  });
+
+  it('clears the refresh busy state on both publication outcomes', () => {
+    showAdaptiveRecommendation(fiveItemRecommendation());
+    setRefreshPending(true);
+    setRefreshPending(false);
+
+    expect(elements.get('refresh-build')?.disabled).toBe(false);
+    expect(elements.get('refresh-build')?.textContent).toBe('Refresh');
+    expect(elements.get('refresh-build')?.attributes.get('aria-busy')).toBe('false');
+
+    setRefreshPending(true);
+    setRefreshPending(false);
+    showAdaptiveError('Adaptive recommendation HTTP 502');
+
+    expect(elements.get('refresh-build')?.disabled).toBe(false);
+    expect(elements.get('refresh-build')?.textContent).toBe('Refresh');
+    expect(elements.get('rec-plan')?.children).toHaveLength(5);
+  });
+
+  it('keeps the last safe purchase route visible during a transient failure', () => {
+    showAdaptiveRecommendation(fiveItemRecommendation());
     showAdaptiveError('Adaptive recommendation HTTP 502');
 
     expect(elements.get('guide-active')?.style.display).toBe('flex');
     expect(elements.get('guide-empty')?.style.display).toBe('none');
-    expect(elements.get('rec-item-name')?.textContent).toBe('Restorative Shot');
-    expect(elements.get('rec-health')?.textContent).toBe('Updating');
+    expect(elements.get('rec-plan')?.children).toHaveLength(5);
     expect(elements.get('rec-update-note')?.style.display).toBe('flex');
-
-    showAdaptiveRecommendation(recommendation());
-    expect(elements.get('rec-health')?.textContent).toBe('Live');
-    expect(elements.get('rec-update-note')?.style.display).toBe('none');
   });
 
-  it('renders strategy badge and method correctly', () => {
-    showAdaptiveRecommendation(recommendation({
-      plannerMethod: 'STRATEGY_FIRST',
-      strategy: {
-        strategyId: 'burst-spirit',
-        commitment: 'COMMITTED',
-        posterior: 0.9,
-        reasonCodes: [],
-        selectedBranches: {},
-        committedBranches: {},
-        buildStatus: 'IN_PROGRESS',
-        progress: { satisfiedHardGoals: 1, totalHardGoals: 3 },
-        slotPlan: { currentUsedSlots: 2, currentFlexUsed: 0, reservedSituationalSlots: 1, feasible: true, reasonCodes: [] },
-        investmentObjectives: [],
-      },
-    }));
+  it('shows Dynamo Lab reconnect copy before a route is available', () => {
+    showAdaptiveError();
 
-    expect(elements.get('rec-planner-badge')?.textContent).toBe('');
-    expect(elements.get('rec-source')?.textContent).toBe('Statlocker Adaptive');
+    expect(elements.get('guide-empty')?.style.display).toBe('flex');
+    expect(elements.get('guide-empty-title')?.textContent).toBe('Dynamo Lab is reconnecting');
+    expect(elements.get('guide-empty-copy')?.textContent)
+      .toBe('The build route will appear when fresh match data is available.');
   });
 
-  it('prunes owned items only when in-game overlay is rendered', () => {
-    inGameOverlay = true;
-    const items = [
-      plannedItem(3862866912, 1, 'OWNED'),
-      plannedItem(1577772648, 2, 'NEXT'),
-      plannedItem(1773091176, 3, 'PLANNED'),
-    ];
+  it('uses Dynamo Lab copy when the player-facing route resets', () => {
+    hideSituationalPanel();
 
-    showAdaptiveRecommendation(recommendation({ recommendedBuild: items }));
-    const planEl = elements.get('rec-plan');
-    expect(planEl?.children).toHaveLength(2);
-    expect(planEl?.children.every((child) => !child.className.includes('empty-row'))).toBe(true);
+    expect(elements.get('guide-empty-title')?.textContent).toBe('Waiting for match data');
+    expect(elements.get('guide-empty-copy')?.textContent)
+      .toBe('Your Dynamo Lab build route will appear automatically when the match is detected.');
   });
 });

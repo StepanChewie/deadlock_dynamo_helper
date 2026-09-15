@@ -1040,6 +1040,13 @@ export class DiagnosticCapture {
   }
 
   private mountPanel(): void {
+    // The player-facing Dynamo Lab windows must not expose diagnostic controls.
+    // Capture keeps running; the marker/export panel only mounts on explicit opt-in
+    // (a dedicated diagnostics window is the intended home for it).
+    if ((globalThis as { __deadlockDiagnosticPanel?: boolean }).__deadlockDiagnosticPanel !== true) {
+      return;
+    }
+
     if (document.getElementById('diagnostic-capture-panel')) {
       this.refreshPanel();
       return;

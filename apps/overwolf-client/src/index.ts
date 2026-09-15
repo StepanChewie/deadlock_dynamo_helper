@@ -28,7 +28,7 @@ if (ow?.windows) {
 }
 
 function initializeInGameWindow(windowId: string): void {
-  ui.logConsole('In-game Statlocker adaptive overlay loaded.');
+  ui.logConsole('In-game Dynamo Lab overlay loaded.');
 
   const mainWindow = ow.windows.getMainWindow() as any;
 
@@ -50,31 +50,21 @@ function initializeInGameWindow(windowId: string): void {
     });
   };
 
-  const toggleHudMode = (): void => {
-    const hud = document.querySelector('.hud-container');
-    const button = document.getElementById('hud-toggle-mode');
-    if (!hud || !button) {
-      return;
-    }
-
-    const isCompact = hud.classList.toggle('compact');
-    button.textContent = isCompact ? 'Expand' : 'Compact';
-    ensureOverlayHeight();
-  };
-
   (window as any).ensureOverlayHeight = ensureOverlayHeight;
-  (window as any).toggleHudMode = toggleHudMode;
 
   mainWindow.inGameAdaptiveUpdate = (data: any): void => {
     if (data) {
+      ui.updateIndicator('Connected', true);
       ui.showAdaptiveRecommendation(data);
     } else {
+      ui.updateIndicator('Waiting', false);
       ui.hideSituationalPanel();
     }
     ensureOverlayHeight();
   };
 
   mainWindow.inGameAdaptiveError = (message: string): void => {
+    ui.updateIndicator('Reconnecting', false);
     ui.showAdaptiveError(message);
     ensureOverlayHeight();
   };
@@ -129,15 +119,15 @@ function initializeBackgroundWindow(): void {
       const response = await fetch(url, init);
       if (response.ok) {
         ui.incrementSends();
-        ui.updateIndicator('NestJS API connected & sending', true);
+        ui.updateIndicator('Connected', true);
       } else {
         ui.logConsole(`Ingest error: HTTP ${response.status}`);
-        ui.updateIndicator(`Ingest error: HTTP ${response.status}`, false);
+        ui.updateIndicator('Connection issue', false);
       }
       return response;
     } catch (error: any) {
       ui.logConsole(`Network error: ${error?.message || error}`);
-      ui.updateIndicator('NestJS API offline', false);
+      ui.updateIndicator('Offline', false);
       throw error;
     }
   };
@@ -149,6 +139,7 @@ function initializeBackgroundWindow(): void {
   inGameOverlayLifecycle.sync(currentMatchId);
 
   const publishAdaptiveRecommendation = (data: any): void => {
+    ui.setRefreshPending(false);
     mainWindow.latestAdaptiveRecommendation = data;
     mainWindow.latestAdaptiveError = null;
 
@@ -162,6 +153,7 @@ function initializeBackgroundWindow(): void {
   };
 
   const publishAdaptiveError = (error: Error): void => {
+    ui.setRefreshPending(false);
     const message = error.message || 'Adaptive recommendation unavailable';
     mainWindow.latestAdaptiveError = message;
     ui.showAdaptiveError(message);
@@ -191,7 +183,10 @@ function initializeBackgroundWindow(): void {
     );
   };
 
-  mainWindow.refreshBuild = (): void => scheduleAdaptiveRecommendation(true);
+  mainWindow.refreshBuild = (): void => {
+    ui.setRefreshPending(true);
+    scheduleAdaptiveRecommendation(true);
+  };
   mainWindow.forceLiveBuildRecommendationRefresh = (): void => scheduleAdaptiveRecommendation(true);
 
   const buffer = new LiveEventBuffer(
@@ -205,9 +200,9 @@ function initializeBackgroundWindow(): void {
 
   const register = async (): Promise<void> => {
     try {
-      ui.updateStatus('REGISTERING...', 'init');
+      ui.updateStatus('Connecting', 'init');
       await setRequiredFeatures();
-      ui.updateStatus('REGISTERED', 'connected');
+      ui.updateStatus('Ready', 'connected');
       ui.logConsole('Successfully registered GEP required features: game_info, match_info');
 
       listenOverwolfEvents((event) => {
@@ -250,7 +245,7 @@ function initializeBackgroundWindow(): void {
         }
       });
     } catch (error: any) {
-      ui.updateStatus('FAILED', 'error');
+      ui.updateStatus('Unavailable', 'error');
       ui.logConsole(
         `GEP feature registration failed: ${error?.message || error}. Retrying in 5s...`,
       );

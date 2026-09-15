@@ -2,12 +2,12 @@
   "manifest_version": 1,
   "type": "WebApp",
   "meta": {
-    "name": "Deadlock Live Probe",
+    "name": "Dynamo Lab",
     "version": "0.1.15",
     "minimum-overwolf-version": "0.197.0",
     "minimum-gep-version": "305.0",
     "author": "Antigravity",
-    "description": "Real-time Deadlock build recommendations and telemetry overlay",
+    "description": "Live Deadlock build route: one current purchase plus the next four legal purchases for the running match",
     "icon": "dynamo.png"
   },
   "permissions": [
@@ -24,6 +24,8 @@
     "externally_connectable": {
       "matches": [
         "https://aboba-telegramovich.duckdns.org",
+        "https://unpkg.com",
+        "https://api.deadlock-api.com",
         "https://fonts.googleapis.com",
         "https://fonts.gstatic.com"
       ]

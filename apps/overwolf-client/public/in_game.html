@@ -2,185 +2,321 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Deadlock Statlocker Adaptive HUD</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <meta name="color-scheme" content="dark" />
+    <title>Dynamo Lab Overlay</title>
     <style>
       :root {
-        --bg: rgba(8, 9, 13, 0.93);
-        --surface-soft: rgba(255, 255, 255, 0.045);
-        --line: rgba(255, 255, 255, 0.105);
-        --text: #f8f7f5;
-        --muted: #aaa9b1;
-        --dim: #74737c;
-        --accent: #ff7658;
-        --accent-soft: rgba(255, 118, 88, 0.15);
-        --live: #62d49a;
-        --warning: #f5bd64;
-        --weapon: #e5a83b;
-        --vitality: #58bd74;
-        --spirit: #a978df;
+        --overlay-width: 340px;
+        --canvas: #041b25;
+        --surface: #08222b;
+        --line: #28505a;
+        --line-soft: rgba(40, 80, 90, 0.6);
+        --text: #e7eff0;
+        --muted: #91aeb4;
+        --amber: #e4a24d;
+        --weapon: #d99a3a;
+        --vitality: #63b77a;
+        --spirit: #a778d4;
+        --sans: "Arial Narrow", "Roboto Condensed", "Segoe UI", system-ui, sans-serif;
+        --mono: ui-monospace, "Cascadia Mono", "Consolas", monospace;
       }
 
       * { box-sizing: border-box; }
-      html, body { width: 100%; min-height: 100%; margin: 0; overflow: hidden; }
-      body { padding: 7px; color: var(--text); background: transparent; font-family: "Outfit", "Segoe UI", sans-serif; }
+      html, body { width: var(--overlay-width); min-height: 100%; margin: 0; overflow-x: hidden; }
+      body {
+        padding: 8px;
+        color: var(--text);
+        background: transparent;
+        font-family: var(--sans);
+      }
 
       .hud-container {
-        position: relative;
-        width: 100%;
-        min-height: 218px;
-        overflow: hidden;
         display: flex;
         flex-direction: column;
-        gap: 10px;
-        padding: 12px;
+        gap: 8px;
+        width: 100%;
+        min-width: 0;
+        padding: 10px;
         border: 1px solid var(--line);
-        border-radius: 16px;
-        background: radial-gradient(circle at 82% 2%, rgba(255, 118, 88, 0.13), transparent 37%), linear-gradient(145deg, rgba(19, 20, 27, 0.97), var(--bg));
-        box-shadow: 0 18px 45px rgba(0, 0, 0, 0.42), inset 0 1px rgba(255, 255, 255, 0.045);
-        backdrop-filter: blur(18px);
+        border-radius: 4px;
+        background: var(--surface);
+        box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45), inset 0 1px rgba(231, 239, 240, 0.05);
         user-select: none;
       }
 
-      .guide-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 27px; cursor: move; }
-      .brand { display: flex; align-items: center; gap: 8px; min-width: 0; }
-      .brand-mark { width: 25px; height: 25px; display: grid; place-items: center; border: 1px solid rgba(255, 118, 88, 0.36); border-radius: 8px; color: var(--accent); background: var(--accent-soft); font: 700 12px/1 "JetBrains Mono", monospace; }
-      .brand-copy { min-width: 0; }
-      .guide-title { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.025em; }
-      .guide-kicker { margin-top: 1px; color: var(--muted); font: 500 8px/1.1 "JetBrains Mono", monospace; letter-spacing: 0.1em; text-transform: uppercase; }
+      .overlay-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        min-height: 26px;
+        cursor: move;
+      }
 
-      .controls { display: flex; gap: 5px; }
-      button { min-height: 25px; border: 1px solid var(--line); border-radius: 7px; padding: 4px 7px; color: var(--muted); background: rgba(255, 255, 255, 0.045); font: 600 9px/1 "Outfit", sans-serif; cursor: pointer; }
-      button:hover { color: var(--text); border-color: rgba(255, 255, 255, 0.22); }
+      .overlay-brand { display: flex; align-items: center; gap: 8px; min-width: 0; }
 
-      #guide-empty { min-height: 156px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 20px; text-align: center; color: var(--muted); border: 1px dashed var(--line); border-radius: 12px; background: rgba(255, 255, 255, 0.018); }
-      .waiting-pulse { width: 33px; height: 33px; border: 1px solid rgba(255, 118, 88, 0.32); border-radius: 50%; background: radial-gradient(circle, rgba(255, 118, 88, 0.28), transparent 66%); box-shadow: 0 0 22px rgba(255, 118, 88, 0.16); }
-      .waiting-title { color: var(--text); font-size: 14px; font-weight: 650; }
-      .waiting-copy { max-width: 245px; font-size: 10px; line-height: 1.45; }
+      .brand-mark {
+        width: 22px;
+        height: 22px;
+        flex: none;
+        display: grid;
+        place-items: center;
+        border: 1px solid var(--amber);
+        border-radius: 3px;
+        color: var(--amber);
+        font: 700 11px/1 var(--mono);
+      }
 
-      #guide-active { display: none; flex-direction: column; gap: 9px; }
-      #situational-recommendation-panel { display: none; flex-direction: column; gap: 9px; }
-      .rec-update-note { display: none; align-items: center; gap: 6px; padding: 7px 9px; border: 1px solid rgba(245, 189, 100, 0.22); border-radius: 8px; color: #f7cf8e; background: rgba(245, 189, 100, 0.08); font-size: 9px; }
+      .overlay-title {
+        margin: 0;
+        overflow: hidden;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-overflow: ellipsis;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
 
-      .primary-card { --slot: var(--accent); position: relative; overflow: hidden; padding: 11px; border: 1px solid var(--line); border-left: 3px solid var(--slot); border-radius: 11px; background: linear-gradient(135deg, rgba(255, 255, 255, 0.068), rgba(255, 255, 255, 0.025)); box-shadow: inset 0 1px rgba(255, 255, 255, 0.035); }
-      #situational-recommendation-panel[data-slot="weapon"] .primary-card { --slot: var(--weapon); }
-      #situational-recommendation-panel[data-slot="vitality"] .primary-card { --slot: var(--vitality); }
-      #situational-recommendation-panel[data-slot="spirit"] .primary-card { --slot: var(--spirit); }
-      .primary-card::after { content: ""; position: absolute; width: 100px; height: 100px; right: -48px; top: -54px; border-radius: 50%; background: var(--slot); opacity: 0.07; filter: blur(6px); }
+      .overlay-state {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--muted);
+        font: 600 9px/1 var(--sans);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
 
-      .rec-ribbon { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
-      #rec-action-label { padding: 3px 7px; border-radius: 5px; color: #0b0b0d; background: var(--accent); font: 700 8px/1.25 "JetBrains Mono", monospace; letter-spacing: 0.06em; text-transform: uppercase; }
-      .planner-badge { padding: 2px 6px; border-radius: 5px; font: 700 7.5px/1.2 "JetBrains Mono", monospace; letter-spacing: 0.05em; text-transform: uppercase; border: 1px solid rgba(255, 255, 255, 0.12); }
-      .planner-badge-strategy { color: #58bd74; background: rgba(88, 189, 116, 0.14); border-color: rgba(88, 189, 116, 0.4); }
-      .planner-badge-legacy { color: #f5bd64; background: rgba(245, 189, 100, 0.14); border-color: rgba(245, 189, 100, 0.4); }
-      #rec-game-state, #rec-health { font: 600 8px/1.2 "JetBrains Mono", monospace; letter-spacing: 0.035em; text-transform: uppercase; }
-      #rec-game-state { color: var(--muted); }
-      #rec-health { margin-left: auto; }
-      #rec-health::before { content: ""; display: inline-block; width: 5px; height: 5px; margin-right: 5px; border-radius: 50%; background: currentColor; box-shadow: 0 0 8px currentColor; }
-      #rec-health.health-live { color: var(--live); }
-      #rec-health.health-degraded, #rec-health.health-waiting { color: var(--warning); }
-      #rec-game-state.state-ahead { color: var(--live); }
-      #rec-game-state.state-behind { color: #ff8e79; }
+      #indicator-dot {
+        width: 6px;
+        height: 6px;
+        flex: none;
+        border-radius: 50%;
+        background: var(--muted);
+      }
 
-      .primary-main { display: flex; align-items: center; gap: 10px; min-width: 0; }
-      #rec-item-glyph { flex: 0 0 39px; width: 39px; height: 39px; display: grid; place-items: center; border: 1px solid var(--slot); border-radius: 9px; color: var(--slot); background: rgba(255, 255, 255, 0.035); font: 700 15px/1 "JetBrains Mono", monospace; }
-      .primary-copy { flex: 1; min-width: 0; }
-      #rec-headline { color: var(--muted); font-size: 9px; font-weight: 550; line-height: 1.2; }
-      #rec-item-name { margin-top: 2px; overflow: hidden; color: var(--text); font-size: 17px; font-weight: 700; line-height: 1.06; text-overflow: ellipsis; white-space: nowrap; }
-      #rec-item-meta { margin-top: 4px; color: var(--dim); font: 500 8px/1.2 "JetBrains Mono", monospace; text-transform: uppercase; }
+      #indicator-dot.active {
+        background: var(--vitality);
+        box-shadow: 0 0 7px var(--vitality);
+      }
 
-      .confidence-block { margin-top: 10px; }
-      .confidence-copy { display: flex; justify-content: space-between; color: var(--dim); font: 500 8px/1.2 "JetBrains Mono", monospace; text-transform: uppercase; }
-      #rec-confidence-label { color: var(--muted); }
-      .confidence-track { height: 3px; margin-top: 5px; overflow: hidden; border-radius: 2px; background: rgba(255, 255, 255, 0.075); }
-      #rec-confidence-fill { width: 4%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent), #ffad65); transition: width 220ms ease; }
+      #guide-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        padding: 18px 12px;
+        border: 1px dashed var(--line);
+        color: var(--muted);
+        text-align: center;
+      }
 
-      .adaptive-secondary { display: flex; flex-direction: column; gap: 9px; }
-      .section-card { padding: 9px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft); }
-      .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
-      .section-title { color: var(--muted); font: 600 8px/1.2 "JetBrains Mono", monospace; letter-spacing: 0.1em; text-transform: uppercase; }
-      #rec-plan-more { color: var(--dim); font: 500 8px/1.2 "JetBrains Mono", monospace; }
+      .waiting-pulse {
+        width: 28px;
+        height: 28px;
+        border: 1px solid var(--line);
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(228, 162, 77, 0.22), transparent 66%);
+      }
 
-      #rec-reasons { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
-      #rec-reasons li { position: relative; padding-left: 11px; color: #d4d2d2; font-size: 9.5px; line-height: 1.3; }
-      #rec-reasons li::before { content: ""; position: absolute; left: 0; top: 5px; width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
+      .waiting-title {
+        margin: 0;
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
 
-      #rec-plan { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
-      .plan-item { --slot: var(--dim); min-width: 0; display: flex; align-items: center; gap: 7px; padding: 6px 7px; border: 1px solid var(--line); border-left: 2px solid var(--slot); border-radius: 7px; background: rgba(5, 6, 9, 0.24); }
-      .slot-weapon { --slot: var(--weapon); }
-      .slot-vitality { --slot: var(--vitality); }
-      .slot-spirit { --slot: var(--spirit); }
-      .status-next { background: rgba(255, 118, 88, 0.075); border-color: rgba(255, 118, 88, 0.26); }
-      .status-owned { opacity: 0.6; }
-      .plan-position { color: var(--slot); font: 600 8px/1 "JetBrains Mono", monospace; }
-      .plan-details { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
-      .plan-details strong { overflow: hidden; font-size: 9px; line-height: 1.05; text-overflow: ellipsis; white-space: nowrap; }
-      .plan-details small { overflow: hidden; color: var(--dim); font: 500 7px/1.1 "JetBrains Mono", monospace; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; }
+      .waiting-copy { max-width: 250px; margin: 0; font-size: 10px; line-height: 1.45; }
 
-      #rec-alternatives { display: grid; gap: 4px; }
-      .alternative-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-left: 8px; border-left: 2px solid var(--slot, var(--dim)); color: #d7d5d6; font-size: 9.5px; }
-      .alternative-row small { color: var(--dim); font: 500 8px/1.2 "JetBrains Mono", monospace; }
-      .empty-row { grid-column: 1 / -1; color: var(--dim); font-size: 9px; }
+      #guide-active {
+        display: none;
+        flex-direction: column;
+        min-width: 0;
+      }
 
-      .adaptive-footer { display: flex; align-items: center; justify-content: space-between; padding: 0 2px; color: var(--dim); font: 500 7.5px/1.2 "JetBrains Mono", monospace; text-transform: uppercase; }
-      .adaptive-footer .source-dot { width: 4px; height: 4px; display: inline-block; margin-right: 5px; border-radius: 50%; background: var(--live); }
+      #situational-recommendation-panel {
+        display: none;
+        flex-direction: column;
+        min-width: 0;
+      }
 
-      .hud-container.compact .adaptive-secondary, .hud-container.compact .adaptive-footer, .hud-container.compact .confidence-block, .hud-container.compact .rec-update-note { display: none !important; }
-      .hud-container.compact { min-height: 0; }
-      .hud-container.compact #situational-recommendation-panel { gap: 0; }
+      #rec-update-note {
+        display: none;
+        align-items: center;
+        margin-bottom: 8px;
+        padding: 6px 8px;
+        border: 1px solid rgba(228, 162, 77, 0.35);
+        border-radius: 3px;
+        color: var(--amber);
+        background: rgba(228, 162, 77, 0.08);
+        font-size: 9.5px;
+        letter-spacing: 0.03em;
+      }
+
+      #rec-plan {
+        display: grid;
+        row-gap: 8px;
+        min-width: 0;
+      }
+
+      .purchase-row {
+        --kind: var(--muted);
+        display: grid;
+        grid-template-columns: 20px 52px minmax(0, 1fr) auto;
+        grid-template-areas:
+          "pos art copy copy"
+          "pos art price category";
+        align-items: center;
+        gap: 2px 8px;
+        min-width: 0;
+        padding: 10px 8px;
+        border: 1px solid var(--line-soft);
+        background: rgba(4, 27, 37, 0.55);
+      }
+
+      .purchase-row.slot-weapon { --kind: var(--weapon); }
+      .purchase-row.slot-vitality { --kind: var(--vitality); }
+      .purchase-row.slot-spirit { --kind: var(--spirit); }
+
+      .purchase-row.is-current {
+        background: rgba(228, 162, 77, 0.07);
+        box-shadow: inset 0 0 0 1px rgba(228, 162, 77, 0.72);
+      }
+
+      .purchase-position {
+        grid-area: pos;
+        width: 20px;
+        height: 20px;
+        display: grid;
+        place-items: center;
+        border: 1px solid var(--line);
+        border-radius: 50%;
+        color: var(--muted);
+        font: 700 10px/1 var(--mono);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .purchase-row.is-current .purchase-position {
+        border-color: var(--amber);
+        color: #041b25;
+        background: var(--amber);
+      }
+
+      .item-art {
+        grid-area: art;
+        position: relative;
+        width: 52px;
+        height: 52px;
+        display: grid;
+        place-items: center;
+        border: 1px solid var(--line);
+        background: #102b39;
+      }
+
+      .item-art-fallback {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        color: var(--kind);
+        font: 700 15px/1 var(--mono);
+      }
+
+      .item-art dl-item-card {
+        position: relative;
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      .purchase-copy {
+        grid-area: copy;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .purchase-copy strong {
+        overflow: hidden;
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 1.15;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .purchase-copy small {
+        color: var(--muted);
+        font-size: 9px;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+      }
+
+      .purchase-price {
+        grid-area: price;
+        justify-self: start;
+        font-family: var(--mono);
+        font-size: 16px;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        line-height: 1.1;
+        white-space: nowrap;
+      }
+
+      .purchase-category {
+        grid-area: category;
+        justify-self: end;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--kind);
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+
+      .purchase-category::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        flex: none;
+        background: var(--kind);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        * { animation: none !important; transition: none !important; }
+      }
     </style>
   </head>
   <body>
     <main class="hud-container">
-      <div class="guide-header">
-        <div class="brand">
-          <div class="brand-mark">S</div>
-          <div class="brand-copy"><h1 class="guide-title">Statlocker Adaptive</h1><div class="guide-kicker">Live build intelligence</div></div>
-        </div>
-        <div class="controls">
-          <button id="hud-refresh-build" type="button" onclick="overwolf.windows.getMainWindow().refreshBuild?.()">Refresh</button>
-          <button id="hud-toggle-mode" type="button" onclick="toggleHudMode()">Compact</button>
-        </div>
-      </div>
+      <header class="overlay-header">
+        <div class="overlay-brand"><span class="brand-mark">D</span><h1 class="overlay-title">Dynamo Lab</h1></div>
+        <span class="overlay-state" aria-live="polite"><span id="indicator-dot" aria-hidden="true"></span><span id="indicator-text">Connecting</span></span>
+      </header>
 
       <section id="guide-empty">
         <div class="waiting-pulse"></div>
-        <div id="guide-empty-title" class="waiting-title">Waiting for match data</div>
-        <div id="guide-empty-copy" class="waiting-copy">Your Statlocker recommendation will appear automatically when the match is detected.</div>
+        <h2 id="guide-empty-title" class="waiting-title">Waiting for match data</h2>
+        <p id="guide-empty-copy" class="waiting-copy">Your Dynamo Lab build route will appear automatically when the match is detected.</p>
       </section>
 
       <section id="guide-active">
         <div id="situational-recommendation-panel">
-          <div id="rec-update-note" class="rec-update-note"></div>
-          <article class="primary-card">
-            <div class="rec-ribbon">
-              <span id="rec-action-label">Stand by</span>
-              <span id="rec-planner-badge" class="planner-badge planner-badge-strategy">Strategy-First</span>
-              <span id="rec-game-state">Game state updating</span>
-              <span id="rec-health" class="health-waiting">Waiting</span>
-            </div>
-            <div class="primary-main">
-              <div id="rec-item-glyph">•</div>
-              <div class="primary-copy"><div id="rec-headline">Adaptive recommendation</div><div id="rec-item-name">Waiting…</div><div id="rec-item-meta"></div></div>
-            </div>
-            <div class="confidence-block">
-              <div class="confidence-copy"><span>Decision confidence</span><span id="rec-confidence-label">—</span></div>
-              <div class="confidence-track"><div id="rec-confidence-fill"></div></div>
-            </div>
-          </article>
-
-          <div class="adaptive-secondary">
-            <section class="section-card"><div class="section-header"><span class="section-title">Why this move</span></div><ul id="rec-reasons"></ul></section>
-            <section class="section-card"><div class="section-header"><span class="section-title">Build path</span><span id="rec-plan-more"></span></div><div id="rec-plan"></div></section>
-            <section id="rec-alternatives-section" class="section-card"><div class="section-header"><span class="section-title">Also viable</span></div><div id="rec-alternatives"></div></section>
-          </div>
-
-          <footer class="adaptive-footer"><span><span class="source-dot"></span><span id="rec-source">Statlocker Adaptive</span></span><span id="rec-evidence">Evidence updating</span></footer>
+          <div id="rec-update-note"></div>
+          <div id="rec-plan" aria-label="Five-item purchase route" data-route-limit="5"></div>
         </div>
       </section>
     </main>
+    <script type="module" src="https://unpkg.com/@deadlock-api/ui-core/dist/main/main.esm.js"></script>
     <script src="dist/index.js"></script>
   </body>
 </html>

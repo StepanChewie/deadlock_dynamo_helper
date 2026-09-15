@@ -1,15 +1,12 @@
 import type { AdaptiveRecommendationResultV1 } from '@deadlock-live-probe/shared';
 import type {
-  AdaptivePresentedAlternative,
-  AdaptivePresentedPlanItem,
+  AdaptivePurchaseRouteRow,
+  AdaptiveRecommendationPresentation,
 } from './adaptive-recommendation-presentation';
-import { buildAdaptiveRecommendationPresentation } from './adaptive-recommendation-presentation';
 import {
-  AdaptiveDecisionDebugPresentation,
-  AdaptiveDecisionDebugReplacement,
-  AdaptiveDecisionDebugRow,
-  buildAdaptiveDecisionDebugPresentation,
-} from './adaptive-decision-debug-presentation';
+  buildAdaptivePurchaseRoute,
+  buildAdaptiveRecommendationPresentation,
+} from './adaptive-recommendation-presentation';
 
 export function updateStatus(text: string, statusClass?: 'connected' | 'error' | 'init'): void {
   const el = document.getElementById('status');
@@ -55,63 +52,20 @@ export function showAdaptiveRecommendation(data: AdaptiveRecommendationResultV1)
   const emptyEl = document.getElementById('guide-empty');
   const activeEl = document.getElementById('guide-active');
   const panel = document.getElementById('situational-recommendation-panel');
-  const nameEl = document.getElementById('rec-item-name');
-  const headlineEl = document.getElementById('rec-headline');
-
-  if (!panel || !nameEl || !headlineEl) return;
 
   hasAdaptiveRecommendation = true;
   if (emptyEl) emptyEl.style.display = 'none';
   if (activeEl) activeEl.style.display = 'flex';
-  panel.style.display = 'flex';
+  if (panel) panel.style.display = 'flex';
 
-  setText('rec-source', view.sourceLabel);
-  setText('rec-game-state', view.stateLabel);
-  setText('rec-health', view.healthLabel);
-  setText('rec-action-label', view.actionLabel);
-  setText('rec-confidence-label', view.confidence.label);
-  setText('rec-evidence', view.evidenceLabel);
-  headlineEl.textContent = view.headline;
-  nameEl.textContent = view.primaryItem?.name || 'Adaptive plan';
-  setText(
-    'rec-item-meta',
-    [
-      view.primaryItem?.tierLabel,
-      view.primaryItem?.costLabel,
-      view.replacedItem
-        ? `Sell ${view.replacedItem.known ? view.replacedItem.name : view.replacedItem.diagnosticLabel}`
-        : undefined,
-      view.situationalPurposeLabel ? `Situational - ${view.situationalPurposeLabel}` : undefined,
-      view.againstLabel,
-      ...view.primaryRequirements,
-      view.primaryItem?.diagnosticLabel,
-    ].filter(Boolean).join(' · '),
-  );
-  setText('rec-item-glyph', itemGlyph(view.primaryItem?.slot));
-
-  panel.setAttribute('data-slot', view.primaryItem?.slot || 'unknown');
-  setTone('rec-health', `health-${view.healthTone}`);
-  setTone('rec-game-state', `state-${view.stateTone}`);
-
-  const confidenceFill = document.getElementById('rec-confidence-fill');
-  if (confidenceFill) confidenceFill.style.width = `${view.confidence.value}%`;
-
-  const planItems = isInGameOverlay()
-    ? view.plan.items.filter((item) => item.status !== 'OWNED' && item.status !== 'COMPLETED')
-    : view.plan.items;
-
-  renderReasons(view.reasons);
-  renderPlan(planItems, view.plan.remainingCount);
-  renderAlternatives(view.alternatives);
-  renderDecisionDebug(buildAdaptiveDecisionDebugPresentation(data));
+  renderContainerRoute('rec-plan', view);
+  renderContainerRoute('overlay-preview-plan', view);
   clearAdaptiveError();
 }
 
 export function showAdaptiveError(message = 'Recommendation is updating'): void {
   const note = document.getElementById('rec-update-note');
   if (hasAdaptiveRecommendation) {
-    setText('rec-health', 'Updating');
-    setTone('rec-health', 'health-waiting');
     if (note) {
       note.textContent = 'Connection interrupted - showing the last safe recommendation.';
       note.style.display = 'flex';
@@ -122,8 +76,8 @@ export function showAdaptiveError(message = 'Recommendation is updating'): void 
 
   const emptyEl = document.getElementById('guide-empty');
   if (emptyEl) emptyEl.style.display = 'flex';
-  setText('guide-empty-title', 'Statlocker is reconnecting');
-  setText('guide-empty-copy', 'The recommendation will appear here as soon as fresh data arrives.');
+  setText('guide-empty-title', 'Dynamo Lab is reconnecting');
+  setText('guide-empty-copy', 'The build route will appear when fresh match data is available.');
 }
 
 export function hideSituationalPanel(): void {
@@ -135,204 +89,92 @@ export function hideSituationalPanel(): void {
   if (activeEl) activeEl.style.display = 'none';
   if (emptyEl) emptyEl.style.display = 'flex';
   setText('guide-empty-title', 'Waiting for match data');
-  setText('guide-empty-copy', 'Your Statlocker recommendation will appear automatically when the match is detected.');
+  setText('guide-empty-copy', 'Your Dynamo Lab build route will appear automatically when the match is detected.');
   hasAdaptiveRecommendation = false;
-  renderDecisionDebug({ visible: false, sections: [], replacements: [] });
   clearAdaptiveError();
 }
 
-function renderReasons(reasons: readonly string[]): void {
-  const container = document.getElementById('rec-reasons');
-  if (!container) return;
-  container.replaceChildren();
-  const visibleReasons = reasons.length > 0
-    ? reasons
-    : ['Following the strongest available Statlocker plan'];
-  visibleReasons.forEach((reason) => {
-    const item = document.createElement('li');
-    item.textContent = reason;
-    container.appendChild(item);
-  });
+export function setRefreshPending(pending: boolean): void {
+  const button = document.getElementById('refresh-build') as HTMLButtonElement | null;
+  if (!button) return;
+  button.disabled = pending;
+  button.textContent = pending ? 'Refreshing' : 'Refresh';
+  button.setAttribute('aria-busy', String(pending));
 }
 
-function renderPlan(
-  items: readonly AdaptivePresentedPlanItem[],
-  remainingCount: number,
-): void {
-  const container = document.getElementById('rec-plan');
+function renderContainerRoute(containerId: string, view: AdaptiveRecommendationPresentation): void {
+  const container = document.getElementById(containerId);
   if (!container) return;
-  container.replaceChildren();
+  const limit = resolveRouteLimit(container);
+  const rows = buildAdaptivePurchaseRoute(view, limit);
+  renderPurchaseRoute(rows, containerId);
+}
 
-  if (items.length === 0) {
-    const empty = document.createElement('div');
-    empty.className = 'empty-row';
-    empty.textContent = 'Plan is being assembled';
-    container.appendChild(empty);
-  } else {
-    items.forEach((planned) => container.appendChild(createPlanItem(planned)));
+function resolveRouteLimit(container: HTMLElement): number {
+  const raw = (
+    typeof container.getAttribute === 'function'
+      ? container.getAttribute('data-route-limit')
+      : (container as unknown as { attributes?: Map<string, string> }).attributes?.get?.('data-route-limit')
+  )?.trim().toLowerCase();
+  if (raw === 'all') {
+    return Number.POSITIVE_INFINITY;
   }
-
-  setText('rec-plan-more', remainingCount > 0 ? `+${remainingCount} later` : '');
+  if (raw) {
+    const parsed = Number.parseInt(raw, 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+  return 5;
 }
 
-function createPlanItem(planned: AdaptivePresentedPlanItem): HTMLElement {
+function renderPurchaseRoute(rows: readonly AdaptivePurchaseRouteRow[], containerId: string): void {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.replaceChildren(...rows.map(createPurchaseRow));
+}
+
+function createPurchaseRow(planned: AdaptivePurchaseRouteRow): HTMLElement {
   const row = document.createElement('div');
-  row.className = `plan-item slot-${planned.item.slot} status-${planned.status.toLowerCase()}`;
+  row.className = `purchase-row slot-${planned.item.slot}${planned.isCurrent ? ' is-current' : ''}`;
   row.setAttribute('data-plan-action-id', planned.planActionId);
+  row.setAttribute('data-current', String(planned.isCurrent));
 
   const position = document.createElement('span');
-  position.className = 'plan-position';
-  position.textContent = String(planned.position).padStart(2, '0');
+  position.className = 'purchase-position';
+  position.textContent = String(planned.position);
 
-  const details = document.createElement('span');
-  details.className = 'plan-details';
+  const art = document.createElement('span');
+  art.className = 'item-art';
+  const fallback = document.createElement('span');
+  fallback.className = 'item-art-fallback';
+  fallback.textContent = itemGlyph(planned.item.slot);
+  fallback.setAttribute('aria-hidden', 'true');
+  const card = document.createElement('dl-item-card');
+  card.setAttribute('item-id', String(planned.item.id));
+  card.setAttribute('variant', 'icon');
+  card.setAttribute('show-tier-badge', 'false');
+  card.setAttribute('tooltip-trigger', 'none');
+  card.setAttribute('aria-label', `${planned.item.name} item icon`);
+  art.append(fallback, card);
+
+  const copy = document.createElement('span');
+  copy.className = 'purchase-copy';
   const name = document.createElement('strong');
   name.textContent = planned.item.name;
-  const meta = document.createElement('small');
-  meta.textContent = [
-    planned.statusLabel,
-    planned.actionLabel,
-    planned.situationalPurposeLabel ? `Situational - ${planned.situationalPurposeLabel}` : undefined,
-    planned.againstLabel,
-    ...planned.requirements,
-  ].filter(Boolean).join(' · ');
-  details.append(name, meta);
+  const action = document.createElement('small');
+  action.textContent = 'Buy now';
+  copy.append(name, action);
 
-  row.append(position, details);
-  return row;
-}
+  const price = document.createElement('strong');
+  price.className = 'purchase-price';
+  price.textContent = planned.item.costLabel?.replace(/\s*souls$/i, '') || '—';
 
-function renderAlternatives(alternatives: readonly AdaptivePresentedAlternative[]): void {
-  const container = document.getElementById('rec-alternatives');
-  const section = document.getElementById('rec-alternatives-section');
-  if (!container || !section) return;
-  container.replaceChildren();
-  section.style.display = alternatives.length > 0 ? 'block' : 'none';
-  alternatives.forEach((alternative) => {
-    const row = document.createElement('div');
-    row.className = `alternative-row slot-${alternative.item?.slot || 'unknown'}`;
+  const category = document.createElement('span');
+  category.className = 'purchase-category';
+  category.textContent = planned.item.slot.toUpperCase();
 
-    const name = document.createElement('span');
-    name.textContent = alternative.headline;
-    const score = document.createElement('small');
-    score.textContent = alternative.scoreLabel;
-    row.append(name, score);
-    container.appendChild(row);
-  });
-}
-
-function renderDecisionDebug(view: AdaptiveDecisionDebugPresentation): void {
-  const root = document.getElementById('decision-debug');
-  if (!root) return;
-  root.replaceChildren();
-  root.style.display = view.visible ? 'block' : 'none';
-  if (!view.visible) return;
-
-  const heading = document.createElement('div');
-  heading.className = 'debug-heading';
-  heading.textContent = 'Decision trace';
-  root.appendChild(heading);
-
-  const grid = document.createElement('div');
-  grid.className = 'debug-grid';
-  for (const section of view.sections) {
-    const card = document.createElement('section');
-    card.className = 'debug-section';
-    const title = document.createElement('h3');
-    title.textContent = section.title;
-    card.appendChild(title);
-    if (section.rows.length === 0) {
-      const empty = document.createElement('div');
-      empty.className = 'debug-empty';
-      empty.textContent = 'Нет значимых кандидатов';
-      card.appendChild(empty);
-    } else {
-      section.rows.forEach((row) => card.appendChild(createDebugRow(row)));
-    }
-    grid.appendChild(card);
-  }
-  root.appendChild(grid);
-
-  if (view.replacements.length > 0) {
-    const replacementDetails = document.createElement('details');
-    replacementDetails.className = 'debug-details';
-    const summary = document.createElement('summary');
-    summary.textContent = 'Replacement math';
-    replacementDetails.appendChild(summary);
-    view.replacements.forEach((replacement) => replacementDetails.appendChild(createReplacementTrace(replacement)));
-    root.appendChild(replacementDetails);
-  }
-
-  if (view.policy) {
-    const details = document.createElement('details');
-    details.className = 'debug-details';
-    const summary = document.createElement('summary');
-    summary.textContent = `Policy ${view.policy.version}`;
-    details.appendChild(summary);
-    const values: readonly [string, string][] = [
-      ['Capacity', String(view.policy.heldItemCapacity)],
-      ['Threat weights', JSON.stringify(view.policy.threatWeights)],
-      ['Threat clamp', `${view.policy.threatClamp.min}..${view.policy.threatClamp.max}`],
-      ['Shrink K', JSON.stringify(view.policy.shrinkK)],
-      ['Plan switch', String(view.policy.planSwitchThreshold)],
-      ['Sell+buy', String(view.policy.sellBuyThreshold)],
-      ['Soft core replace', String(view.policy.softCoreReplaceThreshold)],
-      ['Wildcard replace', String(view.policy.wildcardReplaceThreshold)],
-      ['Matchup confidence', String(view.policy.matchupConfidenceThreshold)],
-      ['Purchase protection ms', String(view.policy.recentPurchaseProtectionMs)],
-      ['Sold rebuy penalty ms', String(view.policy.soldItemRebuyPenaltyMs)],
-    ];
-    values.forEach(([label, value]) => details.appendChild(createDebugKeyValue(label, value)));
-    root.appendChild(details);
-  }
-}
-
-function createDebugRow(row: AdaptiveDecisionDebugRow): HTMLElement {
-  const wrapper = document.createElement('details');
-  wrapper.className = `debug-row${row.selected ? ' selected' : ''}`;
-  const summary = document.createElement('summary');
-  summary.textContent = [row.headline, row.source, row.reason].filter(Boolean).join(' · ');
-  wrapper.appendChild(summary);
-  if (row.score !== undefined) wrapper.appendChild(createDebugKeyValue('Score', String(row.score)));
-  if (row.confidence !== undefined) wrapper.appendChild(createDebugKeyValue('Confidence', String(row.confidence)));
-  row.details.forEach((detail) => wrapper.appendChild(createDebugKeyValue(detail.label, detail.value)));
-  return wrapper;
-}
-
-function createReplacementTrace(replacement: AdaptiveDecisionDebugReplacement): HTMLElement {
-  const card = document.createElement('div');
-  card.className = `debug-replacement verdict-${replacement.verdict.toLowerCase()}`;
-  const title = document.createElement('strong');
-  title.textContent = `${replacement.verdict} · ${replacement.headline}`;
-  card.appendChild(title);
-  const values: readonly [string, string | number][] = [
-    ['inventory', replacement.inventory],
-    ['utilityBefore', replacement.utilityBefore],
-    ['utilityAfter', replacement.utilityAfter],
-    ['rawImprovement', replacement.rawImprovement],
-    ['matchupGain', replacement.matchupGain],
-    ['skeletonDelta', replacement.skeletonDelta],
-    ['synergyDelta', replacement.synergyDelta],
-    ['timingDelta', replacement.timingDelta],
-    ['economicLoss', replacement.economicLoss],
-    ['transactionPenalty', replacement.transactionPenalty],
-    ['churnPenalty', replacement.churnPenalty],
-    ['netImprovement', replacement.netImprovement],
-    ['requiredThreshold', replacement.requiredThreshold],
-    ['reasonCodes', replacement.reasonCodes.join(', ')],
-  ];
-  values.forEach(([label, value]) => card.appendChild(createDebugKeyValue(label, String(value))));
-  return card;
-}
-
-function createDebugKeyValue(label: string, value: string): HTMLElement {
-  const row = document.createElement('div');
-  row.className = 'debug-kv';
-  const key = document.createElement('span');
-  key.textContent = label;
-  const val = document.createElement('code');
-  val.textContent = value;
-  row.append(key, val);
+  row.append(position, art, copy, price, category);
   return row;
 }
 
@@ -345,20 +187,11 @@ function clearAdaptiveError(): void {
   }
 }
 
-function isInGameOverlay(): boolean {
-  return document.querySelector('.hud-container') !== null;
-}
-
 function setText(id: string, text: string): void {
   const element = document.getElementById(id);
   if (element) element.textContent = text;
 }
 
-function setTone(id: string, tone: string): void {
-  const element = document.getElementById(id);
-  if (element) element.className = tone;
-}
-
-function itemGlyph(slot: string | undefined): string {
-  return { weapon: 'W', vitality: 'V', spirit: 'S' }[slot || ''] || '•';
+function itemGlyph(slot: string): string {
+  return { weapon: 'W', vitality: 'V', spirit: 'S' }[slot] || '•';
 }
