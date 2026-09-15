@@ -54,11 +54,11 @@
         "show_in_taskbar": true,
         "size": {
           "width": 1100,
-          "height": 760
+          "height": 680
         },
         "min_size": {
           "width": 860,
-          "height": 560
+          "height": 520
         }
       },
       "in_game": {
@@ -69,7 +69,7 @@
         "use_in_game_coordinate_system": true,
         "size": {
           "width": 340,
-          "height": 700
+          "height": 620
         },
         "min_size": {
           "width": 340,

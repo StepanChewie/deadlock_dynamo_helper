@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { OVERLAY_MAX_HEIGHT, OVERLAY_TOP_OFFSET } from './overlay-geometry';
 
 const desktop = readFileSync(join(__dirname, '../public/desktop.html'), 'utf8');
 const overlay = readFileSync(join(__dirname, '../public/in_game.html'), 'utf8');
@@ -84,10 +85,14 @@ describe('Dynamo Lab release manifest contract', () => {
     ]));
   });
 
-  it('keeps declared windows, game targeting, permissions, and hotkeys unchanged', () => {
+  it('pins declared windows, game targeting, permissions, and hotkeys', () => {
     expect(manifest.data.start_window).toBe('desktop');
     expect(Object.keys(manifest.data.windows)).toEqual(['desktop', 'in_game', 'dynamo_warning']);
-    expect(manifest.data.windows.in_game.size).toEqual({ width: 340, height: 700 });
+    expect(manifest.data.windows.in_game.size).toEqual({
+      width: 340,
+      height: OVERLAY_MAX_HEIGHT,
+    });
+    expect(manifest.data.windows.in_game.default_position.y).toBe(OVERLAY_TOP_OFFSET);
     expect(manifest.data.game_targeting.game_ids).toEqual([24482]);
     expect(manifest.permissions).toEqual(['GameInfo', 'Hotkeys']);
     expect(Object.keys(manifest.data.hotkeys))

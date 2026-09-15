@@ -6,6 +6,10 @@ import { InGameOverlayLifecycle } from './overwolf/in-game-overlay-lifecycle';
 import * as ui from './ui';
 import { AdaptiveRecommendationClient } from './adaptive-recommendation-client';
 import { didAdaptiveMatchChange } from './adaptive-match-transition';
+import {
+  OVERLAY_MAX_HEIGHT,
+  OVERLAY_MIN_HEIGHT,
+} from './overlay-geometry';
 
 const clientId = `client-${Math.random().toString(36).substring(2, 8)}`;
 const apiBaseUrl = 'https://aboba-telegramovich.duckdns.org';
@@ -39,12 +43,10 @@ function initializeInGameWindow(windowId: string): void {
     }
 
     requestAnimationFrame(() => {
-      const minimumHeight = 190;
-      const maximumHeight = 700;
       const contentHeight = Math.ceil(hud.scrollHeight + 24);
       const targetHeight = Math.max(
-        minimumHeight,
-        Math.min(maximumHeight, contentHeight),
+        OVERLAY_MIN_HEIGHT,
+        Math.min(OVERLAY_MAX_HEIGHT, contentHeight),
       );
       ow.windows.changeSize(windowId, 340, targetHeight);
     });

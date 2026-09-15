@@ -9,6 +9,9 @@ const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
 const errors = [];
 const DEADLOCK_GAME_ID = 24482;
+// Overwolf's submission test procedure opens the app on a 1366x720 screen and
+// requires every window to stay inside the screen borders.
+const OVERWOLF_TEST_SCREEN_HEIGHT = 720;
 
 assert(manifest.manifest_version === 1, 'manifest_version must be 1.');
 assert(manifest.type === 'WebApp', 'manifest type must be WebApp.');
@@ -76,6 +79,20 @@ for (const [windowName, windowConfig] of Object.entries(manifest.data?.windows |
     `Window ${windowName} references a missing file.`,
   );
 }
+
+const desktopSize = manifest.data?.windows?.desktop?.size;
+assert(
+  desktopSize?.height <= OVERWOLF_TEST_SCREEN_HEIGHT,
+  `desktop window height ${desktopSize?.height} exceeds the ${OVERWOLF_TEST_SCREEN_HEIGHT}px Overwolf test screen.`,
+);
+
+const inGameWindow = manifest.data?.windows?.in_game;
+assert(
+  (inGameWindow?.default_position?.y || 0) +
+    (inGameWindow?.size?.height || 0) <=
+    OVERWOLF_TEST_SCREEN_HEIGHT,
+  `in_game offset ${inGameWindow?.default_position?.y} plus declared height ${inGameWindow?.size?.height} exceeds the ${OVERWOLF_TEST_SCREEN_HEIGHT}px Overwolf test screen.`,
+);
 
 const iconPath = path.join(publicDir, manifest.meta?.icon || '');
 assert(fs.existsSync(iconPath), 'Manifest icon is missing.');
