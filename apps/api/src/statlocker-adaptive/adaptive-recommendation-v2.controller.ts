@@ -4,6 +4,7 @@ import {
   AdaptiveRecommendationResultV2,
 } from '@deadlock-live-probe/shared';
 import { AdaptiveLiveStateNotReadyError } from './adaptive-decision-state-v1.service';
+import { AdaptiveAvailabilityV1Service } from './adaptive-availability-v1.service';
 import { BuildIterationCaptureV1 } from './build-iteration-capture-v1';
 import { BuildIterationHistoryV1Service } from './build-iteration-history-v1.service';
 import { AdaptiveRecommendationV2Service } from './adaptive-recommendation-v2.service';
@@ -15,6 +16,7 @@ export class AdaptiveRecommendationV2Controller {
     private readonly recommendation: AdaptiveRecommendationV2Service,
     private readonly history: BuildIterationHistoryV1Service,
     private readonly liveState: LiveMatchStateService,
+    private readonly availability: AdaptiveAvailabilityV1Service,
   ) {}
 
   @Post('recommend')
@@ -32,6 +34,12 @@ export class AdaptiveRecommendationV2Controller {
       matchId: body.matchId.trim(),
       ...(body.localSteamId === undefined ? {} : { localSteamId: body.localSteamId.trim() }),
     };
+
+    const availability = this.availability.getAvailability();
+    if (!availability.recommendationsEnabled) {
+      return disabledRecommendation(request.matchId, availability.maintenanceMessage);
+    }
+
     const capture = new BuildIterationCaptureV1();
     const fallbackSteamId = request.localSteamId ?? resolveMarkedLocalSteamId(this.liveState, request.matchId);
 
@@ -79,5 +87,29 @@ function waitingRecommendation(
     },
     score: { total: 0, confidence: 0 },
     degradedReasons: blockers,
+  };
+}
+
+/**
+ * Fail-closed answer while the kill switch is off. It never carries a route, so
+ * a disabled backend can only ever produce "nothing to show", never a stale or
+ * fabricated recommendation.
+ */
+function disabledRecommendation(
+  matchId: string,
+  maintenanceMessage?: string,
+): AdaptiveRecommendationResultV2 {
+  const blockers = ['RECOMMENDATIONS_DISABLED'];
+  return {
+    ready: false,
+    blockers,
+    decisionId: `disabled:${matchId}`,
+    stateRevision: `disabled:${matchId}`,
+    nextAction: {
+      type: 'HOLD',
+      reasonCodes: blockers,
+    },
+    score: { total: 0, confidence: 0 },
+    degradedReasons: maintenanceMessage ? [...blockers, maintenanceMessage] : blockers,
   };
 }

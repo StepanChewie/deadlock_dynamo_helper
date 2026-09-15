@@ -3,6 +3,7 @@ import {
   createRecommendationItemGraph,
 } from '@deadlock-live-probe/build-domain';
 import { AdaptiveRecommendationV2Controller } from '../src/statlocker-adaptive/adaptive-recommendation-v2.controller';
+import { enabledAvailability } from './adaptive-availability-stub';
 import { AdaptiveRecommendationV2Service } from '../src/statlocker-adaptive/adaptive-recommendation-v2.service';
 import { BuildArchetypeV2, BuildArchetypeSnapshotV2 } from '../src/statlocker-adaptive/build-archetype-v2';
 import { BuildArchetypeSelectorV2Service } from '../src/statlocker-adaptive/build-archetype-selector-v2.service';
@@ -369,6 +370,7 @@ function harness(resolverOverride?: { resolve(input: unknown): ResolvedFullBuild
     service,
     { record: jest.fn().mockResolvedValue(undefined) } as any,
     { getState: () => undefined } as any,
+    enabledAvailability(),
   );
 
   return {

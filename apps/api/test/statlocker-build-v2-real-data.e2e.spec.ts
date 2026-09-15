@@ -20,6 +20,7 @@ import {
   deriveAdaptiveSlotStateV1,
 } from '../src/statlocker-adaptive/adaptive-economy-v1';
 import { AdaptiveRecommendationV2Controller } from '../src/statlocker-adaptive/adaptive-recommendation-v2.controller';
+import { enabledAvailability } from './adaptive-availability-stub';
 import { AdaptiveRecommendationV2Service } from '../src/statlocker-adaptive/adaptive-recommendation-v2.service';
 import { BuildArchetypeCompilerV2Service } from '../src/statlocker-adaptive/build-archetype-compiler-v2.service';
 import { BuildArchetypeMinerV2Service } from '../src/statlocker-adaptive/build-archetype-miner-v2.service';
@@ -596,6 +597,7 @@ describe('Statlocker Build V2 real Billy fixture', () => {
       service,
       { record: jest.fn().mockResolvedValue(undefined) } as any,
       { getState: () => undefined } as any,
+      enabledAvailability(),
     );
 
     const result = await controller.recommend({ matchId: fixture.request.matchId });

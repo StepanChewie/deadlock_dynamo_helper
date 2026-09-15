@@ -14,6 +14,7 @@ import { RecommendationItemCatalogVersionV1 } from '../deadlock-live/entities/re
 import { StatlockerEvidenceSnapshotV1Entity } from '../deadlock-live/entities/statlocker-evidence-snapshot-v1.entity';
 import { StatlockerVsHeroWpaRawSnapshotV1Entity } from '../deadlock-live/entities/statlocker-vs-hero-wpa-raw-snapshot-v1.entity';
 import { StatlockerVsHeroWpaRowV1Entity } from '../deadlock-live/entities/statlocker-vs-hero-wpa-row-v1.entity';
+import { AdaptiveAvailabilityV1Service } from './adaptive-availability-v1.service';
 import { AdaptiveDecisionStateV1Service } from './adaptive-decision-state-v1.service';
 import { AdaptiveFeedbackV1Controller } from './adaptive-feedback-v1.controller';
 import { AdaptiveRecommendationObservabilityV1Service } from './adaptive-recommendation-observability-v1.service';
@@ -120,6 +121,7 @@ import { ThreatWeightedMatchupV1Service } from './threat-weighted-matchup-v1.ser
     },
     AdaptiveRecommendationV2Service,
     StatlockerRefreshService,
+    AdaptiveAvailabilityV1Service,
     RecommendationEconomyRulesStoreV1Service,
     RecommendationEconomyRulesBootstrapV1Service,
     AdaptiveDecisionStateV1Service,
@@ -129,6 +131,7 @@ import { ThreatWeightedMatchupV1Service } from './threat-weighted-matchup-v1.ser
   ],
   exports: [
     AdaptiveRecommendationV2Service,
+    AdaptiveAvailabilityV1Service,
     AdaptiveRecommendationObservabilityV1Service,
     RecommendationEconomyRulesBootstrapV1Service,
     BuildDebugTraceStoreV2Service,

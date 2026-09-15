@@ -166,7 +166,63 @@ export function dismissPostMatchFeedback(): void {
 
 let hasAdaptiveRecommendation = false;
 
+export const RECOMMENDATIONS_DISABLED_BLOCKER = 'RECOMMENDATIONS_DISABLED';
+
+const MAINTENANCE_FALLBACK_COPY =
+  'Recommendations are paused while Dynamo Lab is updated for a game patch.';
+
+function isRecommendationsDisabled(data: AdaptiveRecommendationResultV1): boolean {
+  const blockers = (data as { blockers?: unknown })?.blockers;
+  return Array.isArray(blockers) && blockers.includes(RECOMMENDATIONS_DISABLED_BLOCKER);
+}
+
+function maintenanceMessageOf(data: AdaptiveRecommendationResultV1): string {
+  const degraded = (data as { degradedReasons?: unknown })?.degradedReasons;
+  if (!Array.isArray(degraded)) {
+    return MAINTENANCE_FALLBACK_COPY;
+  }
+
+  const message = degraded.find(
+    (entry): entry is string =>
+      typeof entry === 'string' &&
+      entry.trim().length > 0 &&
+      entry !== RECOMMENDATIONS_DISABLED_BLOCKER,
+  );
+
+  return message ?? MAINTENANCE_FALLBACK_COPY;
+}
+
+/**
+ * Replaces the purchase route with the maintenance notice while the remote kill
+ * switch is off. It deliberately renders no route at all, so a disabled backend
+ * can only ever produce "nothing to show" — never a stale plan.
+ */
+export function showMaintenanceState(message: string): void {
+  const emptyEl = document.getElementById('guide-empty');
+  const activeEl = document.getElementById('guide-active');
+  const panel = document.getElementById('situational-recommendation-panel');
+
+  if (panel) panel.style.display = 'none';
+  if (activeEl) activeEl.style.display = 'none';
+  if (emptyEl) emptyEl.style.display = 'flex';
+
+  for (const containerId of ['rec-plan', 'overlay-preview-plan']) {
+    const container = document.getElementById(containerId);
+    if (container) container.replaceChildren();
+  }
+
+  setText('guide-empty-title', 'Recommendations are paused');
+  setText('guide-empty-copy', message);
+  hasAdaptiveRecommendation = false;
+  clearAdaptiveError();
+}
+
 export function showAdaptiveRecommendation(data: AdaptiveRecommendationResultV1): void {
+  if (isRecommendationsDisabled(data)) {
+    showMaintenanceState(maintenanceMessageOf(data));
+    return;
+  }
+
   const view = buildAdaptiveRecommendationPresentation(data);
   const emptyEl = document.getElementById('guide-empty');
   const activeEl = document.getElementById('guide-active');

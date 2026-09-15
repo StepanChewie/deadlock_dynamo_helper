@@ -503,3 +503,62 @@ describe('Dynamo Lab post-match feedback state', () => {
     expect(elements.get('post-match-feedback')?.hidden).toBe(true);
   });
 });
+
+describe('Dynamo Lab maintenance state', () => {
+  let elements: Map<string, FakeElement>;
+  const originalDocument = globalThis.document;
+
+  beforeEach(() => {
+    elements = new Map(elementIds.map((id) => [id, new FakeElement()]));
+    globalThis.document = {
+      getElementById: (id: string) => elements.get(id) || null,
+      createElement: (tagName: string) => new FakeElement(tagName.toUpperCase()),
+    } as unknown as Document;
+    hideSituationalPanel();
+  });
+
+  afterAll(() => {
+    globalThis.document = originalDocument;
+  });
+
+  function disabledRecommendation(message?: string): any {
+    return recommendation({
+      ready: false,
+      blockers: ['RECOMMENDATIONS_DISABLED'],
+      degradedReasons: message
+        ? ['RECOMMENDATIONS_DISABLED', message]
+        : ['RECOMMENDATIONS_DISABLED'],
+      planActions: [],
+    });
+  }
+
+  it('replaces the purchase route with the maintenance notice', () => {
+    showAdaptiveRecommendation(disabledRecommendation('Deadlock patch in progress'));
+
+    expect(elements.get('guide-empty')?.style.display).toBe('flex');
+    expect(elements.get('guide-empty-title')?.textContent).toBe('Recommendations are paused');
+    expect(elements.get('guide-empty-copy')?.textContent).toBe('Deadlock patch in progress');
+  });
+
+  it('clears a route that was rendered before the switch flipped', () => {
+    showAdaptiveRecommendation(fiveItemRecommendation());
+    expect(elements.get('rec-plan')?.children ?? []).toHaveLength(5);
+
+    showAdaptiveRecommendation(disabledRecommendation('Deadlock patch in progress'));
+
+    expect(elements.get('rec-plan')?.children ?? []).toHaveLength(0);
+  });
+
+  it('falls back to generic copy when no maintenance message is supplied', () => {
+    showAdaptiveRecommendation(disabledRecommendation());
+
+    expect(elements.get('guide-empty-copy')?.textContent).toContain('paused');
+  });
+
+  it('still renders a normal route when the switch is on', () => {
+    showAdaptiveRecommendation(fiveItemRecommendation());
+
+    expect(elements.get('guide-active')?.style.display).toBe('flex');
+    expect(elements.get('rec-plan')?.children ?? []).toHaveLength(5);
+  });
+});

@@ -1,8 +1,14 @@
 import { AdaptiveRecommendationV2Controller } from '../src/statlocker-adaptive/adaptive-recommendation-v2.controller';
 import { AdaptiveLiveStateNotReadyError } from '../src/statlocker-adaptive/adaptive-decision-state-v1.service';
+import { enabledAvailability } from './adaptive-availability-stub';
 
 function controllerWith(recommend: jest.Mock, record: jest.Mock, liveState: any = { getState: () => undefined }) {
-  return new AdaptiveRecommendationV2Controller({ recommend } as any, { record } as any, liveState as any);
+  return new AdaptiveRecommendationV2Controller(
+    { recommend } as any,
+    { record } as any,
+    liveState as any,
+    enabledAvailability(),
+  );
 }
 
 describe('AdaptiveRecommendationV2Controller history hook', () => {
