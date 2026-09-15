@@ -1,4 +1,6 @@
 import {
+  applyStoredPreferences,
+  dismissHotkeyHint,
   hideSituationalPanel,
   setRefreshPending,
   showAdaptiveError,
@@ -10,6 +12,7 @@ class FakeElement {
   className = '';
   title = '';
   disabled = false;
+  hidden = false;
   style: Record<string, string> = {};
   children: FakeElement[] = [];
   attributes = new Map<string, string>();
@@ -70,6 +73,7 @@ const elementIds = [
   'rec-plan',
   'overlay-preview-plan',
   'rec-update-note',
+  'hotkey-hint',
 ];
 
 function recommendation(overrides: Record<string, unknown> = {}): any {
@@ -267,5 +271,55 @@ describe('adaptive recommendation UI state', () => {
     expect(elements.get('guide-empty-title')?.textContent).toBe('Waiting for match data');
     expect(elements.get('guide-empty-copy')?.textContent)
       .toBe('Your Dynamo Lab build route will appear automatically when the match is detected.');
+  });
+});
+
+describe('Dynamo Lab hotkey reminder state', () => {
+  let elements: Map<string, FakeElement>;
+  const originalDocument = globalThis.document;
+  const originalLocalStorage = (globalThis as any).localStorage;
+  let store: Map<string, string>;
+
+  beforeEach(() => {
+    elements = new Map(elementIds.map((id) => [id, new FakeElement()]));
+    globalThis.document = {
+      getElementById: (id: string) => elements.get(id) || null,
+      createElement: (tagName: string) => new FakeElement(tagName.toUpperCase()),
+    } as unknown as Document;
+    store = new Map();
+    (globalThis as any).localStorage = {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => void store.set(key, value),
+    };
+  });
+
+  afterAll(() => {
+    globalThis.document = originalDocument;
+    (globalThis as any).localStorage = originalLocalStorage;
+  });
+
+  it('keeps the reminder visible until the player dismisses it', () => {
+    applyStoredPreferences();
+    expect(elements.get('hotkey-hint')?.hidden).toBe(false);
+
+    dismissHotkeyHint();
+    expect(elements.get('hotkey-hint')?.hidden).toBe(true);
+  });
+
+  it('remembers the dismissal across launches', () => {
+    dismissHotkeyHint();
+
+    elements.get('hotkey-hint')!.hidden = false;
+    applyStoredPreferences();
+
+    expect(elements.get('hotkey-hint')?.hidden).toBe(true);
+  });
+
+  it('still dismisses when storage is unavailable', () => {
+    delete (globalThis as any).localStorage;
+
+    expect(() => dismissHotkeyHint()).not.toThrow();
+    expect(elements.get('hotkey-hint')?.hidden).toBe(true);
+    expect(() => applyStoredPreferences()).not.toThrow();
   });
 });

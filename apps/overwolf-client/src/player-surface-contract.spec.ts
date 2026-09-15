@@ -114,3 +114,11 @@ describe('Dynamo Lab third-party runtime dependency contract', () => {
     expect(versionOf(desktop)).toBe(versionOf(overlay));
   });
 });
+
+describe('Dynamo Lab hotkey reminder contract', () => {
+  it('exposes the registered hotkeys to the player', () => {
+    expect(desktop).toContain('Ctrl+Tab');
+    expect(overlay).toContain('Ctrl+Tab');
+    expect(desktop).toContain('Ctrl+Shift+B');
+  });
+});

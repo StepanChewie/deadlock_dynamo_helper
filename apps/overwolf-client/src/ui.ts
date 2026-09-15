@@ -7,6 +7,7 @@ import {
   buildAdaptivePurchaseRoute,
   buildAdaptiveRecommendationPresentation,
 } from './adaptive-recommendation-presentation';
+import { persistDismissed, readDismissed } from './player-preferences';
 
 export function updateStatus(text: string, statusClass?: 'connected' | 'error' | 'init'): void {
   const el = document.getElementById('status');
@@ -43,6 +44,30 @@ export function updateIndicator(text: string, active: boolean): void {
   const dotEl = document.getElementById('indicator-dot');
   if (textEl) textEl.textContent = text;
   if (dotEl) dotEl.classList.toggle('active', active);
+}
+
+const HOTKEY_HINT_KEY = 'hotkey-hint';
+
+function setHidden(id: string, hidden: boolean): void {
+  const el = document.getElementById(id) as (HTMLElement & { hidden: boolean }) | null;
+  if (el) el.hidden = hidden;
+}
+
+/**
+ * Hides the hotkey reminder and remembers the dismissal so it does not nag on
+ * every launch. Overwolf's pre-submission checklist requires the reminder to be
+ * reachable, not permanent.
+ */
+export function dismissHotkeyHint(): void {
+  persistDismissed(HOTKEY_HINT_KEY);
+  setHidden('hotkey-hint', true);
+}
+
+/** Applies remembered dismissals on startup. Call once per window. */
+export function applyStoredPreferences(): void {
+  if (readDismissed(HOTKEY_HINT_KEY)) {
+    setHidden('hotkey-hint', true);
+  }
 }
 
 let hasAdaptiveRecommendation = false;

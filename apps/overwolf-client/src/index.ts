@@ -53,6 +53,8 @@ function initializeInGameWindow(windowId: string): void {
   };
 
   (window as any).ensureOverlayHeight = ensureOverlayHeight;
+  (window as any).dismissHotkeyHint = ui.dismissHotkeyHint;
+  ui.applyStoredPreferences();
 
   mainWindow.inGameAdaptiveUpdate = (data: any): void => {
     if (data) {
@@ -110,6 +112,8 @@ function initializeBackgroundWindow(): void {
   const mainWindow = ow.windows.getMainWindow() as any;
   mainWindow.latestAdaptiveRecommendation = mainWindow.latestAdaptiveRecommendation || null;
   mainWindow.latestAdaptiveError = mainWindow.latestAdaptiveError || null;
+  mainWindow.dismissHotkeyHint = ui.dismissHotkeyHint;
+  ui.applyStoredPreferences();
 
   registerWindowHotkeys(mainWindow);
 

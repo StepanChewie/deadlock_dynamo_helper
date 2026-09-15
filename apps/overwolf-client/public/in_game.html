@@ -55,6 +55,44 @@
 
       .overlay-brand { display: flex; align-items: center; gap: 8px; min-width: 0; }
 
+      .hotkey-hint {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 5px 7px;
+        border: 1px solid var(--line-soft);
+        border-radius: 3px;
+        background: rgba(228, 162, 77, 0.08);
+        color: var(--muted);
+        font-size: 9.5px;
+        letter-spacing: 0.02em;
+      }
+
+      .hotkey-hint[hidden] { display: none; }
+
+      .hotkey-hint kbd {
+        padding: 1px 4px;
+        border: 1px solid var(--line);
+        border-radius: 2px;
+        color: var(--text);
+        font: 700 9px/1.4 var(--mono);
+      }
+
+      .hotkey-hint-dismiss {
+        flex: none;
+        padding: 2px 7px;
+        border: 1px solid var(--line);
+        border-radius: 2px;
+        background: transparent;
+        color: var(--text);
+        font: 600 9px/1.4 var(--sans);
+        cursor: pointer;
+      }
+
+      .hotkey-hint-dismiss:hover,
+      .hotkey-hint-dismiss:focus-visible { border-color: var(--amber); color: var(--amber); }
+
       .brand-mark {
         width: 22px;
         height: 22px;
@@ -305,6 +343,11 @@
         <div class="overlay-brand"><span class="brand-mark">D</span><h1 class="overlay-title">Dynamo Lab</h1></div>
         <span class="overlay-state" aria-live="polite"><span id="indicator-dot" aria-hidden="true"></span><span id="indicator-text">Connecting</span></span>
       </header>
+
+      <div id="hotkey-hint" class="hotkey-hint" role="note">
+        <span><kbd>Ctrl+Tab</kbd> hides this overlay</span>
+        <button type="button" class="hotkey-hint-dismiss" aria-label="Dismiss hotkey reminder" onclick="window.dismissHotkeyHint?.()">Got it</button>
+      </div>
 
       <section id="guide-empty">
         <div class="waiting-pulse"></div>
