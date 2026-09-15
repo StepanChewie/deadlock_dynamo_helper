@@ -62,18 +62,26 @@ describe('Dynamo Lab desktop surface contract', () => {
     expect(desktop).toMatch(/docs\/terms\.md/);
   });
 
-  it('insets the support panel to the same column as the build plane', () => {
+  it('insets every horizontal band to the same column', () => {
     const horizontal = (shorthand: string | undefined): string => {
       const parts = (shorthand ?? '').trim().split(/\s+/).filter(Boolean);
       return parts[1] ?? parts[0] ?? '';
     };
 
-    const workspaceRule = desktop.match(/\.build-workspace\s*\{[^}]*\}/)?.[0] ?? '';
-    const supportRule = desktop.match(/\.support\s*\{[^}]*\}/)?.[0] ?? '';
+    const insetOf = (selector: string, property: 'padding' | 'margin'): string => {
+      const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const rule = desktop.match(new RegExp(`${escaped}\\s*\\{[^}]*\\}`))?.[0] ?? '';
+      return horizontal(rule.match(new RegExp(`${property}:\\s*([^;]+);`))?.[1]);
+    };
 
-    expect(horizontal(workspaceRule.match(/padding:\s*([^;]+);/)?.[1]))
-      .toBe(horizontal(supportRule.match(/margin:\s*([^;]+);/)?.[1]));
-    expect(horizontal(workspaceRule.match(/padding:\s*([^;]+);/)?.[1])).not.toBe('');
+    const contentInset = insetOf('.build-workspace', 'padding');
+    expect(contentInset).not.toBe('');
+
+    // Everything stacked in the workspace column must share one inset, or the
+    // panels visibly step in and out against each other.
+    expect(insetOf('.support', 'margin')).toBe(contentInset);
+    expect(insetOf('.topbar', 'padding')).toBe(contentInset);
+    expect(insetOf('.hotkey-hint', 'padding')).toBe(contentInset);
   });
 
   it('states what leaves the machine without over-claiming', () => {
