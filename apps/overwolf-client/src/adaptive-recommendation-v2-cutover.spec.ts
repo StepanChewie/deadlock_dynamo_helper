@@ -1,4 +1,4 @@
-import type { AdaptiveFullBuildStepV2, AdaptiveRecommendationResultV2 } from '@deadlock-live-probe/shared';
+import type { AdaptiveFullBuildStepV2, AdaptiveRecommendationResultV2 } from '@dynamo-lab/shared';
 import { AdaptiveRecommendationClient } from './adaptive-recommendation-client';
 import { buildAdaptiveRecommendationPresentation } from './adaptive-recommendation-presentation';
 

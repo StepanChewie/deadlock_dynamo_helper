@@ -1,5 +1,5 @@
 {
-  "name": "@deadlock-live-probe/overwolf-client",
+  "name": "@dynamo-lab/overwolf-client",
   "version": "0.1.15",
   "private": true,
   "description": "Statlocker Adaptive recommendations in the classic V8-style HUD",
@@ -8,7 +8,7 @@
     "check:item-catalog": "node scripts/generate-adaptive-item-catalog.js --check",
     "generate:hero-catalog": "node scripts/generate-adaptive-hero-catalog.js",
     "check:hero-catalog": "node scripts/generate-adaptive-hero-catalog.js --check",
-    "prebuild": "yarn workspace @deadlock-live-probe/shared build",
+    "prebuild": "yarn workspace @dynamo-lab/shared build",
     "build:bundle": "node scripts/generate-adaptive-item-catalog.js --check && node scripts/generate-adaptive-hero-catalog.js --check && webpack --mode production",
     "build": "node scripts/generate-adaptive-item-catalog.js --check && node scripts/generate-adaptive-hero-catalog.js --check && webpack --mode production && node scripts/configure-api-base-url.js && node scripts/validate-release.js && node scripts/sync-public-to-windows.js",
     "configure:api": "node scripts/configure-api-base-url.js",
@@ -29,7 +29,7 @@
     "testRegex": "src/.*\\.spec\\.ts$"
   },
   "dependencies": {
-    "@deadlock-live-probe/shared": "0.0.1"
+    "@dynamo-lab/shared": "0.0.1"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",

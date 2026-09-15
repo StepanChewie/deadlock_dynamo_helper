@@ -6,7 +6,7 @@ import {
   SoulsAffordabilityEvidenceV2Report,
   evaluateSoulsAffordabilityEvidenceV2,
   validateControlledSoulsObservationV2,
-} from '@deadlock-live-probe/shared';
+} from '@dynamo-lab/shared';
 import { SoulsAffordabilityEvidenceV2Entity } from './entities/souls-affordability-evidence-v2.entity';
 
 export interface AppendSoulsAffordabilityEvidenceV2Result {

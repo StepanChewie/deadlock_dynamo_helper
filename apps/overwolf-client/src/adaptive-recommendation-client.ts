@@ -1,7 +1,7 @@
 import {
   AdaptiveRecommendationRequestV2,
   AdaptiveRecommendationResultV2,
-} from '@deadlock-live-probe/shared';
+} from '@dynamo-lab/shared';
 
 export interface AdaptiveRecommendationClientHandlers {
   onResult: (result: AdaptiveRecommendationResultV2) => void;

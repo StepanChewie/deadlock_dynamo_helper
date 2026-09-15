@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { RecommendationItemGraph } from '@deadlock-live-probe/build-domain';
+import { RecommendationItemGraph } from '@dynamo-lab/build-domain';
 import { BuildArchetypeSnapshotV2, BuildArchetypeV2 } from './build-archetype-v2';
 import { STATLOCKER_BUILD_V2_CONFIG } from './statlocker-build-v2.config';
 

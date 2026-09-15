@@ -1,6 +1,6 @@
 import { timingSafeEqual } from 'crypto';
 import { Body, Controller, Get, Headers, Post } from '@nestjs/common';
-import { SoulsAffordabilityControlledObservationV2 } from '@deadlock-live-probe/shared';
+import { SoulsAffordabilityControlledObservationV2 } from '@dynamo-lab/shared';
 import { SoulsAffordabilityEvidenceV2Service } from './souls-affordability-evidence-v2.service';
 
 @Controller('deadlock-live/recommendation-souls-evidence/v2')

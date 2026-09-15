@@ -1,4 +1,4 @@
-import { RecommendationItemGraph } from '@deadlock-live-probe/build-domain';
+import { RecommendationItemGraph } from '@dynamo-lab/build-domain';
 import {
   FullBuildInventorySimulationV2,
   FullBuildStepV2,

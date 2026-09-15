@@ -6,7 +6,7 @@ import {
   RecommendationItemGraph,
   recommendationSlotUsageFor,
   RecommendationUpgradePricingPolicyV1,
-} from '@deadlock-live-probe/build-domain';
+} from '@dynamo-lab/build-domain';
 
 export type AdaptiveInvestmentTypeV1 = 'weapon' | 'vitality' | 'spirit';
 

@@ -1,4 +1,4 @@
-import type { AdaptiveRecommendationResultV2 } from '@deadlock-live-probe/shared';
+import type { AdaptiveRecommendationResultV2 } from '@dynamo-lab/shared';
 import {
   projectAdaptiveRecommendationV2ForPresentation,
 } from './adaptive-recommendation-client';

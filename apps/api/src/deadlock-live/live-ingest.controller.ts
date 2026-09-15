@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Logger, Param, Post } from '@nestjs/common';
-import { OverwolfLiveBatchDto } from '@deadlock-live-probe/shared';
+import { OverwolfLiveBatchDto } from '@dynamo-lab/shared';
 import { canonicalizeLiveBatchForStateV2 } from './canonical-live-batch';
 import { InventoryShadowReplayService } from './inventory-shadow-replay.service';
 import { LiveInventoryEventNormalizerService } from './live-inventory-event-normalizer.service';

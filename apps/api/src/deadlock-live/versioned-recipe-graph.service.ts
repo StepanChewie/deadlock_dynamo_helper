@@ -4,7 +4,7 @@ import {
   createRecipeGraph as buildRecipeGraph,
   RecipeDefinition,
   RecipeGraph,
-} from '@deadlock-live-probe/build-domain';
+} from '@dynamo-lab/build-domain';
 import { Repository } from 'typeorm';
 import { CatalogContentService } from './catalog-content.service';
 import { ItemCatalogRecipe } from './entities/item-catalog-recipe.entity';

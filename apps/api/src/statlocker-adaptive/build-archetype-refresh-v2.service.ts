@@ -5,7 +5,7 @@ import {
   RecommendationItemDefinition,
   RecommendationItemGraph,
   createRecommendationItemGraph,
-} from '@deadlock-live-probe/build-domain';
+} from '@dynamo-lab/build-domain';
 import { Repository } from 'typeorm';
 import { RecommendationItemCatalogItemV1 } from '../deadlock-live/entities/recommendation-item-catalog-item-v1.entity';
 import { RecommendationItemCatalogRecipeV1 } from '../deadlock-live/entities/recommendation-item-catalog-recipe-v1.entity';

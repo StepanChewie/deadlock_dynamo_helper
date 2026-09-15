@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   RecommendationCandidate,
   generateRecommendationCandidates,
-} from '@deadlock-live-probe/build-domain';
+} from '@dynamo-lab/build-domain';
 import {
   AdaptiveArchetypeLockSummaryV2,
   AdaptiveEvidenceFamilyV2,
@@ -11,7 +11,7 @@ import {
   AdaptiveImmediateActionV2,
   AdaptiveRecommendationRequestV2,
   AdaptiveRecommendationResultV2,
-} from '@deadlock-live-probe/shared';
+} from '@dynamo-lab/shared';
 import { BuildArchetypeMatchLockV2Entity } from '../deadlock-live/entities/build-archetype-match-lock-v2.entity';
 import { BuildIterationCaptureV1 } from './build-iteration-capture-v1';
 import { candidateGeneratorRulesFromSlotStateV1 } from './adaptive-economy-v1';

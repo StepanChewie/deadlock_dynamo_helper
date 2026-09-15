@@ -5,7 +5,7 @@ import {
   planFingerprintV1,
   projectPlanForStorageV1,
 } from '../src/statlocker-adaptive/build-iteration-fingerprint-v1';
-import { AdaptiveFullBuildStepV2 } from '@deadlock-live-probe/shared';
+import { AdaptiveFullBuildStepV2 } from '@dynamo-lab/shared';
 
 function step(overrides: Partial<AdaptiveFullBuildStepV2>): AdaptiveFullBuildStepV2 {
   return {

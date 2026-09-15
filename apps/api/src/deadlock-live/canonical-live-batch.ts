@@ -3,7 +3,7 @@ import {
   CanonicalGepRosterPayloadV2,
   OverwolfLiveBatchDto,
   OverwolfLiveEventDto,
-} from '@deadlock-live-probe/shared';
+} from '@dynamo-lab/shared';
 
 export function canonicalizeLiveBatchForStateV2(batch: OverwolfLiveBatchDto): OverwolfLiveBatchDto {
   return {

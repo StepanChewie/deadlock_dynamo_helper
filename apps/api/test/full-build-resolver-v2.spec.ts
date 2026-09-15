@@ -2,7 +2,7 @@ import {
   RecommendationCandidate,
   RecommendationItemDefinition,
   createRecommendationItemGraph,
-} from '@deadlock-live-probe/build-domain';
+} from '@dynamo-lab/build-domain';
 import {
   BuildArchetypeItemV2,
   BuildArchetypeRelationshipV2,

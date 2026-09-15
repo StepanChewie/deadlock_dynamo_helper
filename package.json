@@ -1,5 +1,5 @@
 {
-  "name": "deadlock-live-probe",
+  "name": "dynamo-lab",
   "private": true,
   "packageManager": "yarn@1.22.22",
   "workspaces": [
@@ -10,9 +10,9 @@
     "build": "yarn workspaces run build",
     "test": "yarn workspaces run test",
     "lint": "yarn workspaces run lint",
-    "db:migrate": "yarn workspace @deadlock-live-probe/api migration:run",
-    "db:revert": "yarn workspace @deadlock-live-probe/api migration:revert",
-    "db:migrations": "yarn workspace @deadlock-live-probe/api migration:show",
-    "db:generate": "yarn workspace @deadlock-live-probe/api migration:generate"
+    "db:migrate": "yarn workspace @dynamo-lab/api migration:run",
+    "db:revert": "yarn workspace @dynamo-lab/api migration:revert",
+    "db:migrations": "yarn workspace @dynamo-lab/api migration:show",
+    "db:generate": "yarn workspace @dynamo-lab/api migration:generate"
   }
 }

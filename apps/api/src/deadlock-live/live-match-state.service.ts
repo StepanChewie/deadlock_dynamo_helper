@@ -6,7 +6,7 @@ import {
   MinimalPlayerState,
   OverwolfLiveBatchDto,
   OverwolfLiveEventDto,
-} from '@deadlock-live-probe/shared';
+} from '@dynamo-lab/shared';
 
 const EXPLICIT_FLEX_EVENT_KEYS = new Set([
   'flex_slots',

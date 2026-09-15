@@ -1,5 +1,5 @@
 import { Injectable, Optional } from '@nestjs/common';
-import { RecommendationItemGraph } from '@deadlock-live-probe/build-domain';
+import { RecommendationItemGraph } from '@dynamo-lab/build-domain';
 import {
   ADAPTIVE_INVESTMENT_TYPES_V1,
   investmentItemValueV1,

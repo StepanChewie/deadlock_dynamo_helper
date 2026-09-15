@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { AdaptiveEvidenceFreshnessV1 } from '@deadlock-live-probe/shared';
+import { AdaptiveEvidenceFreshnessV1 } from '@dynamo-lab/shared';
 import {
   StatlockerEvidenceFamilyV1,
   StatlockerNormalizedPayloadV1,

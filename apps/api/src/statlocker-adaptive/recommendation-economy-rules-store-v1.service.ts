@@ -2,7 +2,7 @@ import { createHash } from 'crypto';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { InventorySlotType } from '@deadlock-live-probe/build-domain';
+import { InventorySlotType } from '@dynamo-lab/build-domain';
 import { RecommendationEconomyRulesSnapshotV1Entity } from '../deadlock-live/entities/recommendation-economy-rules-snapshot-v1.entity';
 import { RecommendationEconomyRulesV1 } from './adaptive-economy-v1';
 

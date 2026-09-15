@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   RecommendationCandidate,
   RecommendationItemGraph,
-} from '@deadlock-live-probe/build-domain';
+} from '@dynamo-lab/build-domain';
 import {
   BuildArchetypeRoleV2,
   BuildArchetypeV2,

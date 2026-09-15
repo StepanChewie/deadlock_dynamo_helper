@@ -1,4 +1,4 @@
-import { OverwolfLiveBatchDto, OverwolfLiveEventDto } from '@deadlock-live-probe/shared';
+import { OverwolfLiveBatchDto, OverwolfLiveEventDto } from '@dynamo-lab/shared';
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 type MatchIdProvider = () => string | undefined;

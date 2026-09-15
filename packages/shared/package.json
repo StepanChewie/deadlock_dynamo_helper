@@ -1,5 +1,5 @@
 {
-  "name": "@deadlock-live-probe/shared",
+  "name": "@dynamo-lab/shared",
   "version": "0.0.1",
   "private": true,
   "main": "dist/index.js",

@@ -1,7 +1,7 @@
 import {
   RecommendationItemDefinition,
   createRecommendationItemGraph,
-} from '@deadlock-live-probe/build-domain';
+} from '@dynamo-lab/build-domain';
 import { FullBuildTransitionIntentV2 } from '../src/statlocker-adaptive/full-build-plan-v2';
 import { simulateFullBuildInventoryV2 } from '../src/statlocker-adaptive/full-build-inventory-simulator-v2';
 

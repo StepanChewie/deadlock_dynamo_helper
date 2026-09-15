@@ -1,4 +1,4 @@
-import { OverwolfLiveEventDto } from '@deadlock-live-probe/shared';
+import { OverwolfLiveEventDto } from '@dynamo-lab/shared';
 import { DiagnosticCapture } from '../diagnostics/diagnostic-capture';
 import { parseJsonSafely } from './parse-json-safely';
 

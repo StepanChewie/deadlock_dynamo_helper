@@ -3,7 +3,7 @@ import {
   createRecommendationItemGraph,
   generateRecommendationCandidates,
   observedFact,
-} from '@deadlock-live-probe/build-domain';
+} from '@dynamo-lab/build-domain';
 import {
   ADAPTIVE_UNIVERSAL_SLOT_RULES_V1,
   candidateGeneratorRulesFromSlotStateV1,

@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import {
   buildRecommendationRulesetCatalogV1,
   compileStrictRecommendationCatalogV1,
-} from '@deadlock-live-probe/build-domain';
+} from '@dynamo-lab/build-domain';
 import type { StatlockerBuildV2Fixture } from '../src/scripts/capture-statlocker-build-v2-fixture';
 import { resolveRecommendationCatalogAssetSemantics } from '../src/deadlock-live/recommendation-catalog-asset-semantics';
 import { BuildArchetypeCompilerV2Service } from '../src/statlocker-adaptive/build-archetype-compiler-v2.service';

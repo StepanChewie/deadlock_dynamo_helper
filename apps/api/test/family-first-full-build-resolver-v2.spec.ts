@@ -1,7 +1,7 @@
 import {
   RecommendationItemDefinition,
   createRecommendationItemGraph,
-} from '@deadlock-live-probe/build-domain';
+} from '@dynamo-lab/build-domain';
 import { BuildArchetypeFamilyV2, BuildArchetypeV2 } from '../src/statlocker-adaptive/build-archetype-v2';
 import { BuildItemUtilityV2Service } from '../src/statlocker-adaptive/build-item-utility-v2.service';
 import {

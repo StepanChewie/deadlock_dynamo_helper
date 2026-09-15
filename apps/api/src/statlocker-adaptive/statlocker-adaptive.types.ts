@@ -1,4 +1,4 @@
-import { AdaptiveEvidenceFreshnessV1 } from '@deadlock-live-probe/shared';
+import { AdaptiveEvidenceFreshnessV1 } from '@dynamo-lab/shared';
 
 export type StatlockerDatasetV1 =
   | 'WPA_PATCH_DATA'

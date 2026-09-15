@@ -1,4 +1,4 @@
-import { RecommendationItemGraph } from '@deadlock-live-probe/build-domain';
+import { RecommendationItemGraph } from '@dynamo-lab/build-domain';
 import { BuildArchetypeFamilyV2, BuildArchetypeV2 } from './build-archetype-v2';
 
 export type BuildFamilySatisfactionStatusV2 =

@@ -1,4 +1,4 @@
-import { RecommendationItemGraph } from '@deadlock-live-probe/build-domain';
+import { RecommendationItemGraph } from '@dynamo-lab/build-domain';
 import { StatlockerBuildProfileItemV2, StatlockerBuildProfileV2 } from './build-archetype-v2';
 import { StatlockerProBuildAnalysisV1, StatlockerProBuildItemV1 } from './statlocker-adaptive.types';
 

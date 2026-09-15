@@ -3,7 +3,7 @@ import type {
   AdaptiveDecisionTraceCandidateV1,
   AdaptiveDecisionTraceV1,
   AdaptiveRecommendationResultV1,
-} from '@deadlock-live-probe/shared';
+} from '@dynamo-lab/shared';
 import { ADAPTIVE_ITEM_CATALOG } from './generated/adaptive-item-catalog';
 
 export interface AdaptiveDecisionDebugRow {

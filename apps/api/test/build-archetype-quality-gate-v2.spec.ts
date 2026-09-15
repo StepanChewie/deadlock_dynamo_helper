@@ -1,4 +1,4 @@
-import { createRecommendationItemGraph } from '@deadlock-live-probe/build-domain';
+import { createRecommendationItemGraph } from '@dynamo-lab/build-domain';
 import { BuildArchetypeQualityGateV2Service } from '../src/statlocker-adaptive/build-archetype-quality-gate-v2.service';
 import { BuildArchetypeSnapshotV2, BuildArchetypeV2 } from '../src/statlocker-adaptive/build-archetype-v2';
 

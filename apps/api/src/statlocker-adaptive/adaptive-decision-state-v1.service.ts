@@ -11,8 +11,8 @@ import {
   compileStrictRecommendationCatalogV1,
   observedFact,
   unknownFact,
-} from '@deadlock-live-probe/build-domain';
-import { MinimalMatchState, MinimalPlayerState } from '@deadlock-live-probe/shared';
+} from '@dynamo-lab/build-domain';
+import { MinimalMatchState, MinimalPlayerState } from '@dynamo-lab/shared';
 import { LiveMatchStateService } from '../deadlock-live/live-match-state.service';
 import { SoulsAffordabilityEvidenceV2Service } from '../deadlock-live/souls-affordability-evidence-v2.service';
 import { RecommendationItemCatalogVersionV1 } from '../deadlock-live/entities/recommendation-item-catalog-version-v1.entity';

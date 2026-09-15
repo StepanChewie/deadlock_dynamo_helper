@@ -1,4 +1,4 @@
-import { AdaptiveEvidenceSummaryV2 } from '@deadlock-live-probe/shared';
+import { AdaptiveEvidenceSummaryV2 } from '@dynamo-lab/shared';
 import { EnemyThreatScoreV1 } from './enemy-threat-v1.service';
 import { BuildDecisionTraceStageEntryV2 } from './build-decision-trace-v2';
 

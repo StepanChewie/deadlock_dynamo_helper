@@ -1,5 +1,5 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
-import { SoulsAffordabilityControlledObservationV2 } from '@deadlock-live-probe/shared';
+import { SoulsAffordabilityControlledObservationV2 } from '@dynamo-lab/shared';
 
 @Entity('souls_affordability_evidence_v2')
 export class SoulsAffordabilityEvidenceV2Entity {

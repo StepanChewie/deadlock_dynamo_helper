@@ -10,10 +10,10 @@
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
     "paths": {
-      "@deadlock-live-probe/shared": [
+      "@dynamo-lab/shared": [
         "packages/shared/src"
       ],
-      "@deadlock-live-probe/build-domain": [
+      "@dynamo-lab/build-domain": [
         "packages/deadlock-build-domain/src"
       ]
     }

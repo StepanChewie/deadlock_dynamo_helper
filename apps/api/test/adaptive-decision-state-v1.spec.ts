@@ -1,4 +1,4 @@
-import { MinimalMatchState } from '@deadlock-live-probe/shared';
+import { MinimalMatchState } from '@dynamo-lab/shared';
 import { AdaptiveDecisionStateV1Service } from '../src/statlocker-adaptive/adaptive-decision-state-v1.service';
 
 const catalogSha256 = 'a'.repeat(64);

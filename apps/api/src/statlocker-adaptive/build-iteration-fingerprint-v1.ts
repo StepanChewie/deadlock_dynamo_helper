@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { AdaptiveFullBuildPlanV2, AdaptiveFullBuildStepV2 } from '@deadlock-live-probe/shared';
+import { AdaptiveFullBuildPlanV2, AdaptiveFullBuildStepV2 } from '@dynamo-lab/shared';
 import { BuildDecisionTraceStageEntryV2 } from './build-decision-trace-v2';
 
 export type BuildIterationKindV1 = 'PLAN' | 'NOT_READY';

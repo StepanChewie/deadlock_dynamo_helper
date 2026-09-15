@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { LessThan, Repository } from 'typeorm';
-import { AdaptiveRecommendationResultV2 } from '@deadlock-live-probe/shared';
+import { AdaptiveRecommendationResultV2 } from '@dynamo-lab/shared';
 import { AdaptiveBuildIterationV1Entity } from '../deadlock-live/entities/adaptive-build-iteration-v1.entity';
 import { BuildIterationCaptureV1 } from './build-iteration-capture-v1';
 import {

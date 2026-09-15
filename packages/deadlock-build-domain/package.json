@@ -1,5 +1,5 @@
 {
-  "name": "@deadlock-live-probe/build-domain",
+  "name": "@dynamo-lab/build-domain",
   "version": "0.0.1",
   "private": true,
   "main": "dist/index.js",

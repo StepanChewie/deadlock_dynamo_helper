@@ -7,7 +7,7 @@ import type {
   AdaptivePlannedItemV1,
   AdaptiveRecommendationResultV1,
   AdaptiveSituationalContextV1,
-} from '@deadlock-live-probe/shared';
+} from '@dynamo-lab/shared';
 import {
   ADAPTIVE_ITEM_CATALOG,
   AdaptiveItemCatalogEntry,

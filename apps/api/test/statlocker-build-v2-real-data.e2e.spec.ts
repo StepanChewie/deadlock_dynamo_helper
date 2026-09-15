@@ -9,7 +9,7 @@ import {
   generateRecommendationCandidates,
   observedFact,
   unknownFact,
-} from '@deadlock-live-probe/build-domain';
+} from '@dynamo-lab/build-domain';
 import type { StatlockerBuildV2Fixture } from '../src/scripts/capture-statlocker-build-v2-fixture';
 import { resolveRecommendationCatalogAssetSemantics } from '../src/deadlock-live/recommendation-catalog-asset-semantics';
 import {

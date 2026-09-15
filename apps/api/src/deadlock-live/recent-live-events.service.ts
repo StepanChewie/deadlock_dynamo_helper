@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { OverwolfLiveEventDto } from '@deadlock-live-probe/shared';
+import { OverwolfLiveEventDto } from '@dynamo-lab/shared';
 
 @Injectable()
 export class RecentLiveEventsService {

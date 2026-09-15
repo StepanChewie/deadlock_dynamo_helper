@@ -1,4 +1,4 @@
-import { createRecommendationItemGraph } from '@deadlock-live-probe/build-domain';
+import { createRecommendationItemGraph } from '@dynamo-lab/build-domain';
 import { BuildArchetypeV2 } from '../src/statlocker-adaptive/build-archetype-v2';
 import { evaluateBuildFamilySatisfactionV2 } from '../src/statlocker-adaptive/build-family-satisfaction-v2';
 

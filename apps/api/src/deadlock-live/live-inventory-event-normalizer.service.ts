@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   OverwolfLiveBatchDto,
   OverwolfLiveEventDto,
-} from '@deadlock-live-probe/shared';
+} from '@dynamo-lab/shared';
 
 interface LiveItemMetadata {
   name: string;

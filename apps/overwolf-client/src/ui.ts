@@ -1,4 +1,4 @@
-import type { AdaptiveRecommendationResultV1 } from '@deadlock-live-probe/shared';
+import type { AdaptiveRecommendationResultV1 } from '@dynamo-lab/shared';
 import type {
   AdaptivePurchaseRouteRow,
   AdaptiveRecommendationPresentation,

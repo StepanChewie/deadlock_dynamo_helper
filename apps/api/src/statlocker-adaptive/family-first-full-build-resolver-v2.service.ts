@@ -1,6 +1,6 @@
 import { createHash } from 'crypto';
 import { Injectable, Optional } from '@nestjs/common';
-import { RecommendationItemGraph } from '@deadlock-live-probe/build-domain';
+import { RecommendationItemGraph } from '@dynamo-lab/build-domain';
 import { investmentItemValueV1 } from './adaptive-economy-v1';
 import {
   BuildDesiredStateV2Service,

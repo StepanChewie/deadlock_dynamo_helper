@@ -1,4 +1,4 @@
-import { RecommendationItemDefinition, createRecommendationItemGraph } from '@deadlock-live-probe/build-domain';
+import { RecommendationItemDefinition, createRecommendationItemGraph } from '@dynamo-lab/build-domain';
 import { BuildArchetypeFamilyV2, BuildArchetypeV2 } from '../src/statlocker-adaptive/build-archetype-v2';
 import { DesiredBuildStateV2 } from '../src/statlocker-adaptive/build-desired-state-v2.service';
 import { FullBuildStepV2 } from '../src/statlocker-adaptive/full-build-plan-v2';

@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { OverwolfLiveBatchDto, OverwolfLiveEventDto } from '@deadlock-live-probe/shared';
+import { OverwolfLiveBatchDto, OverwolfLiveEventDto } from '@dynamo-lab/shared';
 import {
   createEmptyInventoryState,
   createRecipeGraph,
@@ -12,7 +12,7 @@ import {
   RecipeDefinition,
   RecipeGraph,
   SnapshotDiagnostic,
-} from '@deadlock-live-probe/build-domain';
+} from '@dynamo-lab/build-domain';
 import { Repository } from 'typeorm';
 import { ItemComponent } from './entities/item-component.entity';
 

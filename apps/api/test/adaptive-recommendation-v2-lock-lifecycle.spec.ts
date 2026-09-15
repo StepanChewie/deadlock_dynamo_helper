@@ -2,7 +2,7 @@ import {
   createRecommendationItemGraph,
   observedFact,
   unknownFact,
-} from '@deadlock-live-probe/build-domain';
+} from '@dynamo-lab/build-domain';
 import { AdaptiveRecommendationV2Service } from '../src/statlocker-adaptive/adaptive-recommendation-v2.service';
 import { BuildArchetypeSnapshotV2 } from '../src/statlocker-adaptive/build-archetype-v2';
 import { BuildDebugTraceStoreV2Service } from '../src/statlocker-adaptive/build-debug-trace-store-v2.service';

@@ -2,7 +2,7 @@ import { BadRequestException, Body, Controller, Post } from '@nestjs/common';
 import {
   AdaptiveRecommendationRequestV2,
   AdaptiveRecommendationResultV2,
-} from '@deadlock-live-probe/shared';
+} from '@dynamo-lab/shared';
 import { AdaptiveLiveStateNotReadyError } from './adaptive-decision-state-v1.service';
 import { AdaptiveAvailabilityV1Service } from './adaptive-availability-v1.service';
 import { BuildIterationCaptureV1 } from './build-iteration-capture-v1';

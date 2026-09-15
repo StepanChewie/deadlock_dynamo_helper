@@ -1,9 +1,9 @@
 {
-  "name": "@deadlock-live-probe/api",
+  "name": "@dynamo-lab/api",
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "build:domain": "yarn workspace @deadlock-live-probe/build-domain build",
+    "build:domain": "yarn workspace @dynamo-lab/build-domain build",
     "build": "yarn build:domain && nest build",
     "start": "yarn build:domain && nest start",
     "start:dev": "yarn build:domain && nest start --watch",
@@ -28,8 +28,8 @@
     "testRegex": "test/.*\\.spec\\.ts$"
   },
   "dependencies": {
-    "@deadlock-live-probe/build-domain": "0.0.1",
-    "@deadlock-live-probe/shared": "0.0.1",
+    "@dynamo-lab/build-domain": "0.0.1",
+    "@dynamo-lab/shared": "0.0.1",
     "@nestjs/common": "^11.1.6",
     "@nestjs/core": "^11.1.6",
     "@nestjs/platform-express": "^11.1.6",

@@ -3,7 +3,7 @@ import type {
   AdaptivePlanActionStatusV1,
   AdaptivePlanActionV1,
   AdaptiveRecommendationResultV1,
-} from '@deadlock-live-probe/shared';
+} from '@dynamo-lab/shared';
 import {
   buildAdaptivePurchaseRoute,
   buildAdaptiveRecommendationPresentation,

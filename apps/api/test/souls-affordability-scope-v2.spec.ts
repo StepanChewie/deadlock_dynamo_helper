@@ -1,4 +1,4 @@
-import { SOULS_AFFORDABILITY_EVIDENCE_V2, SoulsAffordabilityControlledObservationV2 } from '@deadlock-live-probe/shared';
+import { SOULS_AFFORDABILITY_EVIDENCE_V2, SoulsAffordabilityControlledObservationV2 } from '@dynamo-lab/shared';
 import { SoulsAffordabilityEvidenceV2Service } from '../src/deadlock-live/souls-affordability-evidence-v2.service';
 
 function observation(index: number, rulesetVersion = 'ruleset-a', catalogSha256 = 'a'.repeat(64)): SoulsAffordabilityControlledObservationV2 {

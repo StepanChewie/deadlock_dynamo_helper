@@ -8,7 +8,7 @@ import {
   writeFile,
 } from 'node:fs/promises';
 import { join } from 'node:path';
-import { OverwolfLiveEventDto } from '@deadlock-live-probe/shared';
+import { OverwolfLiveEventDto } from '@dynamo-lab/shared';
 
 const DEFAULT_MAX_FILE_BYTES = 4 * 1024 * 1024;
 const DEFAULT_MAX_FILES = 32;
