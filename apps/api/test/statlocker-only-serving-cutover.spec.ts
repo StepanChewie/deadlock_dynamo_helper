@@ -80,8 +80,8 @@ describe('Statlocker-only recommendation serving cutover', () => {
       expect(html).not.toContain('MODEL V6');
     }
 
-    expect(inGameHtml).toContain('Statlocker Adaptive');
-    expect(desktopHtml).toContain('Statlocker Adaptive');
+    expect(inGameHtml).toContain('Dynamo Lab');
+    expect(desktopHtml).toContain('Dynamo Lab');
   });
 
   test('production deploy never promotes or verifies legacy V6 serving', () => {
