@@ -272,6 +272,16 @@ function initializeBackgroundWindow(): void {
           gepVersion: readGepVersion(),
         });
 
+        if (readGepPhase()) {
+          gepEventsWithoutPhase = 0;
+          ui.setGameEventsDegraded(false);
+        } else if (gepEventsWithoutPhase < GEP_DEGRADED_EVENT_THRESHOLD) {
+          gepEventsWithoutPhase += 1;
+          if (gepEventsWithoutPhase >= GEP_DEGRADED_EVENT_THRESHOLD) {
+            ui.setGameEventsDegraded(true);
+          }
+        }
+
         const previousMatchId = currentMatchId;
         const context = extractAdaptiveContext(event);
 
@@ -331,6 +341,17 @@ function initializeBackgroundWindow(): void {
 }
 
 let gameLifecycleWatched = false;
+
+/**
+ * Counts GEP events that arrived without `game_info.phase`.
+ *
+ * A healthy Deadlock GEP always reports `phase`, even between matches. When it
+ * is missing while `steam_id` still arrives, Overwolf's game plugin has failed
+ * to attach — the app then receives no `match_info`, so no match id, so nothing
+ * can be recommended. Roughly a minute of that is a fault worth reporting.
+ */
+let gepEventsWithoutPhase = 0;
+const GEP_DEGRADED_EVENT_THRESHOLD = 20;
 
 /**
  * Re-requests GEP features whenever a game launches.

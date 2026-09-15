@@ -279,6 +279,30 @@ export function showAdaptiveError(message = 'Recommendation is updating'): void 
   setText('guide-empty-copy', 'The build route will appear when fresh match data is available.');
 }
 
+let gameEventsDegraded = false;
+
+/**
+ * Switches the waiting state between "nothing yet" and "Overwolf is not passing
+ * game data".
+ *
+ * The two are indistinguishable from inside the app — both are simply an empty
+ * snapshot — but they are very different for a player. A healthy Deadlock GEP
+ * always reports `game_info.phase`; when it is missing while `steam_id` still
+ * arrives, Overwolf's game plugin has failed to attach. Overwolf's own guidance
+ * is to surface event failures rather than absorb them.
+ */
+export function setGameEventsDegraded(degraded: boolean): void {
+  if (gameEventsDegraded === degraded) {
+    return;
+  }
+
+  gameEventsDegraded = degraded;
+
+  if (!hasAdaptiveRecommendation) {
+    hideSituationalPanel();
+  }
+}
+
 export function hideSituationalPanel(): void {
   const emptyEl = document.getElementById('guide-empty');
   const activeEl = document.getElementById('guide-active');
@@ -287,8 +311,18 @@ export function hideSituationalPanel(): void {
   if (panel) panel.style.display = 'none';
   if (activeEl) activeEl.style.display = 'none';
   if (emptyEl) emptyEl.style.display = 'flex';
-  setText('guide-empty-title', 'Waiting for match data');
-  setText('guide-empty-copy', 'Your Dynamo Lab build route will appear automatically when the match is detected.');
+
+  if (gameEventsDegraded) {
+    setText('guide-empty-title', 'Overwolf is not passing game data');
+    setText(
+      'guide-empty-copy',
+      'Deadlock is running but Overwolf is not sending its game events, so there is nothing to build from. Restart Overwolf, then reopen Dynamo Lab.',
+    );
+  } else {
+    setText('guide-empty-title', 'Waiting for match data');
+    setText('guide-empty-copy', 'Your Dynamo Lab build route will appear automatically when the match is detected.');
+  }
+
   hasAdaptiveRecommendation = false;
   clearAdaptiveError();
 }

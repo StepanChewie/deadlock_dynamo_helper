@@ -10,6 +10,7 @@ import {
   revealPostMatchReasons,
   setRefreshPending,
   showAdaptiveError,
+  setGameEventsDegraded,
   showAdaptiveRecommendation,
   showFirstRunGuide,
   showPostMatchFeedback,
@@ -561,6 +562,49 @@ describe('Dynamo Lab maintenance state', () => {
 
     expect(elements.get('guide-active')?.style.display).toBe('flex');
     expect(elements.get('rec-plan')?.children ?? []).toHaveLength(5);
+  });
+});
+
+describe('Dynamo Lab degraded game events notice', () => {
+  let elements: Map<string, FakeElement>;
+  const originalDocument = globalThis.document;
+
+  beforeEach(() => {
+    elements = new Map(elementIds.map((id) => [id, new FakeElement()]));
+    globalThis.document = {
+      getElementById: (id: string) => elements.get(id) || null,
+      createElement: (tagName: string) => new FakeElement(tagName.toUpperCase()),
+    } as unknown as Document;
+    setGameEventsDegraded(false);
+    hideSituationalPanel();
+  });
+
+  afterAll(() => {
+    globalThis.document = originalDocument;
+    setGameEventsDegraded(false);
+  });
+
+  it('explains a stalled Overwolf instead of waiting forever', () => {
+    setGameEventsDegraded(true);
+
+    expect(elements.get('guide-empty')?.style.display).toBe('flex');
+    expect(elements.get('guide-empty-title')?.textContent).toBe('Overwolf is not passing game data');
+    expect(elements.get('guide-empty-copy')?.textContent).toMatch(/restart Overwolf/i);
+  });
+
+  it('goes back to the normal waiting copy once data resumes', () => {
+    setGameEventsDegraded(true);
+    setGameEventsDegraded(false);
+
+    expect(elements.get('guide-empty-title')?.textContent).toBe('Waiting for match data');
+  });
+
+  it('does not claim a fault while a recommendation is on screen', () => {
+    setGameEventsDegraded(true);
+    showAdaptiveRecommendation(fiveItemRecommendation());
+
+    expect(elements.get('guide-active')?.style.display).toBe('flex');
+    expect(elements.get('guide-empty')?.style.display).toBe('none');
   });
 });
 
