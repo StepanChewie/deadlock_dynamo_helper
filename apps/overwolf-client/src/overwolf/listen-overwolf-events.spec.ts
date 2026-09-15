@@ -181,4 +181,39 @@ describe('listenOverwolfEvents', () => {
     jest.useRealTimers();
     delete (globalThis as any).overwolf;
   });
+
+  it('does not duplicate listeners when registration runs again', () => {
+    jest.resetModules();
+    const mod = require('./listen-overwolf-events');
+    jest.useFakeTimers();
+
+    const onInfoUpdates2Add = jest.fn();
+    const onNewEventsAdd = jest.fn();
+    const getInfo = jest.fn((callback: (result: unknown) => void) => {
+      callback({ success: true, res: { game_info: { steam_id: '76561198000000001' } } });
+    });
+
+    (globalThis as any).overwolf = {
+      games: {
+        events: {
+          onInfoUpdates2: { addListener: onInfoUpdates2Add },
+          onNewEvents: { addListener: onNewEventsAdd },
+          getInfo,
+        },
+      },
+    };
+
+    // GEP features are re-requested whenever the game launches, so this setup
+    // runs more than once per session. A second pass must not attach a second
+    // pair of handlers, or every event would be sent twice.
+    mod.listenOverwolfEvents(jest.fn());
+    mod.listenOverwolfEvents(jest.fn());
+
+    expect(onInfoUpdates2Add).toHaveBeenCalledTimes(1);
+    expect(onNewEventsAdd).toHaveBeenCalledTimes(1);
+
+    jest.clearAllTimers();
+    jest.useRealTimers();
+    delete (globalThis as any).overwolf;
+  });
 });

@@ -24,6 +24,19 @@ interface MatchContext {
 let diagnosticCapture: DiagnosticCapture | undefined;
 let stateSafetyTimer: ReturnType<typeof setInterval> | undefined;
 let stateSafetyPollInFlight = false;
+let listenersAttached = false;
+let currentOnEvent: EventCallback | undefined;
+
+/**
+ * Match id seen so far, kept at module level on purpose. GEP features are
+ * re-requested on every game launch, so the listener setup runs more than once
+ * per session; resetting this would forget a match already in progress.
+ */
+const matchContext: MatchContext = {};
+
+function dispatch(event: OverwolfLiveEventDto): void {
+  currentOnEvent?.(event);
+}
 
 function matchIdFromValue(value: unknown): string | undefined {
   const parsed = parseJsonSafely(value);
@@ -151,15 +164,22 @@ export function listenOverwolfEvents(onEvent: EventCallback): void {
 
   diagnosticCapture ??= new DiagnosticCapture(`capture-${Math.random().toString(36).slice(2, 10)}`);
   const capture = diagnosticCapture;
-  const matchContext: MatchContext = {};
+  currentOnEvent = onEvent;
   capture.initialize(overwolf);
+
+  if (listenersAttached) {
+    startStateSafetyPolling(capture, matchContext);
+    return;
+  }
+
+  listenersAttached = true;
 
   overwolf.games.events.onInfoUpdates2.addListener((infoUpdate: any) => {
     try {
       emitInfoEntries(
         infoUpdate?.info,
         infoUpdate?.feature,
-        onEvent,
+        dispatch,
         capture,
         false,
         matchContext,
@@ -194,7 +214,7 @@ export function listenOverwolfEvents(onEvent: EventCallback): void {
           matchContext.currentMatchId = matchIdFromValue(parsedData) ?? matchContext.currentMatchId;
         }
 
-        onEvent({
+        dispatch({
           matchId: matchContext.currentMatchId,
           receivedAt,
           source: 'onNewEvents',
@@ -208,11 +228,10 @@ export function listenOverwolfEvents(onEvent: EventCallback): void {
     }
   });
 
-  startStateSafetyPolling(onEvent, capture, matchContext);
+  startStateSafetyPolling(capture, matchContext);
 }
 
 function startStateSafetyPolling(
-  onEvent: EventCallback,
   capture: DiagnosticCapture,
   matchContext: MatchContext,
 ): void {
@@ -247,7 +266,7 @@ function startStateSafetyPolling(
         emitInfoEntries(
           result.res,
           'state_safety_poll',
-          onEvent,
+          dispatch,
           capture,
           true,
           matchContext,

@@ -311,6 +311,10 @@ function initializeBackgroundWindow(): void {
           scheduleAdaptiveRecommendation(previousMatchId === currentMatchId);
         }
       });
+
+      watchGameLifecycle(() => {
+        void register();
+      });
     } catch (error: any) {
       ui.updateStatus('Unavailable', 'error');
       ui.updateDiagnosticContext({ gepStatus: 'FAILED', lastError: String(error?.message || error) });
@@ -324,6 +328,37 @@ function initializeBackgroundWindow(): void {
   };
 
   void register();
+}
+
+let gameLifecycleWatched = false;
+
+/**
+ * Re-requests GEP features whenever a game launches.
+ *
+ * Registering while no game is running can report success yet leave the feature
+ * set unbound. The only visible symptom is a GEP snapshot that carries nothing
+ * but `game_info.steam_id`, so the match id never arrives and both the overlay
+ * and the recommendation stay silent with no error anywhere. Overwolf answers
+ * `Not in a game` for exactly that case, which is how this was found.
+ */
+function watchGameLifecycle(onGameStarted: () => void): void {
+  if (gameLifecycleWatched) {
+    return;
+  }
+
+  try {
+    const games = (globalThis as any).overwolf?.games;
+    if (typeof games?.onGameLaunched?.addListener !== 'function') {
+      return;
+    }
+
+    gameLifecycleWatched = true;
+    games.onGameLaunched.addListener(() => {
+      onGameStarted();
+    });
+  } catch {
+    // Overwolf API unavailable; the initial registration still stands.
+  }
 }
 
 function restoreInGameOverlayWindow(
