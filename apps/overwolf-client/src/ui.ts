@@ -7,7 +7,7 @@ import {
   buildAdaptivePurchaseRoute,
   buildAdaptiveRecommendationPresentation,
 } from './adaptive-recommendation-presentation';
-import { persistDismissed, readDismissed } from './player-preferences';
+import { PREFERENCE_KEYS, persistDismissed, readDismissed, readPreference } from './player-preferences';
 import { APP_VERSION } from './app-version';
 import {
   buildDiagnosticSummary,
@@ -78,6 +78,7 @@ export function applyStoredPreferences(): void {
   } else {
     showFirstRunGuide();
   }
+  syncOverlayAutoShowPreference();
 }
 
 const FIRST_RUN_KEY = 'first-run-guide';
@@ -493,4 +494,159 @@ function setText(id: string, text: string): void {
 
 function itemGlyph(slot: string): string {
   return { weapon: 'W', vitality: 'V', spirit: 'S' }[slot] || '•';
+}
+
+/* Desktop shell ------------------------------------------------------------
+ * The desktop window is a two-page shell: the live build, and Settings. Both
+ * pages stay in the DOM so the route keeps updating while the player reads
+ * Settings — switching back must not re-fetch or re-render anything.
+ */
+
+export type Workspace = 'build' | 'settings';
+
+const WORKSPACE_NAV: ReadonlyArray<readonly [Workspace, string]> = [
+  ['build', 'nav-build'],
+  ['settings', 'nav-settings'],
+];
+
+let activeWorkspace: Workspace = 'build';
+
+/** The workspace currently on screen. */
+export function readActiveWorkspace(): Workspace {
+  return activeWorkspace;
+}
+
+/**
+ * Switches the visible workspace and moves the navigation highlight with it.
+ *
+ * `aria-current` moves too: it is what tells a screen reader which page it is
+ * on, so leaving it behind on the first button would announce the wrong page.
+ */
+export function showWorkspace(workspace: Workspace): void {
+  activeWorkspace = workspace;
+  setHidden('build-workspace', workspace !== 'build');
+  setHidden('settings-workspace', workspace !== 'settings');
+
+  for (const [name, id] of WORKSPACE_NAV) {
+    const button = document.getElementById(id);
+    if (!button) continue;
+
+    const isCurrent = name === workspace;
+    button.classList.toggle('is-active', isCurrent);
+    if (isCurrent) {
+      button.setAttribute('aria-current', 'page');
+    } else {
+      button.removeAttribute('aria-current');
+    }
+  }
+
+  if (workspace === 'settings') {
+    renderSettingsStatus();
+    syncOverlayAutoShowPreference();
+  }
+}
+
+const EMPTY_SETTINGS_VALUE = '—';
+
+const SETTINGS_STATUS_FIELDS: ReadonlyArray<
+  readonly [string, keyof DiagnosticSummaryInput]
+> = [
+  ['setting-app-version', 'appVersion'],
+  ['setting-backend-status', 'backendStatus'],
+  ['setting-gep-status', 'gepStatus'],
+  ['setting-gep-version', 'gepVersion'],
+  ['setting-gep-features', 'gepFeatures'],
+  ['setting-gep-snapshot', 'gepSnapshot'],
+  ['setting-recommendation-status', 'recommendationStatus'],
+];
+
+/**
+ * How long ago the route on screen was rendered, or `null` if none ever was.
+ *
+ * Shown next to the route because a player looking at a plan that quietly
+ * stopped updating has no other way to tell that the client has gone quiet.
+ */
+export function readRecommendationAgeMs(now: number = Date.now()): number | null {
+  return lastRecommendationRenderAt === 0
+    ? null
+    : Math.max(0, now - lastRecommendationRenderAt);
+}
+
+/** Formats an age from {@link readRecommendationAgeMs} for the status group. */
+export function formatRecommendationAge(ageMs: number | null): string {
+  if (ageMs === null) {
+    return EMPTY_SETTINGS_VALUE;
+  }
+
+  const seconds = Math.round(ageMs / 1000);
+  if (seconds < 60) {
+    return `${seconds}s ago`;
+  }
+
+  const minutes = Math.floor(seconds / 60);
+  return minutes < 60 ? `${minutes}m ago` : `${Math.floor(minutes / 60)}h ago`;
+}
+
+/**
+ * Renders the Settings status group from the same accumulator the diagnostics
+ * block reads, so the panel and the copied report can never disagree.
+ *
+ * Read-only by design: this is the screen a player opens when something looks
+ * wrong, and it must not be able to change any of the state it reports.
+ */
+export function renderSettingsStatus(now: number = Date.now()): void {
+  const values: DiagnosticSummaryInput = { appVersion: APP_VERSION, ...diagnosticContext };
+
+  for (const [id, key] of SETTINGS_STATUS_FIELDS) {
+    const value = values[key];
+    setText(id, typeof value === 'string' && value.trim() ? value : EMPTY_SETTINGS_VALUE);
+  }
+
+  setText('setting-route-age', formatRecommendationAge(readRecommendationAgeMs(now)));
+}
+
+/**
+ * Mirrors the stored overlay preference into the Settings checkbox.
+ *
+ * Re-read rather than assumed: the same key is written elsewhere and survives
+ * across sessions, so the box has to describe what is actually stored rather
+ * than what the last click happened to be.
+ */
+export function syncOverlayAutoShowPreference(): void {
+  const checkbox = document.getElementById('setting-overlay-auto-show') as
+    | (HTMLElement & { checked: boolean })
+    | null;
+
+  if (checkbox) {
+    // The explicit type argument is load-bearing: with the literal `false`
+    // fallback the return type narrows to `false`.
+    checkbox.checked = readPreference<boolean>(PREFERENCE_KEYS.overlayAutoShow, false);
+  }
+}
+
+export type HotkeyName = 'toggle_overlay' | 'show_desktop_build';
+
+const HOTKEY_LABEL_TARGETS: ReadonlyArray<readonly [HotkeyName, string]> = [
+  ['toggle_overlay', 'hint-hotkey-toggle'],
+  ['show_desktop_build', 'hint-hotkey-desktop'],
+];
+
+/**
+ * Writes the hotkeys Overwolf actually has bound into every place that names
+ * them.
+ *
+ * The markup ships the manifest defaults, which stay correct only until a
+ * player rebinds one. The reminder banner and the Settings row are filled from
+ * the same call so the two cannot end up contradicting each other.
+ */
+export function renderHotkeyBindings(bindings: Partial<Record<HotkeyName, string>>): void {
+  for (const [name, id] of HOTKEY_LABEL_TARGETS) {
+    const binding = bindings[name];
+    if (!binding) continue;
+
+    setText(id, binding);
+    if (name === 'toggle_overlay') {
+      setText('setting-hotkey', binding);
+    }
+  }
 }

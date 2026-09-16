@@ -6,11 +6,15 @@ import {
   dismissHotkeyHint,
   dismissPostMatchFeedback,
   EXPIRED_AFTER_MS,
+  formatRecommendationAge,
   hasRecommendationOnScreen,
   hideSituationalPanel,
   markRecommendationFresh,
   openExternal,
+  readActiveWorkspace,
+  readRecommendationAgeMs,
   readRecommendationFreshness,
+  renderHotkeyBindings,
   revealPostMatchReasons,
   setRefreshPending,
   showAdaptiveError,
@@ -18,9 +22,12 @@ import {
   showAdaptiveRecommendation,
   showFirstRunGuide,
   showPostMatchFeedback,
+  showWorkspace,
   STALE_AFTER_MS,
+  syncOverlayAutoShowPreference,
   updateDiagnosticContext,
 } from './ui';
+import { APP_VERSION } from './app-version';
 
 class FakeElement {
   textContent = '';
@@ -28,6 +35,7 @@ class FakeElement {
   title = '';
   disabled = false;
   hidden = false;
+  checked = false;
   style: Record<string, string> = {};
   children: FakeElement[] = [];
   attributes = new Map<string, string>();
@@ -95,6 +103,22 @@ const elementIds = [
   'diagnostic-summary',
   'post-match-feedback',
   'post-match-feedback-reasons',
+  'build-workspace',
+  'settings-workspace',
+  'nav-build',
+  'nav-settings',
+  'hint-hotkey-toggle',
+  'hint-hotkey-desktop',
+  'setting-overlay-auto-show',
+  'setting-hotkey',
+  'setting-app-version',
+  'setting-backend-status',
+  'setting-gep-status',
+  'setting-gep-version',
+  'setting-gep-features',
+  'setting-gep-snapshot',
+  'setting-recommendation-status',
+  'setting-route-age',
 ];
 
 function recommendation(overrides: Record<string, unknown> = {}): any {
@@ -760,5 +784,162 @@ describe('Dynamo Lab recommendation freshness', () => {
     showAdaptiveError('HTTP 502');
 
     expect(hasRecommendationOnScreen()).toBe(false);
+  });
+});
+
+describe('Dynamo Lab desktop workspaces', () => {
+  let elements: Map<string, FakeElement>;
+  const originalDocument = globalThis.document;
+  const originalLocalStorage = (globalThis as any).localStorage;
+
+  beforeEach(() => {
+    elements = new Map(elementIds.map((id) => [id, new FakeElement()]));
+    globalThis.document = {
+      getElementById: (id: string) => elements.get(id) || null,
+      createElement: (tagName: string) => new FakeElement(tagName.toUpperCase()),
+    } as unknown as Document;
+    // Start from "no route has ever been rendered" so the route-age cell has a
+    // known value instead of whatever the previous suite left behind.
+    markRecommendationFresh(0);
+  });
+
+  afterEach(() => {
+    (globalThis as any).localStorage = originalLocalStorage;
+  });
+
+  afterAll(() => {
+    globalThis.document = originalDocument;
+  });
+
+  it('shows the build page and marks its nav entry as current on startup', () => {
+    showWorkspace('build');
+
+    expect(readActiveWorkspace()).toBe('build');
+    expect(elements.get('build-workspace')?.hidden).toBe(false);
+    expect(elements.get('settings-workspace')?.hidden).toBe(true);
+    expect(elements.get('nav-build')?.attributes.get('aria-current')).toBe('page');
+    expect(elements.get('nav-settings')?.attributes.has('aria-current')).toBe(false);
+  });
+
+  it('moves both the highlight and aria-current to Settings', () => {
+    // Switch away from an already-current page, so the stale marker has to be
+    // actively cleared rather than simply never having been set.
+    showWorkspace('build');
+    showWorkspace('settings');
+
+    expect(readActiveWorkspace()).toBe('settings');
+    expect(elements.get('build-workspace')?.hidden).toBe(true);
+    expect(elements.get('settings-workspace')?.hidden).toBe(false);
+    expect(elements.get('nav-settings')?.attributes.get('aria-current')).toBe('page');
+    expect(elements.get('nav-build')?.attributes.has('aria-current')).toBe(false);
+    expect(elements.get('nav-settings')?.className).toContain('is-active');
+    expect(elements.get('nav-build')?.className).not.toContain('is-active');
+  });
+
+  it('leaves the rendered route in place when the player visits Settings', () => {
+    // Both pages stay mounted. Tearing the build page down on navigation would
+    // blank the route until the next poll, which is several seconds of nothing.
+    elements.get('rec-plan')?.replaceChildren(new FakeElement('LI'));
+
+    showWorkspace('settings');
+    showWorkspace('build');
+
+    expect(elements.get('rec-plan')?.children).toHaveLength(1);
+  });
+
+  it('renders the status group from the diagnostic accumulator', () => {
+    updateDiagnosticContext({
+      backendStatus: 'HTTP 200',
+      gepStatus: 'REGISTERED without gep_internal',
+      gepFeatures: 'game_info,match_info',
+      gepSnapshot: 'game_info(steam_id)',
+      gepVersion: '305.1',
+      recommendationStatus: 'READY',
+    });
+
+    showWorkspace('settings');
+
+    // Same accumulator as the diagnostics block, so the panel and the copied
+    // report cannot disagree about what the client is doing.
+    expect(elements.get('setting-app-version')?.textContent).toBe(APP_VERSION);
+    expect(elements.get('setting-backend-status')?.textContent).toBe('HTTP 200');
+    expect(elements.get('setting-gep-status')?.textContent).toBe('REGISTERED without gep_internal');
+    expect(elements.get('setting-gep-features')?.textContent).toBe('game_info,match_info');
+    expect(elements.get('setting-gep-snapshot')?.textContent).toBe('game_info(steam_id)');
+    expect(elements.get('setting-gep-version')?.textContent).toBe('305.1');
+    expect(elements.get('setting-recommendation-status')?.textContent).toBe('READY');
+  });
+
+  it('reports an unknown status as an em dash rather than an empty cell', () => {
+    updateDiagnosticContext({ backendStatus: '', gepSnapshot: undefined });
+
+    showWorkspace('settings');
+
+    expect(elements.get('setting-backend-status')?.textContent).toBe('—');
+    expect(elements.get('setting-gep-snapshot')?.textContent).toBe('—');
+  });
+
+  it('reports no route age until a route has been rendered', () => {
+    expect(readRecommendationAgeMs()).toBeNull();
+    expect(formatRecommendationAge(null)).toBe('—');
+
+    showWorkspace('settings');
+
+    expect(elements.get('setting-route-age')?.textContent).toBe('—');
+  });
+
+  it('formats the route age in seconds, minutes, and hours', () => {
+    expect(formatRecommendationAge(0)).toBe('0s ago');
+    expect(formatRecommendationAge(12_000)).toBe('12s ago');
+    expect(formatRecommendationAge(59_000)).toBe('59s ago');
+    expect(formatRecommendationAge(90_000)).toBe('1m ago');
+    expect(formatRecommendationAge(59 * 60_000)).toBe('59m ago');
+    expect(formatRecommendationAge(3 * 3_600_000)).toBe('3h ago');
+  });
+
+  it('reads the route age back from the last render', () => {
+    markRecommendationFresh(1_000_000);
+
+    expect(readRecommendationAgeMs(1_012_500)).toBe(12_500);
+    // A clock that moved backwards must not produce a negative age.
+    expect(readRecommendationAgeMs(999_000)).toBe(0);
+  });
+
+  it('reflects the stored overlay preference in the Settings checkbox', () => {
+    const store = new Map<string, string>();
+    (globalThis as any).localStorage = {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => store.set(key, value),
+    };
+
+    syncOverlayAutoShowPreference();
+    expect(elements.get('setting-overlay-auto-show')?.checked).toBe(false);
+
+    store.set('dynamo-lab.overlay.autoShow', 'true');
+    syncOverlayAutoShowPreference();
+    expect(elements.get('setting-overlay-auto-show')?.checked).toBe(true);
+  });
+
+  it('leaves the checkbox alone when storage is unavailable', () => {
+    delete (globalThis as any).localStorage;
+
+    expect(() => syncOverlayAutoShowPreference()).not.toThrow();
+    expect(elements.get('setting-overlay-auto-show')?.checked).toBe(false);
+  });
+
+  it('writes the bound hotkeys into the banner and the Settings row together', () => {
+    renderHotkeyBindings({ toggle_overlay: 'Ctrl+F5', show_desktop_build: 'Ctrl+F6' });
+
+    expect(elements.get('hint-hotkey-toggle')?.textContent).toBe('Ctrl+F5');
+    expect(elements.get('hint-hotkey-desktop')?.textContent).toBe('Ctrl+F6');
+    expect(elements.get('setting-hotkey')?.textContent).toBe('Ctrl+F5');
+  });
+
+  it('keeps the shipped default for any hotkey Overwolf did not report', () => {
+    elements.get('hint-hotkey-toggle')!.textContent = 'Ctrl+Shift+D';
+
+    renderHotkeyBindings({});
+
+    expect(elements.get('hint-hotkey-toggle')?.textContent).toBe('Ctrl+Shift+D');
   });
 });

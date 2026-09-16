@@ -260,7 +260,7 @@
 
       .support {
         flex: none;
-        margin: 0 24px 16px;
+        margin: 0;
         border: 1px solid var(--line);
         border-radius: 4px;
         background: var(--surface);
@@ -447,6 +447,143 @@
         padding: 16px 24px;
         overflow: auto;
       }
+
+      /* `display: flex` outranks the user-agent `[hidden]` rule, so every
+         switchable panel has to restate it or `hidden` silently does nothing. */
+      .build-workspace[hidden],
+      .settings-workspace[hidden] { display: none; }
+
+      /* Settings workspace ------------------------------------------------ */
+      .settings-workspace {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 16px 24px;
+        overflow: auto;
+      }
+
+      .settings-head {
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        background: var(--surface);
+      }
+
+      .settings-group {
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        background: var(--surface);
+      }
+
+      .settings-heading {
+        margin: 0;
+        padding: 9px 14px;
+        border-bottom: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 11.5px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .settings-row {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 12px 14px;
+      }
+
+      .settings-row + .settings-row { border-top: 1px solid var(--line-soft); }
+
+      .settings-label {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        flex: 1;
+        min-width: 0;
+      }
+
+      .settings-label > span { font-size: 12.5px; font-weight: 600; }
+
+      .settings-label small {
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.5;
+      }
+
+      .settings-control {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex: none;
+      }
+
+      .settings-control kbd {
+        padding: 3px 8px;
+        border: 1px solid var(--line);
+        border-radius: 3px;
+        color: var(--text);
+        background: var(--canvas);
+        font: 600 11.5px var(--mono);
+      }
+
+      .settings-button {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 12px;
+        border: 1px solid var(--line);
+        border-radius: 3px;
+        color: var(--muted);
+        background: transparent;
+        font: 600 11px var(--sans);
+        letter-spacing: 0.06em;
+        text-decoration: none;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+
+      .settings-button:hover,
+      .settings-button:focus-visible {
+        border-color: var(--amber);
+        color: var(--amber);
+      }
+
+      .settings-toggle {
+        flex: none;
+        width: 16px;
+        height: 16px;
+        margin: 0;
+        accent-color: var(--amber);
+        cursor: pointer;
+      }
+
+      .settings-status {
+        display: grid;
+        grid-template-columns: minmax(0, 190px) minmax(0, 1fr);
+        margin: 0;
+      }
+
+      .settings-status dt,
+      .settings-status dd {
+        margin: 0;
+        padding: 8px 14px;
+        font-size: 11.5px;
+      }
+
+      .settings-status dt {
+        color: var(--muted);
+        letter-spacing: 0.03em;
+      }
+
+      .settings-status dd {
+        color: var(--text);
+        font-family: var(--mono);
+        overflow-wrap: anywhere;
+      }
+
+      .settings-status dt + dd { border-left: 1px solid var(--line-soft); }
+      .settings-status dd + dt { border-top: 1px solid var(--line-soft); }
 
       .build-plane {
         flex: 1;
@@ -690,8 +827,8 @@
         #ow-ad-container { display: none; }
         .nav-item { align-items: center; padding: 8px 4px; }
         .nav-item.is-active { background: rgba(228, 162, 77, 0.14); }
-        .build-workspace { padding: 10px; }
-        .support { margin: 0 10px 10px; }
+        .build-workspace,
+        .settings-workspace { padding: 10px; }
         .topbar { padding: 8px 10px; }
         .hotkey-hint { padding: 7px 10px; }
         .purchase-row { grid-template-columns: 24px 44px minmax(0, 1fr) minmax(64px, auto); }
@@ -708,11 +845,8 @@
       <aside class="app-nav">
         <a class="brand" aria-label="Dynamo Lab home"><img src="dynamo.png" alt="" /><span>Dynamo Lab</span></a>
         <nav aria-label="Dynamo Lab navigation">
-          <button type="button" class="nav-item" aria-disabled="true" disabled aria-label="Overview, coming soon"><span>Overview</span><small>Coming soon</small></button>
-          <button type="button" class="nav-item is-active" aria-current="page"><span>Live Build</span><small>Active</small></button>
-          <button type="button" class="nav-item" aria-disabled="true" disabled aria-label="Matches, coming soon"><span>Matches</span><small>Coming soon</small></button>
-          <button type="button" class="nav-item" aria-disabled="true" disabled aria-label="Match Analysis, coming soon"><span>Match Analysis</span><small>Coming soon</small></button>
-          <button type="button" class="nav-item" aria-disabled="true" disabled aria-label="Settings, coming soon"><span>Settings</span><small>Coming soon</small></button>
+          <button type="button" id="nav-build" class="nav-item is-active" aria-current="page" onclick="overwolf.windows.getMainWindow().showWorkspace?.('build')"><span>Live Build</span><small>Active</small></button>
+          <button type="button" id="nav-settings" class="nav-item" onclick="overwolf.windows.getMainWindow().showWorkspace?.('settings')"><span>Settings</span><small>Overlay, support, status</small></button>
         </nav>
         <div id="ow-ad-container" aria-hidden="true"></div>
       </aside>
@@ -727,11 +861,11 @@
         </header>
 
         <div id="hotkey-hint" class="hotkey-hint" role="note">
-          <span>The overlay opens with <kbd>Ctrl+Shift+D</kbd> — it does not open by itself. <kbd>Ctrl+Shift+B</kbd> reopens this window.</span>
+          <span>The overlay opens with <kbd id="hint-hotkey-toggle">Ctrl+Shift+D</kbd> — it does not open by itself. <kbd id="hint-hotkey-desktop">Ctrl+Shift+B</kbd> reopens this window.</span>
           <button type="button" class="hotkey-hint-dismiss" aria-label="Dismiss hotkey reminder" onclick="overwolf.windows.getMainWindow().dismissHotkeyHint?.()">Got it</button>
         </div>
 
-        <section class="build-workspace">
+        <section id="build-workspace" class="build-workspace">
           <div class="build-plane">
             <header class="build-head"><h1 id="build-title">Full build</h1><span>Route</span></header>
 
@@ -750,28 +884,69 @@
           </div>
         </section>
 
-        <details id="support" class="support">
-          <summary>Support</summary>
+        <section id="settings-workspace" class="settings-workspace" hidden>
+          <header class="build-head settings-head"><h1>Settings</h1><span>Overlay, support, status</span></header>
 
-          <p class="support-copy">If a recommendation looks wrong, tell us on Discord. Copy the diagnostics below and include them in your report.</p>
+          <div class="settings-group">
+            <h2 class="settings-heading">Overlay</h2>
 
-          <div class="support-actions">
-            <button type="button" class="support-button support-primary" onclick="overwolf.windows.getMainWindow().openExternal?.('https://discord.gg/yR4TNN2GDH')">Join Discord</button>
-            <button type="button" class="support-button" onclick="overwolf.windows.getMainWindow().copyDiagnostics?.()">Copy diagnostics</button>
+            <div class="settings-row">
+              <label class="settings-label" for="setting-overlay-auto-show">
+                <span>Open the overlay automatically</span>
+                <small>Show the in-game overlay as soon as a match is detected, instead of waiting for the hotkey.</small>
+              </label>
+              <input type="checkbox" id="setting-overlay-auto-show" class="settings-toggle" onchange="overwolf.windows.getMainWindow().setOverlayAutoShow?.(this.checked)" />
+            </div>
+
+            <div class="settings-row">
+              <span class="settings-label">
+                <span>Overlay hotkey</span>
+                <small>The shortcut that shows and hides the in-game overlay.</small>
+              </span>
+              <span class="settings-control">
+                <kbd id="setting-hotkey">Ctrl+Shift+D</kbd>
+                <a class="settings-button" href="overwolf://settings/games-overlay?hotkey=toggle_overlay">Change</a>
+              </span>
+            </div>
           </div>
 
-          <pre id="diagnostic-summary" class="diagnostic-summary" aria-label="Diagnostic summary"></pre>
+          <div class="settings-group">
+            <h2 class="settings-heading">Status</h2>
+            <dl class="settings-status">
+              <dt>App version</dt><dd id="setting-app-version">&mdash;</dd>
+              <dt>Backend</dt><dd id="setting-backend-status">&mdash;</dd>
+              <dt>GEP</dt><dd id="setting-gep-status">&mdash;</dd>
+              <dt>GEP version</dt><dd id="setting-gep-version">&mdash;</dd>
+              <dt>GEP features</dt><dd id="setting-gep-features">&mdash;</dd>
+              <dt>GEP snapshot</dt><dd id="setting-gep-snapshot">&mdash;</dd>
+              <dt>Recommendation</dt><dd id="setting-recommendation-status">&mdash;</dd>
+              <dt>Route age</dt><dd id="setting-route-age">&mdash;</dd>
+            </dl>
+          </div>
 
-          <p class="support-privacy">
-            <strong>Privacy.</strong> Dynamo Lab sends the current match state to its server so it can build a purchase route: the raw game events Overwolf reports, the match id, and your Steam ID. The post-match feedback you send is stored without any account or player identifier, and it is never used to train the recommendation model. There is no account and no sign-in. Item artwork is loaded from <code>unpkg.com</code>, a third-party CDN. The diagnostics block above is only copied when you press the button.
-          </p>
+          <details id="support" class="support">
+            <summary>Support</summary>
 
-          <p class="support-legal">
-            <button type="button" class="support-link" onclick="overwolf.windows.getMainWindow().openExternal?.('https://github.com/StepanChewie/deadlock_dynamo_helper/blob/main/docs/privacy.md')">Privacy Policy</button>
-            <span aria-hidden="true">·</span>
-            <button type="button" class="support-link" onclick="overwolf.windows.getMainWindow().openExternal?.('https://github.com/StepanChewie/deadlock_dynamo_helper/blob/main/docs/terms.md')">Terms of Use</button>
-          </p>
-        </details>
+            <p class="support-copy">If a recommendation looks wrong, tell us on Discord. Copy the diagnostics below and include them in your report.</p>
+
+            <div class="support-actions">
+              <button type="button" class="support-button support-primary" onclick="overwolf.windows.getMainWindow().openExternal?.('https://discord.gg/yR4TNN2GDH')">Join Discord</button>
+              <button type="button" class="support-button" onclick="overwolf.windows.getMainWindow().copyDiagnostics?.()">Copy diagnostics</button>
+            </div>
+
+            <pre id="diagnostic-summary" class="diagnostic-summary" aria-label="Diagnostic summary"></pre>
+
+            <p class="support-privacy">
+              <strong>Privacy.</strong> Dynamo Lab sends the current match state to its server so it can build a purchase route: the raw game events Overwolf reports, the match id, and your Steam ID. The post-match feedback you send is stored without any account or player identifier, and it is never used to train the recommendation model. There is no account and no sign-in. Item artwork is loaded from <code>unpkg.com</code>, a third-party CDN. The diagnostics block above is only copied when you press the button.
+            </p>
+
+            <p class="support-legal">
+              <button type="button" class="support-link" onclick="overwolf.windows.getMainWindow().openExternal?.('https://github.com/StepanChewie/deadlock_dynamo_helper/blob/main/docs/privacy.md')">Privacy Policy</button>
+              <span aria-hidden="true">·</span>
+              <button type="button" class="support-link" onclick="overwolf.windows.getMainWindow().openExternal?.('https://github.com/StepanChewie/deadlock_dynamo_helper/blob/main/docs/terms.md')">Terms of Use</button>
+            </p>
+          </details>
+        </section>
       </main>
     </div>
 

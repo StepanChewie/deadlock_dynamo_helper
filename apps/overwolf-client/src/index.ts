@@ -8,7 +8,7 @@ import {
 import { setRequiredFeatures } from './overwolf/set-required-features';
 import { isSuccessfulOverwolfResult } from './overwolf/window-result';
 import { InGameOverlayLifecycle } from './overwolf/in-game-overlay-lifecycle';
-import { PREFERENCE_KEYS, readPreference } from './player-preferences';
+import { PREFERENCE_KEYS, persistPreference, readPreference } from './player-preferences';
 import * as ui from './ui';
 import { AdaptiveRecommendationClient } from './adaptive-recommendation-client';
 import { didAdaptiveMatchChange } from './adaptive-match-transition';
@@ -126,6 +126,18 @@ function initializeBackgroundWindow(): void {
     void ui.copyDiagnostics();
   };
   mainWindow.openExternal = ui.openExternal;
+  mainWindow.showWorkspace = ui.showWorkspace;
+  /**
+   * Persists the Settings toggle and re-reads it back into the checkbox.
+   *
+   * The re-read is not decoration: the write coerces its input to a real
+   * boolean, and the box should show what was stored rather than what was
+   * clicked.
+   */
+  mainWindow.setOverlayAutoShow = (enabled: boolean): void => {
+    persistPreference(PREFERENCE_KEYS.overlayAutoShow, enabled === true);
+    ui.syncOverlayAutoShowPreference();
+  };
   mainWindow.revealPostMatchReasons = ui.revealPostMatchReasons;
   mainWindow.dismissPostMatchFeedback = ui.dismissPostMatchFeedback;
   mainWindow.answerPostMatchFeedback = (useful: boolean, reason?: string): void => {
@@ -150,6 +162,7 @@ function initializeBackgroundWindow(): void {
   ui.applyStoredPreferences();
 
   registerWindowHotkeys(mainWindow);
+  watchHotkeyBindings();
 
   const customFetch = async (
     url: string,
@@ -232,6 +245,12 @@ function initializeBackgroundWindow(): void {
    */
   const RECOMMENDATION_FRESHNESS_POLL_MS = 5_000;
   setInterval(() => {
+    // Only while Settings is on screen. These are live readings, and writing
+    // them into a hidden panel is work nobody ever sees.
+    if (ui.readActiveWorkspace() === 'settings') {
+      ui.renderSettingsStatus();
+    }
+
     if (!mainWindow.latestAdaptiveError || !ui.hasRecommendationOnScreen()) {
       return;
     }
@@ -466,6 +485,60 @@ function registerWindowHotkeys(mainWindow: any): void {
       showDesktopBuildWindow(mainWindow, false);
     }
   });
+}
+
+/**
+ * Mirrors Overwolf's live hotkey bindings into the two places that name them.
+ *
+ * `binding` arrives already formatted ("Ctrl+Shift+D"), so no virtual-key table
+ * is needed here. Hotkeys are declared at app level, but a game-targeted app can
+ * still report them under the game id, so both collections are searched.
+ */
+function refreshHotkeyBindings(): void {
+  ow.settings?.hotkeys?.get?.((result: any) => {
+    if (!isSuccessfulOverwolfResult(result)) {
+      return;
+    }
+
+    const games = result.games && typeof result.games === 'object' ? result.games : {};
+    const assigned: any[] = [
+      ...(Array.isArray(result.globals) ? result.globals : []),
+      ...Object.values(games as Record<string, unknown>).flatMap((entries) =>
+        (Array.isArray(entries) ? entries : []),
+      ),
+    ];
+
+    const bindings: Partial<Record<ui.HotkeyName, string>> = {};
+    for (const entry of assigned) {
+      const name = readHotkeyName(entry?.name);
+      if (!name) {
+        continue;
+      }
+
+      const binding = typeof entry?.binding === 'string' ? entry.binding.trim() : '';
+      if (binding) {
+        bindings[name] = binding;
+      }
+    }
+
+    ui.renderHotkeyBindings(bindings);
+  });
+}
+
+/** Narrows a reported hotkey name to the two the desktop surface displays. */
+function readHotkeyName(value: unknown): ui.HotkeyName | null {
+  return value === 'toggle_overlay' || value === 'show_desktop_build' ? value : null;
+}
+
+/**
+ * Keeps the displayed hotkeys honest after a rebind.
+ *
+ * The player changes the binding in Overwolf's own settings window, so the
+ * change event is the only signal that the displayed value went stale.
+ */
+function watchHotkeyBindings(): void {
+  refreshHotkeyBindings();
+  ow.settings?.hotkeys?.onChanged?.addListener(() => refreshHotkeyBindings());
 }
 
 function showDesktopBuildWindow(

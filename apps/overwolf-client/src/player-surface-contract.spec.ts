@@ -11,18 +11,54 @@ describe('Dynamo Lab desktop surface contract', () => {
     expect(desktop).toContain('<title>Dynamo Lab</title>');
     expect(desktop).toContain('id="refresh-build"');
     expect(desktop).toContain('aria-current="page"');
-    expect(desktop.match(/aria-disabled="true"/g)).toHaveLength(4);
+    // No sidebar entry is a placeholder. A disabled "Coming soon" item is a
+    // promise the app does not keep, so there are none left to assert.
+    expect(desktop).not.toContain('aria-disabled');
+    expect(desktop).not.toMatch(/Coming soon/i);
     expect(desktop).not.toMatch(/Statlocker|Decision trace|API sends|Last event/i);
   });
 
-  it('makes future navigation unavailable and identifies the live page', () => {
+  it('offers only navigation that works and identifies the live page', () => {
     const buttons = desktop.match(/<button\b[^>]*>[\s\S]*?<\/button>/g) ?? [];
-    for (const label of ['Overview', 'Matches', 'Match Analysis', 'Settings']) {
+
+    for (const [label, workspace] of [['Live Build', 'build'], ['Settings', 'settings']] as const) {
       const button = buttons.find((markup) => markup.includes(`>${label}<`));
-      expect(button).toMatch(/<button[^>]*aria-disabled="true"[^>]*\sdisabled[\s>]/);
-      expect(button).toContain('Coming soon');
+      expect(button).toBeDefined();
+      expect(button).not.toMatch(/\sdisabled[\s>]/);
+      expect(button).toContain(`showWorkspace?.('${workspace}')`);
     }
+
     expect(desktop).toMatch(/<button[^>]*aria-current="page"[^>]*>[\s\S]*?Live Build[\s\S]*?<\/button>/);
+    expect(desktop).toMatch(/<section id="settings-workspace"[^>]*hidden/);
+  });
+
+  it('exposes the overlay preference and the live hotkey in Settings', () => {
+    expect(desktop).toContain('id="setting-overlay-auto-show"');
+    expect(desktop).toContain('setOverlayAutoShow?.(this.checked)');
+    // Documented deep link into Overwolf's own Overlay & Hotkeys window. The
+    // parameter is the manifest hotkey name, not a display label.
+    expect(desktop).toContain('href="overwolf://settings/games-overlay?hotkey=toggle_overlay"');
+  });
+
+  it('keeps the Settings status group fully wired to rendering targets', () => {
+    const status = desktop.match(/<dl class="settings-status">[\s\S]*?<\/dl>/)?.[0] ?? '';
+    expect(status).not.toBe('');
+
+    const cells = status.match(/<dd\b[^>]*>/g) ?? [];
+    expect(cells).toHaveLength(8);
+    for (const cell of cells) {
+      expect(cell).toMatch(/id="setting-[a-z-]+"/);
+    }
+  });
+
+  it('restates [hidden] for every switchable panel', () => {
+    // `display: flex` outranks the user-agent `[hidden]` rule, so a panel
+    // without this override stays on screen after being told to hide.
+    for (const panel of ['build-workspace', 'settings-workspace']) {
+      expect(desktop).toMatch(
+        new RegExp(`\\.${panel}\\[hidden\\][^{]*\\{[^}]*display:\\s*none`),
+      );
+    }
   });
 
   it('preserves unique rendering targets and keeps the console hidden', () => {
@@ -31,6 +67,12 @@ describe('Dynamo Lab desktop surface contract', () => {
       'build-title', 'guide-empty', 'guide-empty-title', 'guide-empty-copy',
       'guide-active', 'situational-recommendation-panel', 'rec-update-note',
       'rec-plan', 'ow-ad-container', 'console',
+      'build-workspace', 'settings-workspace', 'nav-build', 'nav-settings',
+      'hint-hotkey-toggle', 'hint-hotkey-desktop',
+      'setting-overlay-auto-show', 'setting-hotkey',
+      'setting-app-version', 'setting-backend-status', 'setting-gep-status',
+      'setting-gep-version', 'setting-gep-features', 'setting-gep-snapshot',
+      'setting-recommendation-status', 'setting-route-age',
     ]) {
       expect(desktop.match(new RegExp(`id="${id}"`, 'g'))).toHaveLength(1);
     }
@@ -78,10 +120,15 @@ describe('Dynamo Lab desktop surface contract', () => {
     expect(contentInset).not.toBe('');
 
     // Everything stacked in the workspace column must share one inset, or the
-    // panels visibly step in and out against each other.
-    expect(insetOf('.support', 'margin')).toBe(contentInset);
+    // panels visibly step in and out against each other. Both workspaces, and
+    // the bands above them, sit on that same column.
+    expect(insetOf('.settings-workspace', 'padding')).toBe(contentInset);
     expect(insetOf('.topbar', 'padding')).toBe(contentInset);
     expect(insetOf('.hotkey-hint', 'padding')).toBe(contentInset);
+
+    // Support now lives inside the settings column, so it must not inset itself
+    // a second time on top of the padding it already sits in.
+    expect(insetOf('.support', 'margin')).toBe('0');
   });
 
   it('states what leaves the machine without over-claiming', () => {
