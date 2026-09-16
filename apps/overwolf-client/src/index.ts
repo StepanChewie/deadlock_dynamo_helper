@@ -8,6 +8,7 @@ import {
 import { setRequiredFeatures } from './overwolf/set-required-features';
 import { isSuccessfulOverwolfResult } from './overwolf/window-result';
 import { InGameOverlayLifecycle } from './overwolf/in-game-overlay-lifecycle';
+import { PREFERENCE_KEYS, readPreference } from './player-preferences';
 import * as ui from './ui';
 import { AdaptiveRecommendationClient } from './adaptive-recommendation-client';
 import { didAdaptiveMatchChange } from './adaptive-match-transition';
@@ -178,7 +179,13 @@ function initializeBackgroundWindow(): void {
   let currentMatchId = readString((globalThis as any).__deadlockLiveMatchId);
   let currentLocalSteamId = '';
   let feedbackMatchId = '';
-  const inGameOverlayLifecycle = new InGameOverlayLifecycle(restoreInGameOverlayWindow);
+  const inGameOverlayLifecycle = new InGameOverlayLifecycle(
+    restoreInGameOverlayWindow,
+    // Read on every match, not cached: the player can change it in Settings
+    // while the app is running. Defaults to false, so the overlay does not put
+    // itself on screen until Overwolf confirms that is allowed.
+    () => readPreference(PREFERENCE_KEYS.overlayAutoShow, false),
+  );
   inGameOverlayLifecycle.sync(currentMatchId);
 
   const publishAdaptiveRecommendation = (data: any): void => {
