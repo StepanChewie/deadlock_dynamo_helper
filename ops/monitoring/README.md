@@ -46,6 +46,34 @@ systemctl list-timers deadlock-health-watch.timer
 systemctl start deadlock-health-watch.service && journalctl -t deadlock-health-watch -n 20
 ```
 
+## Updating it
+
+**The `Deploy API` workflow does not install these files.** It rsyncs the whole
+repo (minus `docs`, `.git`, `.env`, `node_modules`, `storage`) into
+`/home/ubuntu/apps/deadlock_dynamo_helper/`, so a changed script does land there
+— but the running copy is `/usr/local/bin/deadlock-health-watch.sh`, and nothing
+copies it across. A merged change therefore sits in the deploy directory while
+the timer keeps executing the old code, silently.
+
+After any change to the script or the units:
+
+```sh
+sudo install -m 0755 ops/monitoring/deadlock-health-watch.sh /usr/local/bin/
+sudo install -m 0644 ops/monitoring/deadlock-health-watch.service /etc/systemd/system/
+sudo install -m 0644 ops/monitoring/deadlock-health-watch.timer   /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl restart deadlock-health-watch.timer
+```
+
+Verify the install is current rather than assuming:
+
+```sh
+cmp -s ops/monitoring/deadlock-health-watch.sh /usr/local/bin/deadlock-health-watch.sh \
+  && echo "in sync" || echo "DRIFT: installed copy is stale"
+```
+
+A `systemd` path unit, or an install step in the deploy workflow, would remove
+this manual step — worth doing if the watcher starts changing often.
+
 ## Notifications
 
 Out of the box the script only writes to the journal, which is a local record, not
