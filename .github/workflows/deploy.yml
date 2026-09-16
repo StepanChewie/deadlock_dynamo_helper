@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - main
+    # docs/ is already excluded from the rsync step below and the Dockerfile
+    # copies no .md files, so a docs-only commit cannot change the image.
+    # Without this filter every README tweak cost a full arm64 rebuild.
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
   workflow_dispatch:
 
 permissions:
