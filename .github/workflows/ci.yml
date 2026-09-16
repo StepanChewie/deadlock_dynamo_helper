@@ -1,10 +1,18 @@
 name: CI
 
 on:
+  # Deliberately unfiltered: every pull request gets the full suite, whatever it
+  # touches, because a PR is where the review decision is actually made.
   pull_request:
   push:
     branches:
       - main
+    # Matches the Deploy API filter. A docs-only commit cannot change the build
+    # or the tests, and running four jobs for a README tweak is pure cost.
+    # Note this only applies to `push`; PRs are unaffected.
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
   workflow_dispatch:
 
 permissions:
