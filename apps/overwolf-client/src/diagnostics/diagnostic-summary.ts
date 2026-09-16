@@ -32,6 +32,13 @@ export interface DiagnosticSummaryInput {
    * and the mismatch shows up only as silently missing features.
    */
   readonly gepVersion?: string;
+  /**
+   * Feature names the GEP actually bound, as reported by `supportedFeatures`.
+   * Recorded because a successful registration call is not proof that every
+   * requested feature bound — a feature the game does not expose is simply
+   * absent, and the app would otherwise keep reporting the set it asked for.
+   */
+  readonly gepFeatures?: string;
 }
 
 const MAX_VALUE_LENGTH = 160;
@@ -51,6 +58,7 @@ const FIELDS: ReadonlyArray<readonly [string, keyof DiagnosticSummaryInput]> = [
   ['GEP phase', 'gepPhase'],
   ['GEP snapshot', 'gepSnapshot'],
   ['GEP version', 'gepVersion'],
+  ['GEP features', 'gepFeatures'],
 ];
 
 function normalize(value: unknown): string | null {

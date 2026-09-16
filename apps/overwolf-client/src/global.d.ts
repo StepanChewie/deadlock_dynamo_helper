@@ -3,8 +3,14 @@ declare namespace overwolf {
     namespace events {
       interface SetRequiredFeaturesResult {
         success: boolean;
-        error?: string;
-        features?: string[];
+        error?: string | null;
+        /**
+         * Every feature available for the games declared in the manifest, as
+         * reported by Overwolf. This was previously declared as `features`,
+         * which is not a field Overwolf sends — nothing read it, so the typo
+         * was invisible.
+         */
+        supportedFeatures?: string[];
       }
       function setRequiredFeatures(
         features: string[],

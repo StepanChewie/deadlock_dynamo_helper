@@ -255,13 +255,29 @@ function initializeBackgroundWindow(): void {
   const register = async (): Promise<void> => {
     try {
       ui.updateStatus('Connecting', 'init');
-      await setRequiredFeatures();
+      const features = await setRequiredFeatures();
       ui.updateStatus('Ready', 'connected');
       // Clear any earlier registration failure. Without this, an app that was
       // started before the game keeps reporting "Not in a game" long after it
       // recovered, which reads like a live fault.
-      ui.updateDiagnosticContext({ gepStatus: 'REGISTERED', lastError: undefined });
-      ui.logConsole('Successfully registered GEP required features: game_info, match_info');
+      ui.updateDiagnosticContext({
+        // Name the shortfall instead of reporting a bare REGISTERED: a feature
+        // the game does not expose is dropped silently by Overwolf, and the
+        // only symptom is missing data further down the pipeline.
+        gepStatus: features.degraded
+          ? `REGISTERED without ${features.rejected.join(', ')}`
+          : 'REGISTERED',
+        gepFeatures: features.registered.join(','),
+        lastError: undefined,
+      });
+      ui.logConsole(
+        `Successfully registered GEP required features: ${features.registered.join(', ')}`,
+      );
+      if (features.degradedReason) {
+        ui.logConsole(
+          `Fell back to the core GEP feature set (${features.degradedReason})`,
+        );
+      }
 
       listenOverwolfEvents((event) => {
         const eventDetails = `Source: ${event.source} | Key: ${event.key || 'n/a'} | Cat: ${event.category || 'n/a'}`;

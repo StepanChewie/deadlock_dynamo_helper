@@ -182,13 +182,26 @@ for (const [name, config] of Object.entries(hotkeys)) {
   );
 }
 
-// NOTE: the plan also asserts here that src/overwolf/set-required-features.ts
-// requests 'gep_internal'. That assertion is deliberately NOT in this PR: the
-// client reads gep_internal.version_info (listen-overwolf-events.ts) but never
-// requests the feature, so the check would be red until PR 6 lands, and PR 3
-// has to merge green. Add it in PR 6 together with the graceful-degradation
-// path, so a feature Overwolf may not support cannot break game_info/match_info
-// registration.
+// The client reads `gep_internal.version_info` to report Overwolf's GEP version
+// (see readGepVersion in src/overwolf/listen-overwolf-events.ts). GEP only
+// delivers data for features that were explicitly requested, so reading a
+// feature that is never requested yields an empty value forever with no error.
+//
+// PR 3 deferred this check: it would have been red until PR 6 added the request
+// together with the graceful-degradation path that keeps an unsupported
+// optional feature from taking game_info/match_info down with it.
+const requiredFeaturesSource = fs.readFileSync(
+  path.join(appRoot, 'src', 'overwolf', 'set-required-features.ts'),
+  'utf8',
+);
+assert(
+  requiredFeaturesSource.includes("'gep_internal'"),
+  "src/overwolf/set-required-features.ts does not request 'gep_internal', so the GEP version line in diagnostics can never be populated.",
+);
+assert(
+  requiredFeaturesSource.includes('CORE_FEATURES'),
+  'set-required-features.ts must keep a separate core feature set, so an unsupported optional feature can be dropped without losing game_info/match_info.',
+);
 
 // Legal and support links must point at published documents, never at a local
 // or development address.
