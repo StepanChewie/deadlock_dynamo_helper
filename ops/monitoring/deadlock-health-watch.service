@@ -1,0 +1,15 @@
+[Unit]
+Description=Dynamo Lab API container health watch (health status + cgroup task count)
+Documentation=https://github.com/StepanChewie/deadlock_dynamo_helper/blob/main/ops/monitoring/README.md
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/deadlock-health-watch.sh
+
+# Needs the docker CLI and read access to /sys/fs/cgroup/.../pids.current.
+# Runs as root deliberately: the cgroup counters are root-owned.
+User=root
+
+# Exits 1 when a problem is detected, so the failure is also visible in
+# `systemctl --failed` -- a second, independent signal from the log line.
