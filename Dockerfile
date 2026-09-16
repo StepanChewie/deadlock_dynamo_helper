@@ -17,9 +17,9 @@ COPY packages/deadlock-build-domain ./packages/deadlock-build-domain
 COPY apps/api ./apps/api
 
 # Build typescript projects
-RUN yarn workspace @deadlock-live-probe/shared build
-RUN yarn workspace @deadlock-live-probe/build-domain build
-RUN yarn workspace @deadlock-live-probe/api build
+RUN yarn workspace @dynamo-lab/shared build
+RUN yarn workspace @dynamo-lab/build-domain build
+RUN yarn workspace @dynamo-lab/api build
 
 # Stage 2: Production runtime
 FROM node:20-alpine

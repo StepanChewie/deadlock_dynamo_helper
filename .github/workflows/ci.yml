@@ -36,7 +36,7 @@ jobs:
         run: yarn install --frozen-lockfile --ignore-engines
 
       - name: Build shared package
-        run: yarn workspace @deadlock-live-probe/shared build
+        run: yarn workspace @dynamo-lab/shared build
 
       - name: Build all workspaces
         env:
@@ -64,7 +64,7 @@ jobs:
         run: yarn install --frozen-lockfile --ignore-engines
 
       - name: Build shared package
-        run: yarn workspace @deadlock-live-probe/shared build
+        run: yarn workspace @dynamo-lab/shared build
 
       - name: Build Overwolf client
         shell: bash
@@ -72,7 +72,7 @@ jobs:
           OVERWOLF_PUBLIC_TARGET: ${{ runner.temp }}/overwolf-client/public
         run: |
           set +e
-          yarn workspace @deadlock-live-probe/overwolf-client build > "$RUNNER_TEMP/overwolf-build.log" 2>&1
+          yarn workspace @dynamo-lab/overwolf-client build > "$RUNNER_TEMP/overwolf-build.log" 2>&1
           status=$?
           if [ "$status" -ne 0 ]; then
             tail -n 200 "$RUNNER_TEMP/overwolf-build.log"
@@ -118,17 +118,17 @@ jobs:
         run: yarn install --frozen-lockfile --ignore-engines
 
       - name: Test shared package
-        run: yarn workspace @deadlock-live-probe/shared test
+        run: yarn workspace @dynamo-lab/shared test
 
 
       - name: Test domain package
-        run: yarn workspace @deadlock-live-probe/build-domain test
+        run: yarn workspace @dynamo-lab/build-domain test
 
       - name: Test API
         shell: bash
         run: |
           set +e
-          yarn workspace @deadlock-live-probe/api test > "$RUNNER_TEMP/api-tests.log" 2>&1
+          yarn workspace @dynamo-lab/api test > "$RUNNER_TEMP/api-tests.log" 2>&1
           status=$?
           if [ "$status" -ne 0 ]; then
             tail -n 200 "$RUNNER_TEMP/api-tests.log"
@@ -137,7 +137,7 @@ jobs:
           tail -n 20 "$RUNNER_TEMP/api-tests.log"
 
       - name: Run frozen Billy family-first review gate
-        run: yarn workspace @deadlock-live-probe/api test --runTestsByPath test/statlocker-build-v2-real-data.e2e.spec.ts
+        run: yarn workspace @dynamo-lab/api test --runTestsByPath test/statlocker-build-v2-real-data.e2e.spec.ts
 
 
       - name: Upload failed API test log
@@ -153,7 +153,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          yarn workspace @deadlock-live-probe/overwolf-client test > "$RUNNER_TEMP/overwolf-tests.log" 2>&1
+          yarn workspace @dynamo-lab/overwolf-client test > "$RUNNER_TEMP/overwolf-tests.log" 2>&1
           status=$?
           if [ "$status" -ne 0 ]; then
             tail -n 200 "$RUNNER_TEMP/overwolf-tests.log"
@@ -205,7 +205,7 @@ jobs:
         run: yarn install --frozen-lockfile --ignore-engines
 
       - name: Build shared package
-        run: yarn workspace @deadlock-live-probe/shared build
+        run: yarn workspace @dynamo-lab/shared build
 
       - name: Test production database migration
         env:
@@ -215,7 +215,7 @@ jobs:
           DB_USER: postgres
           DB_PASSWORD: postgres
           DB_NAME: deadlock_builds
-        run: yarn workspace @deadlock-live-probe/api test production-database-migration.integration.spec.ts
+        run: yarn workspace @dynamo-lab/api test production-database-migration.integration.spec.ts
 
       - name: Test real VS_HERO_WPA PostgreSQL serving path
         env:
@@ -225,7 +225,7 @@ jobs:
           DB_USER: postgres
           DB_PASSWORD: postgres
           DB_NAME: deadlock_builds
-        run: yarn workspace @deadlock-live-probe/api test statlocker-vs-hero-wpa-v2.integration.spec.ts
+        run: yarn workspace @dynamo-lab/api test statlocker-vs-hero-wpa-v2.integration.spec.ts
 
       - name: Validate adaptive Compose config
         env:
@@ -240,4 +240,4 @@ jobs:
       - name: Verify adaptive runtime dependencies
         run: |
           docker run --rm --entrypoint sh deadlock-adaptive-production:ci -c \
-            'test -x "$CHROMIUM_PATH" && node -e "require(\"puppeteer-core\"); require(\"@deadlock-live-probe/build-domain\")"'
+            'test -x "$CHROMIUM_PATH" && node -e "require(\"puppeteer-core\"); require(\"@dynamo-lab/build-domain\")"'
