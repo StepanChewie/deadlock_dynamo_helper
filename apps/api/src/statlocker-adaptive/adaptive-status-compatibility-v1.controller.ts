@@ -1,4 +1,5 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, UseGuards } from '@nestjs/common';
+import { RateLimit, RateLimitGuard } from '../common/rate-limit.guard';
 import {
   AdaptiveAvailabilityV1,
   AdaptiveAvailabilityV1Service,
@@ -29,7 +30,11 @@ export class AdaptiveStatusCompatibilityV1Controller {
     private readonly availability: AdaptiveAvailabilityV1Service,
   ) {}
 
+  // Polled by uptime monitors and by the client; the busiest observed minute for
+  // one address was 2, so this only trips on a polling loop.
   @Get('status')
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ limit: 120, windowMs: 60_000 })
   status(): AdaptiveStatusCompatibilityV1 {
     const refresh = this.refresh.getStatus();
     const local = this.evidence.getLocalStatus(refresh.identity);

@@ -1,7 +1,16 @@
-import { BadRequestException, Body, Controller, Post } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Post,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AdaptiveFeedbackV1Entity } from '../deadlock-live/entities/adaptive-feedback-v1.entity';
+import { RateLimit, RateLimitGuard } from '../common/rate-limit.guard';
+import { RequestTimeoutInterceptor } from '../common/request-timeout.interceptor';
 
 /**
  * Reasons the client offers when a player answers "No" to the post-match prompt.
@@ -63,7 +72,12 @@ export class AdaptiveFeedbackV1Controller {
     private readonly feedback: Repository<AdaptiveFeedbackV1Entity>,
   ) {}
 
+  // A player sends at most a handful of these per match; the busiest observed
+  // minute for one address was 1, so 60 only catches a runaway loop.
   @Post('feedback')
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ limit: 60, windowMs: 60_000 })
+  @UseInterceptors(new RequestTimeoutInterceptor(10_000))
   async submit(@Body() body: AdaptiveFeedbackRequestV1): Promise<AdaptiveFeedbackResponseV1> {
     const matchId = normalizeString(body?.matchId, 128);
     if (!matchId) {

@@ -1,8 +1,9 @@
-import { BadRequestException, Body, Controller, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Post, UseGuards } from '@nestjs/common';
 import {
   AdaptiveRecommendationRequestV2,
   AdaptiveRecommendationResultV2,
 } from '@dynamo-lab/shared';
+import { RateLimit, RateLimitGuard } from '../common/rate-limit.guard';
 import { AdaptiveLiveStateNotReadyError } from './adaptive-decision-state-v1.service';
 import { AdaptiveAvailabilityV1Service } from './adaptive-availability-v1.service';
 import { BuildIterationCaptureV1 } from './build-iteration-capture-v1';
@@ -19,7 +20,12 @@ export class AdaptiveRecommendationV2Controller {
     private readonly availability: AdaptiveAvailabilityV1Service,
   ) {}
 
+  // 240/min is roughly 7x the busiest minute ever observed for one address (35).
+  // Deliberately no request timeout here: this route legitimately computes for
+  // seconds, and a timeout would turn correct slow work into a visible failure.
   @Post('recommend')
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ limit: 240, windowMs: 60_000 })
   async recommend(@Body() body: AdaptiveRecommendationRequestV2): Promise<AdaptiveRecommendationResultV2> {
     if (!body || typeof body.matchId !== 'string' || body.matchId.trim() === '') {
       throw new BadRequestException('matchId is required');
