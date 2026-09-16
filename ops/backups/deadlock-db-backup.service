@@ -1,0 +1,12 @@
+[Unit]
+Description=Nightly logical backup of the deadlock_builds database
+Documentation=https://github.com/StepanChewie/deadlock_dynamo_helper/blob/main/ops/backups/README.md
+After=docker.service
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/local/bin/deadlock-db-backup.sh
+
+# The dump is ~125 MB and takes seconds. This is a runaway guard, not a target.
+TimeoutStartSec=600

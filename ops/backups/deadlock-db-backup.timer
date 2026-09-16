@@ -1,0 +1,16 @@
+[Unit]
+Description=Run the deadlock database backup nightly
+
+[Timer]
+# The host runs UTC. 03:30 sits outside the deploy window and away from
+# logrotate (00:00) and the sysstat jobs.
+OnCalendar=*-*-* 03:30:00
+
+# Catch up if the machine was off at 03:30, and spread the start so it does not
+# pile onto other timers.
+Persistent=true
+RandomizedDelaySec=300
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target
