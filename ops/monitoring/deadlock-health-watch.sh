@@ -15,22 +15,30 @@
 #   DISCORD_WEBHOOK_URL=  post alerts to a Discord webhook
 #   ALERT_CMD=            arbitrary command, receives <level> <message>
 #   KUMA_PUSH_URL=        Uptime Kuma push URL; pushed up/down explicitly
-# Thresholds (environment, with defaults):
-#   DEADLOCK_CONTAINER, DEADLOCK_PIDS_WARN, DEADLOCK_REMIND_MIN
+#   DEADLOCK_CONTAINER, DEADLOCK_PIDS_WARN, DEADLOCK_REMIND_MIN,
+#   DEADLOCK_STATE_FILE   thresholds and targets, see defaults below
+#
+# The file is sourced BEFORE the defaults are resolved, so a value set in the
+# file wins over the built-in default. Precedence, precisely: the file wins over
+# an exported variable too, because sourcing assigns the key outright. To
+# override a threshold for a one-off run, point DEADLOCK_CONF at a scratch file
+# rather than exporting the threshold, since exporting alone will be ignored:
+#   DEADLOCK_CONF=/tmp/scratch.env deadlock-health-watch.sh
 #
 set -uo pipefail
 
-CONTAINER="${DEADLOCK_CONTAINER:-deadlock_dynamo_helper-api-1}"
-PIDS_WARN="${DEADLOCK_PIDS_WARN:-500}"
-REMIND_MIN="${DEADLOCK_REMIND_MIN:-60}"
-CONF="${DEADLOCK_CONF:-/etc/deadlock-health-watch.env}"
-STATE_FILE="${DEADLOCK_STATE_FILE:-/var/lib/deadlock-health-watch/state}"
 TAG="deadlock-health-watch"
+CONF="${DEADLOCK_CONF:-/etc/deadlock-health-watch.env}"
 
 if [ -r "$CONF" ]; then
   # shellcheck disable=SC1090
   . "$CONF"
 fi
+
+CONTAINER="${DEADLOCK_CONTAINER:-deadlock_dynamo_helper-api-1}"
+PIDS_WARN="${DEADLOCK_PIDS_WARN:-500}"
+REMIND_MIN="${DEADLOCK_REMIND_MIN:-60}"
+STATE_FILE="${DEADLOCK_STATE_FILE:-/var/lib/deadlock-health-watch/state}"
 
 mkdir -p "$(dirname "$STATE_FILE")" 2>/dev/null || true
 
@@ -99,9 +107,12 @@ notify() {
   if [ -n "${DISCORD_WEBHOOK_URL:-}" ]; then
     local esc
     esc="$(printf '%s' "**[${lvl}]** ${msg}" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' | tr '\n' ' ')"
-    curl -sS -m 10 -o /dev/null -H 'Content-Type: application/json' \
+    # --fail matters: without it a 401/404/429 from Discord exits 0 and the
+    # alert is silently dropped, which is the failure this script exists to stop.
+    curl -sS --fail --retry 2 --retry-connrefused -m 10 -o /dev/null \
+      -H 'Content-Type: application/json' \
       -d "{\"content\":\"${esc}\"}" "$DISCORD_WEBHOOK_URL" \
-      || logger -t "$TAG" "notify: discord post failed"
+      || logger -t "$TAG" "notify: discord post FAILED (alert was not delivered)"
   fi
 
   if [ -n "${ALERT_CMD:-}" ]; then
@@ -118,10 +129,10 @@ fi
 # rather than relying on the absence of a ping.
 if [ -n "${KUMA_PUSH_URL:-}" ]; then
   if [ "$cur" = "OK" ]; then
-    curl -sS -m 10 -o /dev/null "${KUMA_PUSH_URL}?status=up&msg=OK&ping=" \
+    curl -sS --fail -m 10 -o /dev/null "${KUMA_PUSH_URL}?status=up&msg=OK&ping=" \
       || logger -t "$TAG" "notify: kuma push failed"
   else
-    curl -sS -m 10 -o /dev/null "${KUMA_PUSH_URL}?status=down&msg=$(printf '%s' "$detail" | sed 's/ /%20/g')" \
+    curl -sS --fail -m 10 -o /dev/null "${KUMA_PUSH_URL}?status=down&msg=$(printf '%s' "$detail" | sed 's/ /%20/g')" \
       || logger -t "$TAG" "notify: kuma push failed"
   fi
 fi

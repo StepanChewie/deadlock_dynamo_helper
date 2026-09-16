@@ -65,21 +65,58 @@ DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
 Then `sudo systemctl restart deadlock-health-watch.timer` is not needed — the
 config is read on every run.
 
+The same file also carries the targets and thresholds (`DEADLOCK_CONTAINER`,
+`DEADLOCK_PIDS_WARN`, `DEADLOCK_REMIND_MIN`, `DEADLOCK_STATE_FILE`); see the
+table at the end. A value set there wins over the built-in default.
+
+Keep the file `root:root 600`. A Discord webhook URL is a bearer credential —
+anyone holding it can post to the channel without authentication — and the script
+sources the file as root.
+
+If a notification fails, the script logs
+`notify: discord post FAILED (alert was not delivered)` to the journal. It uses
+`curl --fail`, so an HTTP error from Discord is caught rather than silently
+treated as success; a monitoring script that drops its own alerts quietly would
+be worse than none.
+
 Levels: `ALERT` on the transition into a bad state, `STILL-BAD` as a reminder every
 `DEADLOCK_REMIND_MIN` (default 60), `RECOVERED` on the way back. The state file
 `/var/lib/deadlock-health-watch/state` keeps this from spamming every minute.
 
 ## Test it without breaking anything
 
-Force a bad state by lowering the threshold — the script reads thresholds from the
-environment, and the config file only carries notification settings, so this does
-not touch production:
+Force a bad state by pointing the script at a scratch config that loads the real
+one and then lowers the threshold. This exercises the full production path —
+config file, detection, notification — and posts a **real** alert, which is the
+part worth verifying:
 
 ```sh
-sudo DEADLOCK_PIDS_WARN=1 /usr/local/bin/deadlock-health-watch.sh; echo "exit=$?"
+sudo install -m 600 /dev/null /tmp/scratch.env   # 600: it will carry the webhook
+sudo tee /tmp/scratch.env >/dev/null <<'EOF'
+source /etc/deadlock-health-watch.env
+DEADLOCK_PIDS_WARN=1
+EOF
+
+sudo DEADLOCK_CONF=/tmp/scratch.env \
+     DEADLOCK_STATE_FILE=/tmp/scratch.state \
+     /usr/local/bin/deadlock-health-watch.sh; echo "exit=$? (1 = problem detected)"
 journalctl -t deadlock-health-watch -n 5
-sudo rm -f /var/lib/deadlock-health-watch/state   # clear the latched state
+
+sudo rm -f /tmp/scratch.env /tmp/scratch.state
 ```
+
+`DEADLOCK_STATE_FILE` is redirected as well, so the latched state production
+relies on is left alone. Run it a second time to confirm a sustained fault does
+**not** re-alert — that is what `DEADLOCK_REMIND_MIN` gates.
+
+Do **not** test by exporting `DEADLOCK_PIDS_WARN=1` on its own. The config file
+is sourced after the environment is read and assigns the key outright, so a value
+in `/etc/deadlock-health-watch.env` wins and the exported override is silently
+ignored. Redirect the whole file with `DEADLOCK_CONF` instead.
+
+A clean run is silent and exits 0. A detected problem logs one line, exits 1, and
+therefore also shows up in `systemctl --failed` — a second, independent signal
+that does not depend on any notification channel working.
 
 ## Overriding
 
