@@ -1,5 +1,15 @@
 import { Controller, Get, Header } from '@nestjs/common';
 
+/**
+ * The HTML shell stays public on purpose, matching BuildDebugV2Controller: a
+ * guarded shell could not be loaded by a browser, so the key prompt below could
+ * never run and the tool would be unusable. The shell contains no data -- it is
+ * a static template. The two endpoints it reads, /deadlock/live/states and
+ * /deadlock/live/events/recent, are themselves guarded in LiveIngestController.
+ *
+ * The page therefore asks for the internal key and forwards it as a header
+ * rather than rendering "HTTP 401/401" forever.
+ */
 @Controller('deadlock/live')
 export class DebugPageController {
   @Get('debug')
@@ -32,6 +42,17 @@ export class DebugPageController {
         background: rgba(20, 20, 26, 0.96);
       }
       h1 { margin: 0; font-size: 18px; }
+      .header-actions { display: flex; align-items: center; gap: 12px; }
+      #key-button {
+        padding: 5px 10px;
+        border: 1px solid #3f3f49;
+        border-radius: 7px;
+        background: #202028;
+        color: #d4d4d8;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      #key-button:hover { border-color: #52525b; }
       .status { color: #34d399; font-size: 13px; }
       main {
         display: grid;
@@ -107,7 +128,10 @@ export class DebugPageController {
   <body>
     <header>
       <h1>Deadlock Live Debug</h1>
-      <div class="status" id="status">Polling</div>
+      <div class="header-actions">
+        <button id="key-button" type="button">Set key</button>
+        <div class="status" id="status">Polling</div>
+      </div>
     </header>
     <main>
       <section>
@@ -216,13 +240,33 @@ export class DebugPageController {
         }).join('');
       }
 
+      const KEY_STORAGE = 'dynamo-internal-key';
+
+      function internalKey() {
+        return sessionStorage.getItem(KEY_STORAGE) || '';
+      }
+
+      function requestKey() {
+        const entered = window.prompt('Internal API key (sent as x-dynamo-internal-key)');
+        if (entered === null) return;
+        sessionStorage.setItem(KEY_STORAGE, entered.trim());
+        void refresh();
+      }
+
+      document.getElementById('key-button').addEventListener('click', requestKey);
+
       async function refresh() {
         const status = document.getElementById('status');
         try {
+          const headers = { 'x-dynamo-internal-key': internalKey() };
           const [statesResponse, eventsResponse] = await Promise.all([
-            fetch('/deadlock/live/states', { cache: 'no-store' }),
-            fetch('/deadlock/live/events/recent', { cache: 'no-store' }),
+            fetch('/deadlock/live/states', { cache: 'no-store', headers }),
+            fetch('/deadlock/live/events/recent', { cache: 'no-store', headers }),
           ]);
+          if (statesResponse.status === 401 || eventsResponse.status === 401) {
+            status.textContent = 'Unauthorized - press "Set key"';
+            return;
+          }
           if (!statesResponse.ok || !eventsResponse.ok) {
             throw new Error(\`HTTP \${statesResponse.status}/\${eventsResponse.status}\`);
           }

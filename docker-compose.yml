@@ -17,8 +17,17 @@ services:
     # dozen, so this is ~30x headroom. Keep a cap here; do not fall back to the systemd default.
     pids_limit: 4096
 
+    # Loopback only. Verified against the actual perimeter on 2026-09-16: nginx runs on the
+    # host (systemd, not a container) and every relevant location proxies to
+    # http://127.0.0.1:3000, so it still reaches the API after this change.
+    #
+    # Why bother when 0.0.0.0 was already unreachable: the host firewall blocks :3000 today,
+    # so this is defence in depth, not a fix for an open hole. But with 0.0.0.0 the whole API
+    # -- including routes nginx does not even have a location for, such as /deadlock-live/ --
+    # is one cloud-firewall misconfiguration away from being public. Loopback removes that
+    # dependency entirely.
     ports:
-      - '3000:3000'
+      - '127.0.0.1:3000:3000'
     volumes:
       - deadlock-storage:/app/apps/api/storage
     environment:
@@ -38,6 +47,14 @@ services:
       - BUILD_DEBUG_TRACE_TAIL=${BUILD_DEBUG_TRACE_TAIL:-5}
       - BUILD_DEBUG_TRACE_IDLE_TTL_SEC=${BUILD_DEBUG_TRACE_IDLE_TTL_SEC:-1800}
       - DEADLOCK_API_KEY=${DEADLOCK_API_KEY}
+      # Guards operator-only routes (reference-data, live reads, debug page, statelocker probe).
+      # Unset means those routes fail closed with 401 rather than becoming public. The shipped
+      # Overwolf client never sends it -- it only calls recommend, feedback and live/events.
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-}
+      # Comma-separated CORS allowlist. Empty keeps the API permissive, which is the current
+      # deliberate state: the real Overwolf Origin has not been measured yet, and pinning a
+      # guess would break the client in the field.
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-}
       - DEADLOCK_API_BASE_URL=${DEADLOCK_API_BASE_URL:-https://api.deadlock-api.com}
       - ADAPTIVE_ECONOMY_RULES_JSON=${ADAPTIVE_ECONOMY_RULES_JSON:-}
       - CHROMIUM_PATH=${CHROMIUM_PATH:-/usr/bin/chromium-browser}

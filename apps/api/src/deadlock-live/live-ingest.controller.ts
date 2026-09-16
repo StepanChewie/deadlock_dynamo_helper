@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Logger, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Logger, Param, Post, UseGuards } from '@nestjs/common';
 import { OverwolfLiveBatchDto } from '@dynamo-lab/shared';
+import { InternalApiGuard } from '../common/internal-api.guard';
 import { canonicalizeLiveBatchForStateV2 } from './canonical-live-batch';
 import { InventoryShadowReplayService } from './inventory-shadow-replay.service';
 import { LiveInventoryEventNormalizerService } from './live-inventory-event-normalizer.service';
@@ -20,6 +21,8 @@ export class LiveIngestController {
       LiveInventoryEventNormalizerService,
   ) {}
 
+  // Public by design: the shipped Overwolf client posts here and holds no
+  // internal key. Do not add a guard to this method.
   @Post('events')
   async ingestEvents(@Body() batch: OverwolfLiveBatchDto): Promise<{ ok: true }> {
     this.recentLiveEventsService.append(batch.events);
@@ -37,22 +40,28 @@ export class LiveIngestController {
     return { ok: true };
   }
 
+  // The reads below expose live match state, player inventories and the raw
+  // event feed. None of them are used by the client, so they are operator-only.
   @Get('states')
+  @UseGuards(InternalApiGuard)
   getStates() {
     return this.liveMatchStateService.getAllStates();
   }
 
   @Get('matches/:matchId/state')
+  @UseGuards(InternalApiGuard)
   getState(@Param('matchId') matchId: string) {
     return this.liveMatchStateService.getState(matchId);
   }
 
   @Get('matches/:matchId/inventory-shadow')
+  @UseGuards(InternalApiGuard)
   getInventoryShadow(@Param('matchId') matchId: string) {
     return this.inventoryShadowReplayService.getMatchTimelines(matchId);
   }
 
   @Get('matches/:matchId/inventory-shadow/:steamId')
+  @UseGuards(InternalApiGuard)
   getPlayerInventoryShadow(
     @Param('matchId') matchId: string,
     @Param('steamId') steamId: string,
@@ -61,6 +70,7 @@ export class LiveIngestController {
   }
 
   @Get('events/recent')
+  @UseGuards(InternalApiGuard)
   getRecentEvents() {
     return this.recentLiveEventsService.getRecent();
   }

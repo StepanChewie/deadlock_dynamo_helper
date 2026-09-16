@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post, Put } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseIntPipe,
+  Post,
+  Put,
+  UseGuards,
+} from '@nestjs/common';
+import { InternalApiGuard } from '../common/internal-api.guard';
 import { CatalogContentService } from './catalog-content.service';
 import {
   HistoricalCatalogBackfillService,
@@ -15,7 +25,10 @@ import {
 } from './ruleset-window-manifest.service';
 import { VersionedRecipeGraphService } from './versioned-recipe-graph.service';
 
+// Operator-only: catalog imports and ruleset mutations change what every client
+// is recommended, so the whole controller is behind the internal key.
 @Controller('deadlock/reference-data')
+@UseGuards(InternalApiGuard)
 export class ReferenceDataController {
   constructor(
     private readonly itemCatalogImportService: ItemCatalogImportService,
