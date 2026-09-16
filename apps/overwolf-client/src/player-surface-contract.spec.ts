@@ -35,9 +35,11 @@ describe('Dynamo Lab desktop surface contract', () => {
   it('exposes the overlay preference and the live hotkey in Settings', () => {
     expect(desktop).toContain('id="setting-overlay-auto-show"');
     expect(desktop).toContain('setOverlayAutoShow?.(this.checked)');
-    // Documented deep link into Overwolf's own Overlay & Hotkeys window. The
-    // parameter is the manifest hotkey name, not a display label.
-    expect(desktop).toContain('href="overwolf://settings/games-overlay?hotkey=toggle_overlay"');
+    expect(desktop).toContain('openHotkeySettings?.()');
+    // Deliberately not an `<a href="overwolf://...">`: the windows declare
+    // `block_top_window_navigation` and `popup_blocker`, so an in-app link is
+    // blocked on purpose and would silently do nothing.
+    expect(desktop).not.toMatch(/<a\b[^>]*overwolf:\/\//);
   });
 
   it('keeps the Settings status group fully wired to rendering targets', () => {
@@ -48,6 +50,20 @@ describe('Dynamo Lab desktop surface contract', () => {
     expect(cells).toHaveLength(8);
     for (const cell of cells) {
       expect(cell).toMatch(/id="setting-[a-z-]+"/);
+    }
+  });
+
+  it('defines every main-window handler the desktop markup invokes', () => {
+    // The markup calls handlers defensively (`handler?.()`), so a name that does
+    // not exist is a silent no-op - a button that looks wired and does nothing.
+    const source = readFileSync(join(__dirname, 'index.ts'), 'utf8');
+    const invoked = new Set(
+      [...desktop.matchAll(/getMainWindow\(\)\.([A-Za-z0-9_]+)\?\./g)].map((m) => m[1]),
+    );
+    expect(invoked.size).toBeGreaterThan(0);
+
+    for (const name of invoked) {
+      expect(source).toMatch(new RegExp(`mainWindow\\.${name}\\s*=`));
     }
   });
 

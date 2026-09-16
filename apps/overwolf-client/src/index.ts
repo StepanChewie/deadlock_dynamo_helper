@@ -20,6 +20,12 @@ import {
 
 const clientId = `client-${Math.random().toString(36).substring(2, 8)}`;
 const apiBaseUrl = 'https://aboba-telegramovich.duckdns.org';
+/**
+ * Deep link into Overwolf's Overlay & Hotkeys window, focused on the in-game
+ * overlay binding. The `hotkey` value must be the manifest hotkey name; the
+ * link cannot reach Overwolf's own hotkeys or another app's.
+ */
+const HOTKEY_SETTINGS_URL = 'overwolf://settings/games-overlay?hotkey=toggle_overlay';
 const ow = (window as any).overwolf;
 
 if (ow?.windows) {
@@ -127,6 +133,17 @@ function initializeBackgroundWindow(): void {
   };
   mainWindow.openExternal = ui.openExternal;
   mainWindow.showWorkspace = ui.showWorkspace;
+  /**
+   * Opens Overwolf's own Overlay & Hotkeys window, focused on our binding.
+   *
+   * The documented mechanism is the `overwolf://settings/games-overlay` URL.
+   * It goes out through `openExternal` rather than as an `<a href>`: every
+   * window declares `block_top_window_navigation` and `popup_blocker`, so an
+   * in-app link is blocked on purpose and would silently do nothing.
+   */
+  mainWindow.openHotkeySettings = (): void => {
+    ui.openExternal(HOTKEY_SETTINGS_URL);
+  };
   /**
    * Persists the Settings toggle and re-reads it back into the checkbox.
    *

@@ -32,4 +32,21 @@ describe('toggle_overlay hotkey copy', () => {
       expect(readFileSync(join(clientRoot, relative), 'utf8')).toMatch(/Ctrl\+Shift\+D/);
     }
   });
+
+  it('deep-links into Overwolf hotkey settings by manifest hotkey name', () => {
+    // The documented deep link is the only way to open Overwolf's own Overlay &
+    // Hotkeys window focused on our binding, and its `hotkey` parameter has to
+    // be the manifest hotkey name - not a display label. Renaming the binding
+    // would otherwise break the link silently, since nothing else reads it.
+    const source = readFileSync(join(clientRoot, 'src', 'index.ts'), 'utf8');
+    const manifest = JSON.parse(
+      readFileSync(join(clientRoot, 'public', 'manifest.json'), 'utf8'),
+    );
+
+    const deepLink = source.match(
+      /overwolf:\/\/settings\/games-overlay\?hotkey=([a-z_]+)/,
+    );
+    expect(deepLink).not.toBeNull();
+    expect(Object.keys(manifest.data.hotkeys)).toContain(deepLink?.[1]);
+  });
 });

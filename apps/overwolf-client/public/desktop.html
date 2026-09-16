@@ -538,7 +538,6 @@
         background: transparent;
         font: 600 11px var(--sans);
         letter-spacing: 0.06em;
-        text-decoration: none;
         text-transform: uppercase;
         cursor: pointer;
       }
@@ -905,7 +904,7 @@
               </span>
               <span class="settings-control">
                 <kbd id="setting-hotkey">Ctrl+Shift+D</kbd>
-                <a class="settings-button" href="overwolf://settings/games-overlay?hotkey=toggle_overlay">Change</a>
+                <button type="button" class="settings-button" onclick="overwolf.windows.getMainWindow().openHotkeySettings?.()">Change</button>
               </span>
             </div>
           </div>
