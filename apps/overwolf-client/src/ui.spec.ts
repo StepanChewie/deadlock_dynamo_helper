@@ -5,8 +5,12 @@ import {
   dismissFirstRunGuide,
   dismissHotkeyHint,
   dismissPostMatchFeedback,
+  EXPIRED_AFTER_MS,
+  hasRecommendationOnScreen,
   hideSituationalPanel,
+  markRecommendationFresh,
   openExternal,
+  readRecommendationFreshness,
   revealPostMatchReasons,
   setRefreshPending,
   showAdaptiveError,
@@ -14,6 +18,7 @@ import {
   showAdaptiveRecommendation,
   showFirstRunGuide,
   showPostMatchFeedback,
+  STALE_AFTER_MS,
   updateDiagnosticContext,
 } from './ui';
 
@@ -649,5 +654,111 @@ describe('Dynamo Lab external link handling', () => {
     (globalThis as any).open = undefined;
 
     expect(() => openExternal('https://discord.gg/yR4TNN2GDH')).not.toThrow();
+  });
+});
+
+describe('Dynamo Lab recommendation freshness', () => {
+  let elements: Map<string, FakeElement>;
+  const originalDocument = globalThis.document;
+  const RENDERED_AT = new Date('2026-09-17T00:00:00Z');
+
+  beforeEach(() => {
+    elements = new Map(elementIds.map((id) => [id, new FakeElement()]));
+    globalThis.document = {
+      getElementById: (id: string) => elements.get(id) || null,
+      createElement: (tagName: string) => new FakeElement(tagName.toUpperCase()),
+    } as unknown as Document;
+    hideSituationalPanel();
+
+    jest.useFakeTimers();
+    jest.setSystemTime(RENDERED_AT);
+    // Start from "no route has ever been rendered", so each case has a known
+    // age instead of whatever the previous suite left behind.
+    markRecommendationFresh(0);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    markRecommendationFresh();
+  });
+
+  afterAll(() => {
+    globalThis.document = originalDocument;
+  });
+
+  it('treats a route rendered moments ago as fresh', () => {
+    showAdaptiveRecommendation(fiveItemRecommendation());
+    jest.setSystemTime(new Date('2026-09-17T00:00:09Z'));
+
+    expect(readRecommendationFreshness()).toBe('FRESH');
+  });
+
+  it('crosses from fresh to stale to expired at the documented ages', () => {
+    showAdaptiveRecommendation(fiveItemRecommendation());
+    const renderedAt = Date.now();
+
+    expect(readRecommendationFreshness(renderedAt + 9_999)).toBe('FRESH');
+    expect(readRecommendationFreshness(renderedAt + STALE_AFTER_MS)).toBe('STALE');
+    expect(readRecommendationFreshness(renderedAt + EXPIRED_AFTER_MS - 1)).toBe('STALE');
+    expect(readRecommendationFreshness(renderedAt + EXPIRED_AFTER_MS)).toBe('EXPIRED');
+  });
+
+  it('keeps the original note while the route is still fresh', () => {
+    showAdaptiveRecommendation(fiveItemRecommendation());
+    jest.setSystemTime(new Date('2026-09-17T00:00:05Z'));
+
+    showAdaptiveError('HTTP 502');
+
+    expect(elements.get('rec-update-note')?.textContent)
+      .toBe('Connection interrupted - showing the last safe recommendation.');
+    expect(elements.get('rec-update-note')?.style.display).toBe('flex');
+  });
+
+  it('warns that a stale route may be outdated', () => {
+    showAdaptiveRecommendation(fiveItemRecommendation());
+    jest.setSystemTime(new Date('2026-09-17T00:00:15Z'));
+
+    showAdaptiveError('HTTP 502');
+
+    expect(elements.get('rec-update-note')?.textContent)
+      .toBe('Connection interrupted - this route may be outdated.');
+    expect(elements.get('guide-active')?.style.display).toBe('flex');
+  });
+
+  it('hides an expired route rather than letting the player follow it', () => {
+    showAdaptiveRecommendation(fiveItemRecommendation());
+    jest.setSystemTime(new Date('2026-09-17T00:00:31Z'));
+
+    showAdaptiveError('HTTP 502');
+
+    expect(elements.get('guide-active')?.style.display).toBe('none');
+    expect(elements.get('situational-recommendation-panel')?.style.display).toBe('none');
+    expect(elements.get('guide-empty')?.style.display).toBe('flex');
+    expect(hasRecommendationOnScreen()).toBe(false);
+  });
+
+  it('reports expired before anything has been rendered, and still shows reconnect copy', () => {
+    // The age is unbounded before the first render. That must not be read as
+    // "a route went stale", which would hide a screen that was never shown.
+    expect(readRecommendationFreshness()).toBe('EXPIRED');
+
+    showAdaptiveError();
+
+    expect(elements.get('guide-empty-title')?.textContent).toBe('Dynamo Lab is reconnecting');
+    expect(elements.get('guide-empty-copy')?.textContent)
+      .toBe('The build route will appear when fresh match data is available.');
+  });
+
+  it('does not keep the stale note on screen after the route expires', () => {
+    showAdaptiveRecommendation(fiveItemRecommendation());
+    jest.setSystemTime(new Date('2026-09-17T00:00:15Z'));
+    showAdaptiveError('HTTP 502');
+    expect(elements.get('rec-update-note')?.textContent)
+      .toBe('Connection interrupted - this route may be outdated.');
+
+    jest.setSystemTime(new Date('2026-09-17T00:00:45Z'));
+    showAdaptiveError('HTTP 502');
+
+    expect(hasRecommendationOnScreen()).toBe(false);
   });
 });

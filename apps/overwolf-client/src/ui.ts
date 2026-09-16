@@ -253,6 +253,10 @@ export function showAdaptiveRecommendation(data: AdaptiveRecommendationResultV1)
   const panel = document.getElementById('situational-recommendation-panel');
 
   hasAdaptiveRecommendation = true;
+  // Rendering a route is what makes it fresh. Recording it here rather than at
+  // the call site means no caller can forget, and the age always describes what
+  // is actually on screen.
+  markRecommendationFresh();
   if (emptyEl) emptyEl.style.display = 'none';
   if (activeEl) activeEl.style.display = 'flex';
   if (panel) panel.style.display = 'flex';
@@ -262,11 +266,71 @@ export function showAdaptiveRecommendation(data: AdaptiveRecommendationResultV1)
   clearAdaptiveError();
 }
 
+export type RecommendationFreshness = 'FRESH' | 'STALE' | 'EXPIRED';
+
+/**
+ * Age thresholds for the route currently on screen.
+ *
+ * Measured from the last successful render, not from the failure. The client
+ * already retries on its own (1.5s debounce, 3s retry delay), so "how long has
+ * this been failing" is not the useful question — "how old is what the player
+ * is looking at" is.
+ */
+export const STALE_AFTER_MS = 10_000;
+export const EXPIRED_AFTER_MS = 30_000;
+
+let lastRecommendationRenderAt = 0;
+
+/** Records that a route was rendered. Rendering is what makes it fresh. */
+export function markRecommendationFresh(at: number = Date.now()): void {
+  lastRecommendationRenderAt = at;
+}
+
+/**
+ * How much trust the route on screen still deserves.
+ *
+ * With nothing rendered yet the answer is `EXPIRED`, which is correct: there is
+ * no route to keep. Callers must not read that as "a route went stale" — check
+ * whether a route is displayed first.
+ */
+export function readRecommendationFreshness(now: number = Date.now()): RecommendationFreshness {
+  const age = now - lastRecommendationRenderAt;
+  if (age < STALE_AFTER_MS) {
+    return 'FRESH';
+  }
+
+  return age < EXPIRED_AFTER_MS ? 'STALE' : 'EXPIRED';
+}
+
+/**
+ * Whether a route is currently on screen.
+ *
+ * Only a displayed route can age out, so this is what a periodic re-evaluation
+ * should key off. Re-running the empty state on a timer would overwrite the
+ * Overwolf-degraded copy — the one with the actionable restart hint — with a
+ * generic message.
+ */
+export function hasRecommendationOnScreen(): boolean {
+  return hasAdaptiveRecommendation;
+}
+
 export function showAdaptiveError(message = 'Recommendation is updating'): void {
   const note = document.getElementById('rec-update-note');
+
   if (hasAdaptiveRecommendation) {
+    const freshness = readRecommendationFreshness();
+
+    if (freshness === 'EXPIRED') {
+      // Past the expiry window a stale route is more dangerous than no route:
+      // the player would spend gold against a build the match has moved past.
+      hideSituationalPanel();
+      return;
+    }
+
     if (note) {
-      note.textContent = 'Connection interrupted - showing the last safe recommendation.';
+      note.textContent = freshness === 'STALE'
+        ? 'Connection interrupted - this route may be outdated.'
+        : 'Connection interrupted - showing the last safe recommendation.';
       note.style.display = 'flex';
       note.title = message;
     }

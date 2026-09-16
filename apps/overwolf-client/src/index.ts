@@ -221,6 +221,24 @@ function initializeBackgroundWindow(): void {
     mainWindow.inGameAdaptiveError?.(message);
   };
 
+  /**
+   * Ages the route on screen while the client is failing.
+   *
+   * `showAdaptiveError` runs on each failed attempt, but the retry loop stops
+   * when a match ends — without this, the last note would stay frozen on screen
+   * past the point where the route should have been hidden. Only a displayed
+   * route is re-evaluated: with nothing on screen there is nothing to expire,
+   * and re-running the empty state would overwrite the Overwolf-degraded copy.
+   */
+  const RECOMMENDATION_FRESHNESS_POLL_MS = 5_000;
+  setInterval(() => {
+    if (!mainWindow.latestAdaptiveError || !ui.hasRecommendationOnScreen()) {
+      return;
+    }
+
+    ui.showAdaptiveError(mainWindow.latestAdaptiveError);
+  }, RECOMMENDATION_FRESHNESS_POLL_MS);
+
   const scheduleAdaptiveRecommendation = (force = false): void => {
     if (!currentMatchId) {
       adaptiveClient.cancel();
