@@ -40,7 +40,7 @@ yarn db:migrate
 Start the API:
 
 ```bash
-yarn workspace @deadlock-live-probe/api start:dev
+yarn workspace @dynamo-lab/api start:dev
 ```
 
 On startup, `ReferenceDataImportService` restores the hero and item seeds. When `DEADLOCK_API_KEY` is configured, it also refreshes current items and component recipes from the assets API.
@@ -48,7 +48,7 @@ On startup, `ReferenceDataImportService` restores the hero and item seeds. When 
 The API can run pending migrations automatically when explicitly enabled:
 
 ```bash
-DB_RUN_MIGRATIONS=true yarn workspace @deadlock-live-probe/api start
+DB_RUN_MIGRATIONS=true yarn workspace @dynamo-lab/api start
 ```
 
 ## Verification

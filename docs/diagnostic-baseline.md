@@ -25,7 +25,7 @@ The parser reconstructs:
 - incoming damage grouped by source
 - manual marker matches
 
-Inventory normalization reuses `@deadlock-live-probe/build-domain`:
+Inventory normalization reuses `@dynamo-lab/build-domain`:
 
 - the first snapshot is `RECONCILE`
 - new items become `BUY` or `REBUY`
@@ -66,13 +66,13 @@ Evaluation uses leave-one-match-out validation. Every match is predicted using a
 Build the domain package:
 
 ```bash
-yarn workspace @deadlock-live-probe/build-domain build
+yarn workspace @dynamo-lab/build-domain build
 ```
 
 Generate a report:
 
 ```bash
-yarn workspace @deadlock-live-probe/build-domain diagnostics:baseline -- \
+yarn workspace @dynamo-lab/build-domain diagnostics:baseline -- \
   /path/to/match-a.zip \
   /path/to/match-b.zip \
   --recipes /path/to/recipes.json \

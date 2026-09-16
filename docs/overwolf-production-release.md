@@ -38,7 +38,7 @@ Build the client against the deployed public API base URL:
 ```bash
 OVERWOLF_API_BASE_URL=https://your-api.example.com \
 OVERWOLF_PUBLIC_TARGET=/path/to/overwolf-sideload/public \
-yarn workspace @deadlock-live-probe/overwolf-client build
+yarn workspace @dynamo-lab/overwolf-client build
 ```
 
 The build compiles the shared package and the Overwolf bundle, embeds the supplied API base URL, updates `externally_connectable` to the matching origin, validates the manifest, windows, permissions, assets and compiled files, and copies the unpacked app to `OVERWOLF_PUBLIC_TARGET`.

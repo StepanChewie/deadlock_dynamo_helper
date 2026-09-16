@@ -29,11 +29,11 @@ yarn install --ignore-engines
 Compile shared types and create the Overwolf Webpack bundle:
 
 ```bash
-yarn workspace @deadlock-live-probe/shared build
+yarn workspace @dynamo-lab/shared build
 ```
 
 ```bash
-yarn workspace @deadlock-live-probe/overwolf-client build
+yarn workspace @dynamo-lab/overwolf-client build
 ```
 
 The production build also synchronizes `apps/overwolf-client/public` to the configured Windows sideload location.
@@ -43,7 +43,7 @@ The production build also synchronizes `apps/overwolf-client/public` to the conf
 Launch the NestJS backend on port `3000`:
 
 ```bash
-yarn workspace @deadlock-live-probe/api start:dev
+yarn workspace @dynamo-lab/api start:dev
 ```
 
 Verify that the server has booted and is listening on `http://localhost:3000`.

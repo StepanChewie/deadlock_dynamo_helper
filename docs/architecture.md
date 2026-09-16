@@ -76,7 +76,7 @@ Pure, framework-free logic shared by the API and tests: `recommendation-ruleset-
 | `yarn test` | Run all workspace test suites |
 | `yarn lint` | Lint all workspaces |
 | `yarn db:migrate` / `db:revert` / `db:migrations` / `db:generate` | TypeORM migrations for the API |
-| `yarn workspace @deadlock-live-probe/api start:dev` | Run API in watch mode |
+| `yarn workspace @dynamo-lab/api start:dev` | Run API in watch mode |
 
 Database reset, backup, migration, and metadata reprocessing: `docs/database-migrations.md`.
 
