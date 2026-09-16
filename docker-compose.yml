@@ -17,6 +17,17 @@ services:
     # dozen, so this is ~30x headroom. Keep a cap here; do not fall back to the systemd default.
     pids_limit: 4096
 
+    # Second blast-radius guard, for disk. The json-file driver keeps every line forever by
+    # default, and during the 2026-09-16 storm (1843 failed healthchecks over 30 hours) this
+    # container's log grew with no ceiling at all on a box that was already full. 3 x 10 MB is
+    # weeks of normal operation and still hours of a storm -- enough to diagnose from, and
+    # unable to fill the disk.
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
     # Loopback only. Verified against the actual perimeter on 2026-09-16: nginx runs on the
     # host (systemd, not a container) and every relevant location proxies to
     # http://127.0.0.1:3000, so it still reaches the API after this change.
