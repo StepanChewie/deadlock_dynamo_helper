@@ -1,5 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
-import { RateLimit, RateLimitGuard } from '../common/rate-limit.guard';
+import { Controller, Get } from '@nestjs/common';
 import {
   AdaptiveAvailabilityV1,
   AdaptiveAvailabilityV1Service,
@@ -30,11 +29,14 @@ export class AdaptiveStatusCompatibilityV1Controller {
     private readonly availability: AdaptiveAvailabilityV1Service,
   ) {}
 
-  // Polled by uptime monitors and by the client; the busiest observed minute for
-  // one address was 2, so this only trips on a polling loop.
+  // Deliberately NOT rate limited.
+  //
+  // This is the container's own liveness probe: the compose healthcheck fetches
+  // it every 15s and treats any non-2xx as failure, so a 429 here would report
+  // the container unhealthy and fail the deploy gate. Host-local callers share
+  // the same source address as that healthcheck, which makes the margin easy to
+  // eat without noticing. Never put a limiter on a health endpoint.
   @Get('status')
-  @UseGuards(RateLimitGuard)
-  @RateLimit({ limit: 120, windowMs: 60_000 })
   status(): AdaptiveStatusCompatibilityV1 {
     const refresh = this.refresh.getStatus();
     const local = this.evidence.getLocalStatus(refresh.identity);

@@ -31,7 +31,6 @@ const MEASURED_PEAK_PER_MINUTE = {
   'POST /deadlock/live/events': 245,
   'POST /deadlock/adaptive/v2/recommend': 35,
   'POST /deadlock/adaptive/v1/feedback': 1,
-  'GET /deadlock/adaptive/v1/status': 2,
 } as const;
 
 describe('RateLimitGuard wiring', () => {
@@ -39,7 +38,6 @@ describe('RateLimitGuard wiring', () => {
     ['POST /deadlock/live/events', LiveIngestController, 'ingestEvents', MEASURED_PEAK_PER_MINUTE['POST /deadlock/live/events']],
     ['POST /deadlock/adaptive/v2/recommend', AdaptiveRecommendationV2Controller, 'recommend', MEASURED_PEAK_PER_MINUTE['POST /deadlock/adaptive/v2/recommend']],
     ['POST /deadlock/adaptive/v1/feedback', AdaptiveFeedbackV1Controller, 'submit', MEASURED_PEAK_PER_MINUTE['POST /deadlock/adaptive/v1/feedback']],
-    ['GET /deadlock/adaptive/v1/status', AdaptiveStatusCompatibilityV1Controller, 'status', MEASURED_PEAK_PER_MINUTE['GET /deadlock/adaptive/v1/status']],
   ];
 
   describe('public routes carry a limit', () => {
@@ -57,6 +55,15 @@ describe('RateLimitGuard wiring', () => {
   });
 
   describe('routes that must not be limited', () => {
+    it('does not rate limit the status route -- it is the container healthcheck', () => {
+      // The compose healthcheck fetches this route every 15s and treats a
+      // non-2xx response as an unhealthy container, so a 429 here would fail
+      // the deploy gate. A health endpoint must never be rate limited.
+      expect(guardNamesOnMethod(AdaptiveStatusCompatibilityV1Controller, 'status')).not.toContain(
+        RateLimitGuard.name,
+      );
+    });
+
     it('does not rate limit the internal-key operator routes', () => {
       // These are already behind the internal key, and the debug tooling polls
       // them in bursts. A 429 here would break the operator's own tooling.

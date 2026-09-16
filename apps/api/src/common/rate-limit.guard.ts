@@ -27,10 +27,13 @@ const RATE_LIMIT_METADATA = 'dynamo:rate-limit';
  *   POST /deadlock/live/events           p90 64/min   max 245/min per address
  *   POST /deadlock/adaptive/v2/recommend p90 32/min   max  35/min per address
  *   POST /deadlock/adaptive/v1/feedback              max   1/min per address
- *   GET  /deadlock/adaptive/v1/status                max   2/min per address
  *
  * Every limit below is set several times above the observed maximum, so the
  * guard only ever fires on genuinely abnormal traffic.
+ *
+ * `GET /deadlock/adaptive/v1/status` is deliberately excluded: it is the
+ * container's own healthcheck target, and a 429 there would report the
+ * container unhealthy.
  */
 export const RateLimit = (options: RateLimitOptions) =>
   SetMetadata(RATE_LIMIT_METADATA, options);
