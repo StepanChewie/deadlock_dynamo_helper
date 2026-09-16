@@ -112,10 +112,18 @@ jobs:
           # deployed once already.
           sudo install -m 0755 ops/monitoring/deadlock-health-watch.sh /usr/local/bin/
           sudo install -m 0755 ops/backups/deadlock-db-backup.sh       /usr/local/bin/
+          sudo install -m 0755 ops/nginx/check-drift.sh                /usr/local/bin/deadlock-nginx-drift-check.sh
           sudo install -m 0644 ops/monitoring/deadlock-health-watch.service /etc/systemd/system/
           sudo install -m 0644 ops/monitoring/deadlock-health-watch.timer   /etc/systemd/system/
           sudo install -m 0644 ops/backups/deadlock-db-backup.service       /etc/systemd/system/
           sudo install -m 0644 ops/backups/deadlock-db-backup.timer         /etc/systemd/system/
+
+          # The nginx snapshot is the baseline the drift check compares against,
+          # so it has to live on the host too. Kept outside /usr/local/bin
+          # because it is data, not an executable.
+          sudo install -d -m 0755 /usr/local/share/deadlock
+          sudo install -m 0644 ops/nginx/aboba-telegramovich.duckdns.org.conf \
+            /usr/local/share/deadlock/nginx-snapshot.conf
 
           sudo systemctl daemon-reload
           sudo systemctl enable --now deadlock-health-watch.timer
@@ -125,6 +133,8 @@ jobs:
           # silently did nothing is exactly the failure this step exists for.
           cmp -s ops/monitoring/deadlock-health-watch.sh /usr/local/bin/deadlock-health-watch.sh
           cmp -s ops/backups/deadlock-db-backup.sh       /usr/local/bin/deadlock-db-backup.sh
+          cmp -s ops/nginx/check-drift.sh                /usr/local/bin/deadlock-nginx-drift-check.sh
+          cmp -s ops/nginx/aboba-telegramovich.duckdns.org.conf /usr/local/share/deadlock/nginx-snapshot.conf
           systemctl is-active --quiet deadlock-health-watch.timer
           systemctl is-active --quiet deadlock-db-backup.timer
           echo 'ops units installed; both timers active'
@@ -281,6 +291,27 @@ jobs:
 
           sudo nginx -t
           sudo systemctl reload nginx
+
+      # Deliberately non-fatal, and deliberately after the route is applied.
+      #
+      # The live vhost is NOT deployed from this repository -- this step's
+      # predecessor rewrites one block inside it, by hand-applied edits made the
+      # other two, and Certbot rewrites the ssl_* lines on every renewal. So the
+      # file drifts, and before this step nothing reported it: "what is exposed
+      # to the internet" could change without a commit and without a failure.
+      #
+      # It must not gate the deploy. Drift is expected, and a red pipeline over
+      # a certificate renewal would be a reporting gap turned into an outage
+      # path -- the same mistake as putting a rate limiter on a healthcheck.
+      - name: Report nginx perimeter drift (non-fatal)
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          if /usr/local/bin/deadlock-nginx-drift-check.sh; then
+            echo 'nginx perimeter is in sync with the committed snapshot'
+          else
+            echo "::warning title=nginx perimeter drift::The live nginx config differs from ops/nginx/aboba-telegramovich.duckdns.org.conf. Read the diff above, and refresh the snapshot only if the change is intended."
+          fi
 
       - name: Verify Statlocker adaptive through local HTTPS
         shell: bash
