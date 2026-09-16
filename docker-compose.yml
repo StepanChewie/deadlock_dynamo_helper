@@ -1,6 +1,22 @@
 services:
   api:
     image: ${DEADLOCK_API_IMAGE:-deadlock-adaptive-production:current}
+
+    # tini as PID 1. Do not remove.
+    # Chromium's children (zygotes, chrome_crashpad) are orphaned whenever browser.close()
+    # fails to tear down the whole tree. Without an init they re-parent to PID 1, which is
+    # `node` -- and Node only reaps children it spawned itself via libuv, so re-parented
+    # orphans are never reaped and become permanent zombies, each holding a task slot.
+    # On 2026-09-16 that reached 14 179 zombies: pids 14192/14192, fork() -> EAGAIN, and the
+    # healthcheck (which forks `node -e`) could never run again. init reaps them instead.
+    init: true
+
+    # Blast-radius guard. The ceiling inherited from systemd's DefaultTasksMax is 14192
+    # (15% of the host's threads-max), so a runaway in this container can starve every other
+    # container on the box -- it did. Steady state is ~110 tasks and one browser costs a few
+    # dozen, so this is ~30x headroom. Keep a cap here; do not fall back to the systemd default.
+    pids_limit: 4096
+
     ports:
       - '3000:3000'
     volumes:

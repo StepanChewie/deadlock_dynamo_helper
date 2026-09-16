@@ -33,9 +33,14 @@ export interface StatlockerBrowserLauncherV1 {
   launch(options: Record<string, unknown>): Promise<StatlockerBrowserV1>;
 }
 
+interface StatlockerBrowserProcessV1 {
+  kill(signal?: NodeJS.Signals | number): boolean;
+}
+
 interface StatlockerBrowserV1 {
   newPage(): Promise<StatlockerPageV1>;
   close(): Promise<void>;
+  process?(): StatlockerBrowserProcessV1 | null;
 }
 
 interface StatlockerPageV1 {
@@ -68,6 +73,7 @@ export class StatlockerBrowserCollectorService {
   private readonly pageTimeoutMs = 45_000;
   private readonly bodyTimeoutMs = 60_000;
   private readonly maxConcurrency = 3;
+  private readonly closeTimeoutMs = 5_000;
 
   constructor(
     @Inject(STATLOCKER_BROWSER_LAUNCHER_V1)
@@ -124,7 +130,44 @@ export class StatlockerBrowserCollectorService {
         datasets,
       };
     } finally {
-      await browser.close();
+      await this.closeBrowser(browser);
+    }
+  }
+
+  /**
+   * Close the browser without ever blocking the caller.
+   *
+   * `browser.close()` can hang indefinitely when chromium's own shutdown cannot fork, and a
+   * bare `await browser.close()` then does two kinds of damage: it pins the refresh service's
+   * `inFlight` key forever, so that scope never refreshes again, and it leaves the process tree
+   * behind. Those leftovers re-parent to PID 1 and, without an init, accumulate as zombies until
+   * the container's task ceiling is reached -- see `init: true` in docker-compose.yml.
+   *
+   * Same pattern as the probe's `closeBrowser` in
+   * `statlocker-probe/statlocker-browser.service.ts`, with the timer cleared so a fast close
+   * does not leave a pending 5 s handle behind.
+   */
+  private async closeBrowser(browser: StatlockerBrowserV1): Promise<void> {
+    let timer: NodeJS.Timeout | undefined;
+
+    const closed = await Promise.race([
+      Promise.resolve()
+        .then(() => browser.close())
+        .then(() => true)
+        .catch(() => true),
+      new Promise<boolean>((resolve) => {
+        timer = setTimeout(() => resolve(false), this.closeTimeoutMs);
+      }),
+    ]).finally(() => {
+      if (timer) clearTimeout(timer);
+    });
+
+    if (closed) return;
+
+    try {
+      browser.process?.()?.kill('SIGKILL');
+    } catch {
+      // Best-effort cleanup only.
     }
   }
 
