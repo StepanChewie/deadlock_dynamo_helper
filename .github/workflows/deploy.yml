@@ -96,6 +96,39 @@ jobs:
           echo 'API did not become healthy in time.' >&2
           exit 1
 
+      - name: Install ops units (health watcher and database backup)
+        run: |
+          set -euo pipefail
+          cd /home/ubuntu/apps/deadlock_dynamo_helper
+
+          # These scripts and units are versioned here, so install them from the
+          # checkout on every deploy. Config lives in /etc/*.env and is never
+          # touched by this step: the webhook URL and thresholds are server
+          # state, not repository state.
+          #
+          # Before this step existed, ops/ was rsynced but never installed, so
+          # a fix to the watcher reached the server and did nothing until
+          # someone copied it by hand -- which is how a stale build stayed
+          # deployed once already.
+          sudo install -m 0755 ops/monitoring/deadlock-health-watch.sh /usr/local/bin/
+          sudo install -m 0755 ops/backups/deadlock-db-backup.sh       /usr/local/bin/
+          sudo install -m 0644 ops/monitoring/deadlock-health-watch.service /etc/systemd/system/
+          sudo install -m 0644 ops/monitoring/deadlock-health-watch.timer   /etc/systemd/system/
+          sudo install -m 0644 ops/backups/deadlock-db-backup.service       /etc/systemd/system/
+          sudo install -m 0644 ops/backups/deadlock-db-backup.timer         /etc/systemd/system/
+
+          sudo systemctl daemon-reload
+          sudo systemctl enable --now deadlock-health-watch.timer
+          sudo systemctl enable --now deadlock-db-backup.timer
+
+          # Assert the install happened instead of trusting it: a copy that
+          # silently did nothing is exactly the failure this step exists for.
+          cmp -s ops/monitoring/deadlock-health-watch.sh /usr/local/bin/deadlock-health-watch.sh
+          cmp -s ops/backups/deadlock-db-backup.sh       /usr/local/bin/deadlock-db-backup.sh
+          systemctl is-active --quiet deadlock-health-watch.timer
+          systemctl is-active --quiet deadlock-db-backup.timer
+          echo 'ops units installed; both timers active'
+
       - name: Verify Statlocker adaptive serving locally
         run: |
           set -euo pipefail
