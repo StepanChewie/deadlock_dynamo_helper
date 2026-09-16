@@ -46,7 +46,7 @@ if (ow?.windows) {
         }
         if (textElement) {
           textElement.textContent =
-            'Зажмите карточку мышкой и перетащите её в нужное место (Ctrl+Tab)';
+            'Зажмите карточку мышкой и перетащите её в нужное место (Ctrl+Shift+D скрывает оверлей)';
         }
         return;
       }

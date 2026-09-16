@@ -160,8 +160,13 @@ describe('Dynamo Lab third-party runtime dependency contract', () => {
 
 describe('Dynamo Lab hotkey reminder contract', () => {
   it('exposes the registered hotkeys to the player', () => {
-    expect(desktop).toContain('Ctrl+Tab');
-    expect(overlay).toContain('Ctrl+Tab');
+    expect(desktop).toContain('Ctrl+Shift+D');
+    expect(overlay).toContain('Ctrl+Shift+D');
     expect(desktop).toContain('Ctrl+Shift+B');
+  });
+
+  it('does not advertise the retired toggle binding', () => {
+    expect(desktop).not.toMatch(/Ctrl\+Tab/i);
+    expect(overlay).not.toMatch(/Ctrl\+Tab/i);
   });
 });

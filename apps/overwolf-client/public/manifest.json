@@ -111,7 +111,7 @@
       "toggle_overlay": {
         "title": "Toggle In-Game Build Overlay",
         "action-name": "toggle_overlay",
-        "default": "Ctrl+Tab"
+        "default": "Ctrl+Shift+D"
       },
       "show_desktop_build": {
         "title": "Show Full Build Window",
