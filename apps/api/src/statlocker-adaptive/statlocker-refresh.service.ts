@@ -128,7 +128,14 @@ export class StatlockerRefreshService implements OnApplicationBootstrap {
     return this.singleFlight(key, async () => {
       this.markAttempt(nowMs);
       try {
+        this.logger.log(
+          `global refresh: globalDue=${globalDue} vsHeroWpaDue=${vsHeroWpaDue} `
+          + `targets=[${targets.map((target) => target.dataset).join(', ')}]`,
+        );
         const result = await this.collector.collectBatch(targets);
+        this.logger.log(
+          `global refresh: collected [${result.datasets.map((entry) => entry.dataset).join(', ')}]`,
+        );
         for (const dataset of result.datasets) {
           if (dataset.dataset === 'VS_HERO_WPA') {
             const rawSnapshot = await this.rawVsHeroWpaStore?.persistCollected({
@@ -183,13 +190,25 @@ export class StatlockerRefreshService implements OnApplicationBootstrap {
           }
 
           const normalized = this.normalizeCollected(dataset, result.statlockerPatchId);
-          await this.publishObservation(normalized, identity, dataset);
+          const published = await this.publishObservation(normalized, identity, dataset);
+          this.logger.log(
+            `global refresh: published ${dataset.dataset} scope=${normalized.scopeKey} `
+            + `snapshot=${published.snapshotId} fetchedAt=${published.fetchedAt.toISOString()}`,
+          );
         }
         if (globalDue) this.lastSuccessByKey.set(key, nowMs);
         if (vsHeroWpaDue) this.lastSuccessByKey.set(vsHeroWpaKey, nowMs);
         this.markSuccess(nowMs);
       } catch (error) {
+        // This used to be silent. The error reached only `lastError`, which the
+        // status endpoint does not expose, so a failing global refresh looked
+        // exactly like a healthy one - and `lastSuccessAt` is shared with the
+        // per-hero path, so even that did not give it away. A refresh that
+        // "succeeds" while writing nothing is the shape of the 2026-09-17
+        // incident: WPA_PATCH_DATA and T4_CHAINS went 4 and 8 days without a
+        // fetch against a 30-minute TTL, and nothing anywhere said why.
         this.lastError = describeError(error);
+        this.logger.error(`global refresh failed: ${describeError(error)}`);
         throw error;
       }
     });
@@ -442,8 +461,8 @@ export class StatlockerRefreshService implements OnApplicationBootstrap {
     normalized: StatlockerNormalizedDatasetV1<StatlockerNormalizedPayloadV1>,
     identity: StatlockerGameIdentityV1,
     source: StatlockerCollectedDatasetV1,
-  ): Promise<void> {
-    await this.store.publish({
+  ): Promise<StatlockerStoredSnapshotV1> {
+    return this.store.publish({
       dataset: normalized.dataset,
       rulesetVersion: identity.rulesetVersion,
       catalogSha256: identity.catalogSha256,
