@@ -88,17 +88,15 @@ export class RecommendationEconomyRulesBootstrapV1Service implements OnModuleIni
             version.rulesetKey,
             version.payloadSha256,
           );
-          // An entry written before the canonical rules carried an upgrade
-          // pricing policy is unusable: without a policy the compiler cannot
-          // derive any recipe's soul cost and drops every upgrade recipe, so the
-          // catalog has no progression at all. Replacing it is safe because the
-          // check is limited to our own canonical source - an operator-verified
-          // entry is never touched, whatever it contains.
-          const isStaleCanonicalEntry =
-            existing !== undefined &&
-            existing.source === 'canonical-deadlock-universal-v1' &&
-            existing.upgradePricingPolicy === undefined;
-          if (existing && !isStaleCanonicalEntry) continue;
+          // Only a version with no entry at all is published.
+          //
+          // Replacing an existing entry was tried and does not work from here:
+          // resolveExact parses the payload column and does not return `source`,
+          // which lives in its own column, so there is no way to tell our own
+          // canonical row from an operator's. It is also unnecessary - the
+          // generator now always writes the pricing policy, so a catalog
+          // imported from here on gets a usable entry the first time.
+          if (existing) continue;
 
           await this.publishEconomyRules({
             snapshotId: `canonical:${version.rulesetKey}:${version.payloadSha256.slice(0, 16)}`,

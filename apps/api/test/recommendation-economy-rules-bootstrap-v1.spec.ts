@@ -83,54 +83,27 @@ describe('RecommendationEconomyRulesBootstrapV1Service', () => {
     );
   });
 
-  it('does not republish rules a version already has', async () => {
-    const resolveExact = jest.fn().mockResolvedValue({ rulesetId: 'client-6694' });
-    const { service, economyRulesStore } = createService(
-      [{ rulesetKey: 'client-6694', payloadSha256: 'f5226f2e89233f2671b3ae041734e3679fa37acc' }],
-      resolveExact,
-    );
+  it('does not replace an entry a version already has', async () => {
+    // Deliberate, and the reason is worth recording: an existing entry that
+    // predates the pricing policy is unusable and does have to be removed, but
+    // this service cannot decide that. resolveExact parses the payload column
+    // and does not return `source`, which lives in its own column, so it cannot
+    // tell its own canonical row from an operator's. Such a row is removed by
+    // hand; the generator keeps the situation from recurring.
+    for (const source of [
+      'canonical-deadlock-universal-v1',
+      'operator-verified-deadlock-shop-full-component-credit',
+    ]) {
+      const resolveExact = jest.fn().mockResolvedValue({ rulesetId: 'client-6694', source });
+      const { service, economyRulesStore } = createService(
+        [{ rulesetKey: 'client-6694', payloadSha256: 'f5226f2e89233f2671b3ae041734e3679fa37acc' }],
+        resolveExact,
+      );
 
-    await service.onModuleInit();
+      await service.onModuleInit();
 
-    expect(economyRulesStore.publish).not.toHaveBeenCalled();
-    expect(service.getStatus().bootstrapEconomyRulesCount).toBe(0);
-  });
-
-  it('replaces its own canonical entry when that entry has no pricing policy', async () => {
-    // Such an entry was written by the version of this code that omitted the
-    // policy, and it is unusable: no policy means no recipe costs, which means
-    // no upgrade recipes and no progression. It has to be replaced, otherwise
-    // the fix never reaches a catalog that already has the broken entry.
-    const resolveExact = jest.fn().mockResolvedValue({
-      rulesetId: 'client-6694',
-      source: 'canonical-deadlock-universal-v1',
-    });
-    const { service, economyRulesStore } = createService(
-      [{ rulesetKey: 'client-6694', payloadSha256: 'f5226f2e89233f2671b3ae041734e3679fa37acc' }],
-      resolveExact,
-    );
-
-    await service.onModuleInit();
-
-    expect(economyRulesStore.publish).toHaveBeenCalledTimes(1);
-    expect(economyRulesStore.publish.mock.calls[0][0].rules.upgradePricingPolicy).toBeDefined();
-  });
-
-  it('leaves an operator entry alone even when it carries no pricing policy', async () => {
-    // Only our own canonical entries are replaced. What an operator pinned is
-    // theirs to change.
-    const resolveExact = jest.fn().mockResolvedValue({
-      rulesetId: 'client-6694',
-      source: 'operator-verified-deadlock-shop-full-component-credit',
-    });
-    const { service, economyRulesStore } = createService(
-      [{ rulesetKey: 'client-6694', payloadSha256: 'f5226f2e89233f2671b3ae041734e3679fa37acc' }],
-      resolveExact,
-    );
-
-    await service.onModuleInit();
-
-    expect(economyRulesStore.publish).not.toHaveBeenCalled();
+      expect(economyRulesStore.publish).not.toHaveBeenCalled();
+    }
   });
 
   it('skips versions that carry no ruleset key or payload hash', async () => {
