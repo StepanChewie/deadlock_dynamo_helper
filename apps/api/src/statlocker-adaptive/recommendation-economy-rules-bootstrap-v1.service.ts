@@ -56,7 +56,27 @@ export class RecommendationEconomyRulesBootstrapV1Service implements OnModuleIni
       this.bootstrapEconomyRulesCount += 1;
     }
 
-    if (this.bootstrapEconomyRulesCount === 0 && this.versionRepo?.find) {
+    // This loop must run even when ADAPTIVE_ECONOMY_RULES_JSON supplied entries.
+    //
+    // Those entries are pinned to one (rulesetKey, payloadSha256) pair each, so
+    // they cover the catalog that existed when the operator wrote them and
+    // nothing else. Gating this on `bootstrapEconomyRulesCount === 0` meant that
+    // the moment an operator pinned anything by hand, no later catalog import
+    // ever received rules - and the live decision state resolves them exactly by
+    // (rulesetId, catalogSha256), so `resolveExact` returned undefined for the
+    // new catalog and the verified upgrade pricing policy was silently lost.
+    //
+    // The consequence is not subtle. Without an upgrade pricing policy the
+    // compiler cannot derive a recipe's soul cost, and a recipe whose cost is
+    // unknown is dropped from the item graph entirely. Every progression path
+    // then becomes unexecutable: on 2026-09-17 the full build stopped after four
+    // family entry purchases and the app answered REQUIRED_FAMILY_UNSATISFIED
+    // for the rest of the match. Catalog 6694 was imported on 2026-09-16 and had
+    // no matching economy snapshot at all.
+    //
+    // Running it unconditionally is safe: the resolveExact check below publishes
+    // only for versions that have no entry yet, so this stays idempotent.
+    if (this.versionRepo?.find) {
       try {
         const versions = await this.versionRepo.find({
           order: { importedAt: 'DESC' },
