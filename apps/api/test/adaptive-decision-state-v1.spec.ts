@@ -172,34 +172,101 @@ describe('AdaptiveDecisionStateV1Service', () => {
     expect(first.stateRevision).toBe(second.stateRevision);
   });
 
-  it('keeps unidentified roster slots out of every roster derivation', async () => {
-    // GEP reports slots it cannot attribute with `steam_id: "0"`, and the live
-    // state turns those into `bot:<slot>` players carrying placeholder hero ids
-    // (55, 1 and 0 were observed). On 2026-09-17, match 106167848, seven such
-    // slots pushed the enemy roster to 8 heroes instead of 6, so every request
-    // for the whole match answered ENEMY_ROSTER_INCOMPLETE and the app showed no
-    // build at all.
+  it('counts bot-match enemies, which all arrive with steam_id "0"', async () => {
+    // A bot match reports every slot except yours with `steam_id: "0"`, so the
+    // live state names all of them `bot:<slot>`. They are still the players, and
+    // their heroes are real, so they must be counted.
     //
-    // One of the phantoms here deliberately carries no `souls`: a single slot
-    // without that field turns the whole team total into `undefined`, which is
-    // the second way a phantom can corrupt the state.
-    const withUnidentifiedSlots: MinimalMatchState = {
+    // This is the counterweight to the phantom-slot bug fixed alongside it, and
+    // it is not hypothetical: on 2026-09-17 match 106173851, a bot match, the
+    // local player was on team 3 and team 2 held six bots with heroes
+    // 6/11/27/35/17/18. Excluding `bot:` keys emptied the enemy roster and the
+    // app showed nothing. The two cases are distinguished by whether the slot's
+    // `bot:` entry was superseded by a real steam id - not by the key prefix.
+    const botMatchState: MinimalMatchState = {
       ...matchState,
       playersBySteamId: {
-        ...matchState.playersBySteamId,
+        local: {
+          steamId: 'local',
+          playerName: 'Local',
+          isLocal: true,
+          heroId: 14,
+          heroName: 'HOLLIDAY',
+          teamId: 3,
+          souls: 2000,
+          items: [{ id: 1, name: 'Owned', className: 'owned', enhanced: false }],
+        },
+        // A team-mate, also a bot.
+        'bot:roster_7': {
+          steamId: 'bot:roster_7',
+          playerName: 'UNKNOWN',
+          heroId: 7,
+          heroName: 'WRAITH',
+          teamId: 3,
+          souls: 1000,
+          items: [],
+        },
+        'bot:roster_0': {
+          steamId: 'bot:roster_0',
+          playerName: 'UNKNOWN',
+          heroId: 6,
+          heroName: 'ABRAMS',
+          teamId: 2,
+          souls: 1500,
+          items: [],
+        },
+        'bot:roster_1': {
+          steamId: 'bot:roster_1',
+          playerName: 'UNKNOWN',
+          heroId: 11,
+          heroName: 'DYNAMO',
+          teamId: 2,
+          souls: 1500,
+          items: [],
+        },
+        'bot:roster_2': {
+          steamId: 'bot:roster_2',
+          playerName: 'UNKNOWN',
+          heroId: 77,
+          heroName: 'APOLLO',
+          teamId: 2,
+          souls: 1500,
+          items: [],
+        },
         'bot:roster_3': {
           steamId: 'bot:roster_3',
           playerName: 'UNKNOWN',
-          heroId: 55,
-          heroName: 'UNKNOWN',
+          heroId: 27,
+          heroName: 'YAMATO',
           teamId: 2,
+          souls: 1500,
+          items: [],
+        },
+        'bot:roster_4': {
+          steamId: 'bot:roster_4',
+          playerName: 'UNKNOWN',
+          heroId: 35,
+          heroName: 'VISCOUS',
+          teamId: 2,
+          souls: 1500,
           items: [],
         },
         'bot:roster_5': {
           steamId: 'bot:roster_5',
           playerName: 'UNKNOWN',
-          heroId: 1,
-          heroName: 'INFERNUS',
+          heroId: 17,
+          heroName: 'GREY TALON',
+          teamId: 2,
+          souls: 1500,
+          items: [],
+        },
+        // The observer slot: its own team, and hero id 0, which is not a hero.
+        // Dropped by the hero-id validity rule, not by its identity.
+        'bot:roster_11': {
+          steamId: 'bot:roster_11',
+          playerName: 'UNKNOWN',
+          heroId: 0,
+          heroName: 'UNKNOWN',
           teamId: 1,
           souls: 0,
           items: [],
@@ -207,15 +274,13 @@ describe('AdaptiveDecisionStateV1Service', () => {
       },
     };
 
-    const { service } = createService(true, withUnidentifiedSlots);
+    const { service } = createService(true, botMatchState);
     const built = await service.build('match-1');
 
-    expect(built.enemyHeroIds).toEqual([20, 30]);
-    expect((built.enemyHeroes ?? []).map((hero) => hero.heroId)).toEqual([20, 30]);
-    expect((built.enemyLiveStates ?? []).map((enemy) => enemy.heroId)).toEqual([20, 30]);
-    expect(built.allyHeroIds).toEqual([11]);
-    expect(built.enemyTeamSouls).toBe(9000);
-    expect(built.ourTeamSouls).toBe(5000);
+    expect(built.enemyHeroIds).toEqual([6, 11, 17, 27, 35, 77]);
+    expect(built.enemyHeroIds).toHaveLength(6);
+    expect((built.enemyHeroes ?? []).map((hero) => hero.heroId)).toEqual([6, 11, 17, 27, 35, 77]);
+    expect((built.enemyLiveStates ?? []).map((enemy) => enemy.heroId)).toEqual([6, 11, 17, 27, 35, 77]);
   });
 
   it('carries deterministic per-enemy live state without inventing missing metrics', async () => {
