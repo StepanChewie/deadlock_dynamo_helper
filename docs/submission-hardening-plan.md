@@ -1039,6 +1039,12 @@ setInterval(() => {
 +Dynamo Lab is an independent project. It is **not** affiliated with, endorsed by, or sponsored by Valve Corporation or Overwolf Ltd. *Deadlock* is a trademark of Valve Corporation, and Overwolf is a trademark of Overwolf Ltd. Both names are used only to describe what the app works with.
 ```
 
+> **Поправка по факту (8a не делаем).** Обоснование в плане **неверно**: «„approved by“ подразумевает существование процесса одобрения, которого нет» — не работает, когда фраза стоит под отрицанием. «not … approved by Valve» не утверждает одобрение, а **отрицает** его, то есть это более сильная оговорка, а не ложное обещание. Юридически здесь чинить нечего.
+>
+> Расхождение двух документов реально есть (`terms.md:17` перечисляет четыре глагола и упоминает Overwolf Ltd, `privacy.md:75` — три), но разная степень подробности между Terms и Privacy — норма, а не дефект. **Правку не вносил:** юридический текст за владельцем, и он прямо сказал, что формулировки пишет сам.
+>
+> Единственное, что стоит его внимания, — **не юридическое, а фактическое**: `terms.md:11` описывает приложение как «the item to buy now, plus the next four legal purchases». Это точно описывает **оверлей** (`in_game.html:361`, `data-route-limit="5"`), но не **desktop-окно**, которое показывает маршрут целиком (`desktop.html:869`, «Full build», `data-route-limit="all"`). Формулировка не ложная, но неполная.
+
 ### 8b. Deletion tooling
 
 `docs/privacy.md` обещает: «Ask us to delete your match data… tell us the match id… We will delete the records for that match». Инструмента нет — поиск по `delete-match-data` даёт ноль вхождений.
@@ -1053,6 +1059,14 @@ setInterval(() => {
 | raw event log | `RawEventLogService`, `storage/deadlock-live/<matchId>.ndjson` | `unlink` одного файла |
 
 Последний пункт снимает вопрос «а можно ли вообще удалить по matchId»: файл называется по matchId (`raw-event-log.service.ts:69`), так что удаление точечное. Ротация «32 файла» этому не мешает — если файл уже вытеснен, удалять нечего.
+
+> **Поправка по факту (PR 8, `3a51f8c5`).** «Всех сущностей с колонкой `matchId` — три» — вывод из **файлов сущностей**, а не из схемы. По миграциям колонка `matchId` есть ещё в восьми таблицах: `matches`, `match_players`, `raw_match_metadata` (там `bigint` — это id из deadlock-api.com, другое пространство имён, не id нашего клиента), `shadow_mode_decisions`, `recommendation_telemetry_events`, `recommendation_telemetry_rejections_v8`, `recommendation_decisions_v8`, `adaptive_recommendation_decisions_v1`.
+>
+> Проверил каждую: **ни одна не упоминается ни в одном файле вне `migrations/`**, то есть это мёртвые таблицы, созданные миграциями и никем не заполняемые. Поэтому удалять из них нечего и список из трёх таблиц верен — но верен по другой причине, чем написано выше, и «проверил сущности» это не доказывает. Если такая таблица когда-нибудь оживёт, инструмент надо будет расширить.
+>
+> **Скрытый баг, который это вскрыло.** `AdaptiveFeedbackV1Entity` был зарегистрирован **только** через `TypeOrmModule.forFeature`, поэтому отсутствовал в `DATABASE_ENTITIES` и был невидим для отдельного `AppDataSource`. В работающем приложении выглядело здоровым; первый же `getRepository` из скрипта упал бы с `EntityMetadataNotFoundError`. Исправлено, добавлен сторожевой тест на регистрацию всех `@Entity`.
+>
+> **В рантайм-образе нет `ts-node`** (`yarn install --production`), поэтому запуск в контейнере — `node dist/src/scripts/delete-match-data.js`, а не `yarn data:delete-match`. Записано в ранбук.
 
 **Файлы:** `apps/api/src/scripts/delete-match-data.ts` (новый), `apps/api/package.json`, `package.json` в корне.
 
@@ -1167,11 +1181,11 @@ void main();
 - `Reset overlay position` — существующий бинд `reset_desktop_build` уже это делает; в Settings достаточно кнопки, вызывающей ту же функцию.
 - `Route length` — 1 / 3 / 5, пишет `PREFERENCE_KEYS.routeLength`. Требует поддержки на сервере или обрезки на клиенте при отрисовке — уточнить перед реализацией; если серверной поддержки нет, в этом PR лучше не добавлять вовсе, чем добавить нерабочий контрол.
 
-> **Поправка по факту (PR 9, `1d21442d`).** `Reset overlay position` **не сделан**. Перечисления мониторов в кодовой базе нет, и `changePosition` + `getMonitorsList` пришлось бы писать с нуля без возможности проверить локально (нужен живой Overwolf) — то есть с риском отгрузить кнопку, которая ничего не делает. Заодно вскрылось, что бинд `reset_desktop_build` в манифесте называется «Reset Full Build Window to Primary Monitor», а в коде делает только restore + bringToFront: **заголовок манифеста обещает больше, чем код**. Это отдельное решение владельца, а не часть PR 9.
+> **Поправка по факту (PR 9, `1d21442d`).** `Reset overlay position` в рамках PR 9 **не сделан** — перечисления мониторов в кодовой базе нет, и `changePosition` + `getMonitorsList` пришлось бы писать с нуля без возможности проверить локально (нужен живой Overwolf). **Сделано позже и иначе — см. `roadmap.md` 4.6:** `getMonitorsList` требует разрешения `DesktopStreaming`, которое приложение не объявляет, поэтому вместо «на основной монитор» реализовано «вернуть на видимый экран» через DOM Screen API, а заголовок манифеста исправлен под поведение.
 >
 > `Route length` тоже **не добавлен** — по правилу, которое план сам и сформулировал: лучше не добавлять нерабочий контрол. Обрезка на клиенте возможна (`resolveRouteLimit` уже читает `data-route-limit`, дефолт 5, `'all'` → `Infinity`), но она режет *отображение*, а не вычисленный маршрут, и семантика остаётся нерешённой.
 >
-> Хоткей в Settings — не кнопка, а ссылка `overwolf://settings/games-overlay?hotkey=toggle_overlay`: документация Overwolf описывает этот способ именно как «clickable link», метода API для него нет. Значение подписи при этом берётся живое из `hotkeys.get()` (поле `binding`), а не из манифеста.
+> **Поправка к поправке (PR 9, `2b40b27a`).** Здесь было написано, что хоткей в Settings — «не кнопка, а ссылка `overwolf://settings/games-overlay?hotkey=toggle_overlay`». **Это неверно и было исправлено.** Оба окна объявляют `block_top_window_navigation` и `popup_blocker`: первый флаг гасит переход по ссылке внутри приложения, второй срабатывает ровно на `target="_blank"`. Документация Overwolf описывает этот deep link как «clickable link», но в *этих* окнах он мёртв. Сделано `<button onclick>` + `ui.openExternal`. Значение подписи по-прежнему берётся живое из `hotkeys.get()` (поле `binding`), а не из манифеста.
 
 **Support**
 - Privacy Policy, Terms — уже есть в `desktop.html:770,772`, переиспользовать существующие `openExternal`-ссылки на GitHub blob.
