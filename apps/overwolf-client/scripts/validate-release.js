@@ -26,6 +26,13 @@ const STORE_ICON_FIELDS = ['icon', 'icon_gray', 'window_icon'];
 // OVERWOLF_API_BASE_URL, which is a different statement from "the origin is not
 // DuckDNS" -- see docs/roadmap.md section 6, decision 3.
 const RETIRED_API_HOSTS = [/^localhost$/i, /^127\.0\.0\.1$/i, /^\[::1\]$/i];
+
+// Reserved names from RFC 2606 / RFC 6761. A packaged build that reaches one of
+// these is pointing at a placeholder, whichever placeholder it is - so this
+// catches the intent rather than one specific string. It is the second line of
+// defence behind the build refusing to run without OVERWOLF_API_BASE_URL: it
+// also covers a manifest edited by hand after the build.
+const RESERVED_API_HOST_SUFFIXES = ['.invalid', '.example', '.test', '.localhost'];
 const RETIRED_HOTKEYS = [/Ctrl\+Tab/i];
 
 assert(manifest.manifest_version === 1, 'manifest_version must be 1.');
@@ -99,6 +106,16 @@ for (const value of externalMatches || []) {
   assert(
     !host || !RETIRED_API_HOSTS.some((pattern) => pattern.test(host)),
     `externally_connectable still contains a development origin: ${value}`,
+  );
+}
+
+// Nor a placeholder. A build without OVERWOLF_API_BASE_URL cannot be produced at
+// all any more, but a manifest can still be edited by hand afterwards.
+for (const value of externalMatches || []) {
+  const host = (safeHost(value) || '').toLowerCase();
+  assert(
+    !RESERVED_API_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix)),
+    `externally_connectable points at a placeholder origin: ${value}`,
   );
 }
 

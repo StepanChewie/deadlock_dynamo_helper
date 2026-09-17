@@ -1,7 +1,18 @@
 const fs = require('fs');
 const path = require('path');
 
-const DEFAULT_API_BASE_URL = 'https://aboba-telegramovich.duckdns.org';
+// The origin that `src/index.ts` compiles into the bundle.
+//
+// This is a *search string* for the substitution below, not a fallback. It used
+// to double as the default when OVERWOLF_API_BASE_URL was unset, which meant a
+// forgotten variable produced a working-looking build pointing at whatever this
+// literal happened to be - the failure mode PR 10 exists to remove. The two
+// roles are now separate and there is no default at all.
+//
+// It must stay byte-identical to the `apiBaseUrl` literal in src/index.ts:
+// a divergence would make the search match nothing, and
+// `src/api-base-url-contract.spec.ts` fails first, naming the cause.
+const BUNDLE_SOURCE_API_BASE_URL = 'https://aboba-telegramovich.duckdns.org';
 // Origins the shipped app must keep reachable: the Deadlock UI artwork module,
 // its asset API, and the fonts used by the standalone warning window.
 const RETAINED_ORIGIN_PATTERNS = [
@@ -15,24 +26,38 @@ const publicDir = path.join(appRoot, 'public');
 const distDir = path.join(publicDir, 'dist');
 const manifestPath = path.join(publicDir, 'manifest.json');
 
-const apiBaseUrl = normalizeApiBaseUrl(
-  process.env.OVERWOLF_API_BASE_URL || DEFAULT_API_BASE_URL,
-);
+// Required, deliberately. A default here is how a build ends up pointing at the
+// wrong host with nothing failing - see docs/roadmap.md section 6, decision 3.
+// The release procedure sets it explicitly; see docs/overwolf-production-release.md.
+const requestedApiBaseUrl = String(process.env.OVERWOLF_API_BASE_URL ?? '').trim();
+if (!requestedApiBaseUrl) {
+  throw new Error(
+    'OVERWOLF_API_BASE_URL is required for an Overwolf client build. There is '
+    + 'no default origin on purpose: a forgotten variable used to produce a '
+    + 'working-looking build pointing at whatever the literal happened to be. '
+    + 'Set it to the origin this build should talk to - the production API '
+    + 'origin for a release. For a bundle aimed at a local origin, note that '
+    + '`yarn build` also runs the store-ready validation, which rejects '
+    + 'localhost: use `yarn build:bundle` then `yarn configure:api` instead.',
+  );
+}
+
+const apiBaseUrl = normalizeApiBaseUrl(requestedApiBaseUrl);
 const apiOrigin = new URL(apiBaseUrl).origin;
 
 let replacementCount = 0;
 for (const filePath of listJavaScriptFiles(distDir)) {
   const source = fs.readFileSync(filePath, 'utf8');
-  const configured = source.split(DEFAULT_API_BASE_URL).join(apiBaseUrl);
+  const configured = source.split(BUNDLE_SOURCE_API_BASE_URL).join(apiBaseUrl);
   if (configured !== source) {
-    replacementCount += source.split(DEFAULT_API_BASE_URL).length - 1;
+    replacementCount += source.split(BUNDLE_SOURCE_API_BASE_URL).length - 1;
     fs.writeFileSync(filePath, configured);
   }
 }
 
-if (apiBaseUrl !== DEFAULT_API_BASE_URL && replacementCount === 0) {
+if (apiBaseUrl !== BUNDLE_SOURCE_API_BASE_URL && replacementCount === 0) {
   throw new Error(
-    `The compiled Overwolf bundle did not contain the expected API URL ${DEFAULT_API_BASE_URL}.`,
+    `The compiled Overwolf bundle did not contain the expected API URL ${BUNDLE_SOURCE_API_BASE_URL}.`,
   );
 }
 

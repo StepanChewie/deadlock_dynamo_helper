@@ -49,6 +49,10 @@ jobs:
       - name: Build all workspaces
         env:
           OVERWOLF_PUBLIC_TARGET: ${{ runner.temp }}/overwolf-client/public
+          # The client build refuses to run without an explicit API origin, so
+          # CI supplies the production one. Public information: the same value
+          # is already committed in src/index.ts and public/manifest.json.
+          OVERWOLF_API_BASE_URL: https://aboba-telegramovich.duckdns.org
         run: yarn build
 
   build-overwolf:
@@ -78,6 +82,10 @@ jobs:
         shell: bash
         env:
           OVERWOLF_PUBLIC_TARGET: ${{ runner.temp }}/overwolf-client/public
+          # The client build refuses to run without an explicit API origin, so
+          # CI supplies the production one. Public information: the same value
+          # is already committed in src/index.ts and public/manifest.json.
+          OVERWOLF_API_BASE_URL: https://aboba-telegramovich.duckdns.org
         run: |
           set +e
           yarn workspace @dynamo-lab/overwolf-client build > "$RUNNER_TEMP/overwolf-build.log" 2>&1

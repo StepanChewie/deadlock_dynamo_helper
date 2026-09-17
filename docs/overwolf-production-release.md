@@ -41,6 +41,17 @@ OVERWOLF_PUBLIC_TARGET=/path/to/overwolf-sideload/public \
 yarn workspace @dynamo-lab/overwolf-client build
 ```
 
+`OVERWOLF_API_BASE_URL` is **required**. There is no default origin: a build
+without it fails immediately instead of silently embedding whatever literal
+`src/index.ts` happens to contain, which is how a misconfigured build used to
+ship pointing at the wrong host with nothing reporting a problem.
+
+The same value is what the store-ready validation checks, so it also rejects
+localhost and reserved placeholder origins. For a bundle deliberately aimed at a
+local origin, use `yarn workspace @dynamo-lab/overwolf-client build:bundle`
+followed by `yarn workspace @dynamo-lab/overwolf-client configure:api` instead of
+`build` — that skips the store-ready gate.
+
 The build compiles the shared package and the Overwolf bundle, embeds the supplied API base URL, updates `externally_connectable` to the matching origin, validates the manifest, windows, permissions, assets and compiled files, and copies the unpacked app to `OVERWOLF_PUBLIC_TARGET`.
 
 ## 3. Load through Overwolf Developer Mode
