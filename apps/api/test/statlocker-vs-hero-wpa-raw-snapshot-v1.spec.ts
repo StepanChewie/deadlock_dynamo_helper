@@ -71,14 +71,14 @@ describe('Statlocker VS_HERO_WPA RAW snapshot V1 persistence contract', () => {
     expect(repository.insert).toHaveBeenCalledWith(row);
   });
 
-  it('returns an existing content identity without mutating or reinserting it', async () => {
+  it('returns an existing content identity unchanged when the identity still matches', async () => {
     const existing = {
       snapshotId: 'b'.repeat(64),
       contentSha256: 'b'.repeat(64),
       fetchedAt: new Date('2026-09-09T10:00:00.000Z'),
       sourcePath: '/old-path',
       sourceStatus: 200,
-      statlockerPatchId: 'old-patch',
+      statlockerPatchId: 'patch-1',
       rulesetVersion: 'rules-v1',
       catalogSha256: 'a'.repeat(64),
       collectorVersion: 'collector-v1',
@@ -91,6 +91,7 @@ describe('Statlocker VS_HERO_WPA RAW snapshot V1 persistence contract', () => {
       create: jest.fn((row) => row),
       findOne: jest.fn().mockResolvedValue(existing),
       insert: jest.fn(),
+      update: jest.fn(),
     };
     const store = new StatlockerVsHeroWpaRawStoreV1Service(repository as never);
     jest.spyOn(store, 'contentSha256').mockReturnValue(existing.contentSha256);
@@ -99,7 +100,7 @@ describe('Statlocker VS_HERO_WPA RAW snapshot V1 persistence contract', () => {
       fetchedAt: '2026-09-09T11:00:00.000Z',
       sourcePath: '/new-path',
       sourceStatus: 200,
-      statlockerPatchId: 'new-patch',
+      statlockerPatchId: 'patch-1',
       rulesetVersion: 'rules-v1',
       catalogSha256: 'a'.repeat(64),
       collectorVersion: 'collector-v2',
@@ -112,5 +113,103 @@ describe('Statlocker VS_HERO_WPA RAW snapshot V1 persistence contract', () => {
     });
     expect(repository.create).not.toHaveBeenCalled();
     expect(repository.insert).not.toHaveBeenCalled();
+    expect(repository.update).not.toHaveBeenCalled();
+  });
+
+  it('re-stamps and re-ingests an unchanged payload when the catalog moved on', async () => {
+    // The relational rows carry the identity they were ingested under, and
+    // queryWpa filters on it. An unchanged statlocker payload combined with a new
+    // catalog therefore has to be ingested again, or the rows stay invisible and
+    // the recommendation silently loses its matchup evidence - which is exactly
+    // what happened on 2026-09-17, when all 173 496 rows were still stamped
+    // client-6686 / 052d9e97 while the live identity was client-6694 / f5226f2e.
+    const existing = {
+      snapshotId: 'b'.repeat(64),
+      contentSha256: 'b'.repeat(64),
+      fetchedAt: new Date('2026-09-09T10:00:00.000Z'),
+      sourcePath: '/old-path',
+      sourceStatus: 200,
+      statlockerPatchId: 'patch-1',
+      rulesetVersion: 'client-6686',
+      catalogSha256: 'a'.repeat(64),
+      collectorVersion: 'collector-v1',
+      rawPayload: { stable: true },
+      ingestStatus: 'PUBLISHED',
+      ingestMetadata: { publicationId: 'dataset-1' },
+      createdAt: new Date('2026-09-09T10:00:00.000Z'),
+    } as StatlockerVsHeroWpaRawSnapshotV1Entity;
+    const repository = {
+      create: jest.fn((row) => row),
+      findOne: jest.fn().mockResolvedValue(existing),
+      insert: jest.fn(),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
+    };
+    const store = new StatlockerVsHeroWpaRawStoreV1Service(repository as never);
+    jest.spyOn(store, 'contentSha256').mockReturnValue(existing.contentSha256);
+
+    const row = await store.persist({
+      fetchedAt: '2026-09-17T18:00:00.000Z',
+      sourcePath: '/new-path',
+      sourceStatus: 200,
+      statlockerPatchId: 'patch-1',
+      rulesetVersion: 'client-6694',
+      catalogSha256: 'c'.repeat(64),
+      collectorVersion: 'collector-v2',
+      rawPayload: { stable: true },
+    });
+
+    expect(repository.update).toHaveBeenCalledWith(
+      { snapshotId: existing.snapshotId },
+      expect.objectContaining({
+        rulesetVersion: 'client-6694',
+        catalogSha256: 'c'.repeat(64),
+        ingestStatus: 'PENDING',
+      }),
+    );
+    expect(row.rulesetVersion).toBe('client-6694');
+    expect(row.catalogSha256).toBe('c'.repeat(64));
+    expect(row.ingestStatus).toBe('PENDING');
+    expect(row.snapshotId).toBe(existing.snapshotId);
+    expect(repository.insert).not.toHaveBeenCalled();
+  });
+
+  it('re-stamps when only the catalog changed', async () => {
+    const existing = {
+      snapshotId: 'b'.repeat(64),
+      contentSha256: 'b'.repeat(64),
+      fetchedAt: new Date('2026-09-09T10:00:00.000Z'),
+      sourcePath: '/old-path',
+      sourceStatus: 200,
+      statlockerPatchId: 'patch-1',
+      rulesetVersion: 'client-6694',
+      catalogSha256: 'a'.repeat(64),
+      collectorVersion: 'collector-v1',
+      rawPayload: { stable: true },
+      ingestStatus: 'PUBLISHED',
+      ingestMetadata: {},
+      createdAt: new Date('2026-09-09T10:00:00.000Z'),
+    } as StatlockerVsHeroWpaRawSnapshotV1Entity;
+    const repository = {
+      create: jest.fn((row) => row),
+      findOne: jest.fn().mockResolvedValue(existing),
+      insert: jest.fn(),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
+    };
+    const store = new StatlockerVsHeroWpaRawStoreV1Service(repository as never);
+    jest.spyOn(store, 'contentSha256').mockReturnValue(existing.contentSha256);
+
+    const row = await store.persist({
+      fetchedAt: '2026-09-17T18:00:00.000Z',
+      sourcePath: '/new-path',
+      sourceStatus: 200,
+      statlockerPatchId: 'patch-1',
+      rulesetVersion: 'client-6694',
+      catalogSha256: 'c'.repeat(64),
+      collectorVersion: 'collector-v2',
+      rawPayload: { stable: true },
+    });
+
+    expect(repository.update).toHaveBeenCalledTimes(1);
+    expect(row.ingestStatus).toBe('PENDING');
   });
 });
