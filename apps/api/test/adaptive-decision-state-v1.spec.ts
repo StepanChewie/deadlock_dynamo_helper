@@ -172,6 +172,45 @@ describe('AdaptiveDecisionStateV1Service', () => {
     expect(first.stateRevision).toBe(second.stateRevision);
   });
 
+  it('keeps unidentified roster slots out of the enemy roster', async () => {
+    // GEP reports slots it cannot attribute with `steam_id: "0"`, and the live
+    // state turns those into `bot:<slot>` players carrying placeholder hero ids
+    // (55, 1 and 0 were observed). On 2026-09-17, match 106167848, seven such
+    // slots pushed the enemy roster to 8 heroes instead of 6, so every request
+    // for the whole match answered ENEMY_ROSTER_INCOMPLETE and the app showed no
+    // build at all.
+    const withUnidentifiedSlots: MinimalMatchState = {
+      ...matchState,
+      playersBySteamId: {
+        ...matchState.playersBySteamId,
+        'bot:roster_3': {
+          steamId: 'bot:roster_3',
+          playerName: 'UNKNOWN',
+          heroId: 55,
+          heroName: 'UNKNOWN',
+          teamId: 2,
+          souls: 0,
+          items: [],
+        },
+        'bot:roster_5': {
+          steamId: 'bot:roster_5',
+          playerName: 'UNKNOWN',
+          heroId: 1,
+          heroName: 'INFERNUS',
+          teamId: 2,
+          souls: 0,
+          items: [],
+        },
+      },
+    };
+
+    const { service } = createService(true, withUnidentifiedSlots);
+    const built = await service.build('match-1');
+
+    expect(built.enemyHeroIds).toEqual([20, 30]);
+    expect((built.enemyHeroes ?? []).map((hero) => hero.heroId)).toEqual([20, 30]);
+  });
+
   it('carries deterministic per-enemy live state without inventing missing metrics', async () => {
     const result = await createService(true).service.build('match-1');
 

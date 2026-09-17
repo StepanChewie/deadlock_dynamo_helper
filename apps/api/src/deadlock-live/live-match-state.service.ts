@@ -271,6 +271,21 @@ export class LiveMatchStateService {
       return;
     }
 
+    // A roster slot that has revealed its real steam id supersedes the synthetic
+    // `bot:<slot>` player created while the id was still unknown.
+    //
+    // The synthetic entry is never written to again -- every later event for the
+    // slot resolves to the steam id -- so it keeps whatever placeholder arrived
+    // first, typically hero_id 0 or 55 with hero_name "UNKNOWN". Left in place it
+    // inflates the roster for the whole match: on 2026-09-17, match 106167848,
+    // the state held 20 players for a 12-player match, so the enemy roster
+    // counted 8 heroes instead of 6 and every request from the first second of
+    // the match to the twelfth minute came back ENEMY_ROSTER_INCOMPLETE.
+    const rosterSlot = this.rosterSlotForEvent(eventKey);
+    if (rosterSlot && playerKey !== `bot:${rosterSlot}`) {
+      delete state.playersBySteamId[`bot:${rosterSlot}`];
+    }
+
     const player = this.getOrCreatePlayer(state, playerKey);
     const playerName = this.getStringValue(payload, 'player_name');
     const heroName = this.getStringValue(payload, 'hero_name');

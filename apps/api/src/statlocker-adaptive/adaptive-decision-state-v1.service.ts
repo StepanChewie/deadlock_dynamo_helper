@@ -249,9 +249,28 @@ function catalogRulesetId(version: RecommendationItemCatalogVersionV1): string |
   return typeof value === 'string' && value.trim() ? value : undefined;
 }
 
+/**
+ * True for a roster slot the game has not attributed to a real player.
+ *
+ * `LiveMatchStateService.resolvePlayerKey` falls back to `bot:<roster slot>`
+ * when a roster payload carries `steam_id: "0"`, which is what GEP sends for
+ * slots it cannot identify. Observed on 2026-09-17, match 106167848: seven such
+ * slots, carrying placeholder hero ids 55, 1 and 0.
+ *
+ * Such an entry has no steam id, so it cannot be looked up as a real opponent,
+ * and its placeholder hero id corrupts the enemy roster. Counting it made the
+ * roster 8 heroes instead of 6 and every request for the whole match answered
+ * ENEMY_ROSTER_INCOMPLETE.
+ */
+function isUnidentifiedPlayer(playerKey: string): boolean {
+  return playerKey.startsWith('bot:');
+}
+
 function resolveEnemyHeroes(match: MinimalMatchState, localTeamId: number): readonly AdaptiveEnemyHeroV1[] {
   const byHeroId = new Map<number, AdaptiveEnemyHeroV1>();
-  for (const player of Object.values(match.playersBySteamId)) {
+  // Entries, not values: the key is what identifies an unidentified player.
+  for (const [playerKey, player] of Object.entries(match.playersBySteamId)) {
+    if (isUnidentifiedPlayer(playerKey)) continue;
     if (player.teamId === undefined || player.teamId === localTeamId || !Number.isInteger(player.heroId)) continue;
     const heroId = Number(player.heroId);
     const heroName = typeof player.heroName === 'string' && player.heroName.trim()
