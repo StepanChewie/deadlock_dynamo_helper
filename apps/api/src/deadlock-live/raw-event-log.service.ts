@@ -139,7 +139,14 @@ function boundNdjson(value: string, maxBytes: number): string {
   return kept.join('');
 }
 
-function sanitizeMatchId(value: string): string {
+/**
+ * Maps a match id onto a filesystem-safe stem.
+ *
+ * Exported so the deletion tool derives the same file name this service writes.
+ * Two copies of this rule would be a correctness bug waiting to happen: the
+ * delete tool would silently fail to find a file it had every reason to expect.
+ */
+export function sanitizeMatchId(value: string): string {
   const normalized = value.trim().replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 120);
   return normalized || 'unknown';
 }

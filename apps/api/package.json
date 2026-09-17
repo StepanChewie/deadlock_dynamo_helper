@@ -14,7 +14,8 @@
     "migration:run": "typeorm-ts-node-commonjs migration:run -d src/database/data-source.ts",
     "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/database/data-source.ts",
     "migration:show": "typeorm-ts-node-commonjs migration:show -d src/database/data-source.ts",
-    "build:v2:capture-fixture": "ts-node src/scripts/capture-statlocker-build-v2-fixture.ts"
+    "build:v2:capture-fixture": "ts-node src/scripts/capture-statlocker-build-v2-fixture.ts",
+    "data:delete-match": "ts-node src/scripts/delete-match-data.ts"
   },
   "jest": {
     "moduleFileExtensions": [

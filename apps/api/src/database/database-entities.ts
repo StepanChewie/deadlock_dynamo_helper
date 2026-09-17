@@ -1,4 +1,5 @@
 import { AdaptiveBuildIterationV1Entity } from '../deadlock-live/entities/adaptive-build-iteration-v1.entity';
+import { AdaptiveFeedbackV1Entity } from '../deadlock-live/entities/adaptive-feedback-v1.entity';
 import { BuildArchetypeMatchLockV2Entity } from '../deadlock-live/entities/build-archetype-match-lock-v2.entity';
 import { BuildArchetypeSnapshotV2Entity } from '../deadlock-live/entities/build-archetype-snapshot-v2.entity';
 import { GameRuleset } from '../deadlock-live/entities/game-ruleset.entity';
@@ -36,4 +37,9 @@ export const DATABASE_ENTITIES = [
   BuildArchetypeSnapshotV2Entity,
   RecommendationEconomyRulesSnapshotV1Entity,
   AdaptiveBuildIterationV1Entity,
+  // Registered here as well as via `forFeature` in the statlocker-adaptive
+  // module: this list is what the standalone `AppDataSource` knows about, and
+  // scripts that use it directly (delete-match-data) cannot reach an entity
+  // that only `forFeature` registered.
+  AdaptiveFeedbackV1Entity,
 ];

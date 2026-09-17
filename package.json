@@ -13,6 +13,7 @@
     "db:migrate": "yarn workspace @dynamo-lab/api migration:run",
     "db:revert": "yarn workspace @dynamo-lab/api migration:revert",
     "db:migrations": "yarn workspace @dynamo-lab/api migration:show",
-    "db:generate": "yarn workspace @dynamo-lab/api migration:generate"
+    "db:generate": "yarn workspace @dynamo-lab/api migration:generate",
+    "data:delete-match": "yarn workspace @dynamo-lab/api data:delete-match"
   }
 }
