@@ -123,7 +123,7 @@
         "default": "Ctrl+Shift+B"
       },
       "reset_desktop_build": {
-        "title": "Reset Full Build Window to Primary Monitor",
+        "title": "Reset Full Build Window Position",
         "action-name": "reset_desktop_build",
         "default": "Ctrl+Shift+Home"
       }

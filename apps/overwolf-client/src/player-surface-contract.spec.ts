@@ -36,6 +36,10 @@ describe('Dynamo Lab desktop surface contract', () => {
     expect(desktop).toContain('id="setting-overlay-auto-show"');
     expect(desktop).toContain('setOverlayAutoShow?.(this.checked)');
     expect(desktop).toContain('openHotkeySettings?.()');
+    // Asserted by name as well as by the generic handler sweep: that sweep
+    // derives its names *from* the markup, so deleting this whole row would
+    // shrink the sweep's input and still pass.
+    expect(desktop).toContain('resetBuildWindowPosition?.()');
     // Deliberately not an `<a href="overwolf://...">`: the windows declare
     // `block_top_window_navigation` and `popup_blocker`, so an in-app link is
     // blocked on purpose and would silently do nothing.
@@ -75,6 +79,21 @@ describe('Dynamo Lab desktop surface contract', () => {
         new RegExp(`\\.${panel}\\[hidden\\][^{]*\\{[^}]*display:\\s*none`),
       );
     }
+  });
+
+  it('does not promise monitor targeting the app cannot perform', () => {
+    // The reset hotkey used to be titled "Reset Full Build Window to Primary
+    // Monitor" while the handler only restored and focused. Overwolf's monitor
+    // enumeration needs the `DesktopStreaming` permission, which this app does
+    // not declare, so the copy has to describe what actually happens: bringing
+    // the window back into view. Asserted as a prohibition, not as an exact
+    // string, so improving the wording is still allowed.
+    const titles = Object.values(manifest.data.hotkeys as Record<string, { title: string }>)
+      .map((hotkey) => hotkey.title)
+      .join('\n');
+
+    expect(titles).not.toMatch(/primary monitor/i);
+    expect(manifest.data.hotkeys.reset_desktop_build.title).toMatch(/position/i);
   });
 
   it('preserves unique rendering targets and keeps the console hidden', () => {

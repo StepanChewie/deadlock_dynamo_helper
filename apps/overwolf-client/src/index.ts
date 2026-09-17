@@ -8,6 +8,11 @@ import {
 import { setRequiredFeatures } from './overwolf/set-required-features';
 import { isSuccessfulOverwolfResult } from './overwolf/window-result';
 import { InGameOverlayLifecycle } from './overwolf/in-game-overlay-lifecycle';
+import {
+  resolveWindowPlacement,
+  type WindowSize,
+  type WorkArea,
+} from './overwolf/window-placement';
 import { PREFERENCE_KEYS, persistPreference, readPreference } from './player-preferences';
 import * as ui from './ui';
 import { AdaptiveRecommendationClient } from './adaptive-recommendation-client';
@@ -144,6 +149,7 @@ function initializeBackgroundWindow(): void {
   mainWindow.openHotkeySettings = (): void => {
     ui.openExternal(HOTKEY_SETTINGS_URL);
   };
+  mainWindow.resetBuildWindowPosition = resetDesktopBuildWindow;
   /**
    * Persists the Settings toggle and re-reads it back into the checkbox.
    *
@@ -499,8 +505,81 @@ function registerWindowHotkeys(mainWindow: any): void {
 
     if (info?.name === 'reset_desktop_build') {
       ui.logConsole('Hotkey reset_desktop_build pressed.');
-      showDesktopBuildWindow(mainWindow, false);
+      resetDesktopBuildWindow();
     }
+  });
+}
+
+/** The display the window is currently on, as reported by the DOM Screen API. */
+function readWorkArea(): WorkArea {
+  // `globalThis.screen` is the DOM `Screen` interface, which does not declare
+  // `availLeft`/`availTop`; go through `unknown` rather than widening the cast.
+  const view = (globalThis as unknown as { screen?: Record<string, unknown> }).screen;
+  return {
+    left: typeof view?.availLeft === 'number' ? view.availLeft : 0,
+    top: typeof view?.availTop === 'number' ? view.availTop : 0,
+    width: typeof view?.availWidth === 'number' ? view.availWidth : 0,
+    height: typeof view?.availHeight === 'number' ? view.availHeight : 0,
+  };
+}
+
+/** The window's own size, or null when the platform does not report it. */
+function readWindowSize(): WindowSize | null {
+  const view = globalThis as unknown as { outerWidth?: unknown; outerHeight?: unknown };
+  if (typeof view.outerWidth !== 'number' || typeof view.outerHeight !== 'number') {
+    return null;
+  }
+
+  return { width: view.outerWidth, height: view.outerHeight };
+}
+
+/**
+ * Brings the build window back onto a visible display.
+ *
+ * Deliberately *not* "move it to the primary monitor", which is what the hotkey
+ * used to claim. Overwolf's monitor enumeration needs the `DesktopStreaming`
+ * permission, and this app declares only `GameInfo` and `Hotkeys` — taking a
+ * screen-capture-sounding permission for a window-reset key is not a trade
+ * worth making. The DOM Screen API already reports the working area of the
+ * display the window is on, which is what recovery actually needs.
+ *
+ * The move is best-effort. If the work area is unusable, or `changePosition` is
+ * unavailable, the window is still restored and focused — exactly the old
+ * behaviour — so the hotkey never does nothing.
+ */
+function resetDesktopBuildWindow(): void {
+  ow.windows.obtainDeclaredWindow('desktop', (result: any) => {
+    if (!isSuccessfulOverwolfResult(result) || !result.window?.id) {
+      ui.logConsole('Failed to obtain the desktop build window for resetting.');
+      return;
+    }
+
+    const windowId = result.window.id;
+
+    const settle = (): void => {
+      // Restore after moving: a minimized window would otherwise be moved and
+      // left minimized, which reads as "the reset did nothing".
+      ow.windows.restore(windowId, () => {
+        if (typeof ow.windows.bringToFront === 'function') {
+          ow.windows.bringToFront(windowId, true, () => {});
+        }
+      });
+    };
+
+    const placement = resolveWindowPlacement(readWorkArea(), readWindowSize());
+    if (!placement || typeof ow.windows.changePosition !== 'function') {
+      settle();
+      return;
+    }
+
+    ow.windows.changePosition(windowId, placement.left, placement.top, (moveResult: any) => {
+      if (isSuccessfulOverwolfResult(moveResult)) {
+        ui.logConsole(`Reset the build window to ${placement.left},${placement.top}.`);
+      } else {
+        ui.logConsole('Failed to reposition the build window; restoring it instead.');
+      }
+      settle();
+    });
   });
 }
 
