@@ -37,6 +37,14 @@ DB_USER="${DEADLOCK_BACKUP_USER:-postgres}"
 BACKUP_DIR="${DEADLOCK_BACKUP_DIR:-/var/backups/deadlock}"
 KEEP="${DEADLOCK_BACKUP_KEEP:-7}"
 
+# A deliberate failure-path test (see README) posts a REAL alert to the
+# production channel. It has to, because proving delivery is the whole point of
+# running it - but it must not be mistaken for an incident, which is exactly what
+# happened on 2026-09-16 at 20:59 UTC: the verification run's alert was reported
+# back as a genuine backup failure. Set this to 1 when inducing a failure on
+# purpose and the alert says so in its first line.
+TEST_ALERT="${DEADLOCK_BACKUP_TEST_ALERT:-0}"
+
 # The webhook is not duplicated in this file: reuse the one the health watcher
 # already has, so rotating it stays a one-place change. Explicit override first.
 if [ -z "${DISCORD_WEBHOOK_URL:-}" ]; then
@@ -62,9 +70,17 @@ notify() {
 }
 
 fail() {
-  logger -t "$TAG" "FAILED: $1"
-  echo "$1" >&2
-  notify "[$TAG] backup FAILED: $1"
+  local reason="$1"
+  # The journal line and the alert both carry the same marker, so a deliberate
+  # test is identifiable in either place after the fact.
+  if [ "$TEST_ALERT" = "1" ]; then
+    logger -t "$TAG" "FAILED (TEST ALERT - not an incident): $reason"
+    notify "[$TAG] TEST ALERT - not an incident: $reason"
+  else
+    logger -t "$TAG" "FAILED: $reason"
+    notify "[$TAG] backup FAILED: $reason"
+  fi
+  echo "$reason" >&2
   exit 1
 }
 

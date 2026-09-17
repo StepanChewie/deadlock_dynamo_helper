@@ -61,12 +61,31 @@ To exercise the failure path without touching the real database, point it at a
 container that does not exist:
 
 ```bash
-sudo DEADLOCK_BACKUP_CONTAINER=does-not-exist /usr/local/bin/deadlock-db-backup.sh
+sudo DEADLOCK_BACKUP_CONTAINER=does-not-exist \
+  DEADLOCK_BACKUP_TEST_ALERT=1 \
+  /usr/local/bin/deadlock-db-backup.sh
 ```
+
+**This posts a real alert to the production Discord channel.** That is the point
+of running it — an alert path that has never delivered anything is not known to
+work. `DEADLOCK_BACKUP_TEST_ALERT=1` marks it as a test so it cannot be mistaken
+for an incident; **without that variable the alert is word-for-word identical to
+a genuine failure.** On 2026-09-16 a verification run at 20:59 UTC did exactly
+that, and the resulting alert was reported back as a real backup failure. The
+marker appears in the journal line too, so either place identifies it.
 
 ## Restoring
 
-Not yet rehearsed end to end — treat that as an open item. The command is:
+**Rehearsed end to end on 2026-09-17 against the 2026-09-16 dump.** Restoring
+into a scratch database reproduced **32 tables against 32 live, `pg_restore`
+exit 0, zero errors**, with row counts matching exactly for every table checked
+(`adaptive_build_iterations_v1` 99, `build_archetype_match_locks_v2` 7,
+`statlocker_vs_hero_wpa_rows_v1` 173 496). `item_catalog_items` restored 2 904
+rows against 3 630 live, which is expected rather than a fault: that table is
+refreshed periodically and a dump is a point-in-time snapshot. The scratch
+database was dropped afterwards.
+
+The commands:
 
 ```bash
 # Inspect first: this lists the archive contents without touching anything.
@@ -77,7 +96,14 @@ docker exec -i aboba-telegramovich-postgres-1 \
   createdb -U postgres deadlock_restore_check
 docker exec -i aboba-telegramovich-postgres-1 \
   pg_restore -U postgres -d deadlock_restore_check --no-owner < /var/backups/deadlock/<file>.dump
+docker exec aboba-telegramovich-postgres-1 \
+  dropdb -U postgres deadlock_restore_check
 ```
+
+One trap worth knowing when scripting this: `docker exec -i` attaches the
+caller's stdin, so if the script itself is being piped in (`ssh host bash -s <
+script.sh`) the first interactive exec swallows the rest of the script. Give
+`-i` only to the command that actually reads stdin (`pg_restore`).
 
 ## Known gap: these dumps are on the same disk as the database
 
