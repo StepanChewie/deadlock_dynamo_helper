@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { HERO_REFERENCE_SEED } from '../deadlock-live/reference-data.seed';
 import { StatlockerDatasetV1 } from './statlocker-adaptive.types';
 
@@ -81,6 +81,7 @@ export class StatlockerBrowserCollectorService {
    * builds - so it only ever fires on a genuine hang, never on a slow network.
    */
   private readonly batchTimeoutMs = 180_000;
+  private readonly logger = new Logger(StatlockerBrowserCollectorService.name);
 
   constructor(
     @Inject(STATLOCKER_BROWSER_LAUNCHER_V1)
@@ -102,23 +103,29 @@ export class StatlockerBrowserCollectorService {
     try {
       return await this.withDeadline(this.batchTimeoutMs, 'statlocker collection', async () => {
         const page = await browser.newPage();
+        this.logger.log('collection: page created');
         await page.goto(`${this.baseUrl}/items/meta-model/wpa-analysis/`, {
           waitUntil: 'domcontentloaded',
           timeout: this.pageTimeoutMs,
         });
+        this.logger.log('collection: page loaded');
 
         const patchControl = await this.fetchFromPage(page, '/api/info/wpa-patches');
         this.assertSuccessfulResponse('/api/info/wpa-patches', patchControl);
         const statlockerPatchId = resolveMinorPatchId(patchControl.data);
+        this.logger.log(`collection: patch resolved to ${statlockerPatchId}`);
         const fetchedAt = new Date().toISOString();
         const datasets: StatlockerCollectedDatasetV1[] = [];
 
         for (let index = 0; index < targets.length; index += this.maxConcurrency) {
           const chunk = targets.slice(index, index + this.maxConcurrency);
+          this.logger.log(`collection: chunk [${chunk.map((entry) => entry.dataset).join(', ')}]`);
           const chunkResults = await Promise.all(chunk.map(async (target) => {
             const path = buildDatasetPath(target, statlockerPatchId);
+            this.logger.log(`collection: fetching ${target.dataset} -> ${path}`);
             const response = await this.fetchFromPage(page, path, statlockerPatchId);
             this.assertSuccessfulResponse(path, response);
+            this.logger.log(`collection: fetched ${target.dataset} status=${response.status}`);
             return {
               dataset: target.dataset,
               scopeKey: target.scopeKey,
