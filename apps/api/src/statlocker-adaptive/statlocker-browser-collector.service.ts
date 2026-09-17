@@ -74,6 +74,13 @@ export class StatlockerBrowserCollectorService {
   private readonly bodyTimeoutMs = 60_000;
   private readonly maxConcurrency = 3;
   private readonly closeTimeoutMs = 5_000;
+  /**
+   * Overall ceiling for one batch. Sized well above the sum of the per-step
+   * timeouts a batch can legitimately need - a page load plus a chunk of
+   * concurrent fetches is about 105s for the largest batch the refresh service
+   * builds - so it only ever fires on a genuine hang, never on a slow network.
+   */
+  private readonly batchTimeoutMs = 180_000;
 
   constructor(
     @Inject(STATLOCKER_BROWSER_LAUNCHER_V1)
@@ -93,44 +100,83 @@ export class StatlockerBrowserCollectorService {
     });
 
     try {
-      const page = await browser.newPage();
-      await page.goto(`${this.baseUrl}/items/meta-model/wpa-analysis/`, {
-        waitUntil: 'domcontentloaded',
-        timeout: this.pageTimeoutMs,
+      return await this.withDeadline(this.batchTimeoutMs, 'statlocker collection', async () => {
+        const page = await browser.newPage();
+        await page.goto(`${this.baseUrl}/items/meta-model/wpa-analysis/`, {
+          waitUntil: 'domcontentloaded',
+          timeout: this.pageTimeoutMs,
+        });
+
+        const patchControl = await this.fetchFromPage(page, '/api/info/wpa-patches');
+        this.assertSuccessfulResponse('/api/info/wpa-patches', patchControl);
+        const statlockerPatchId = resolveMinorPatchId(patchControl.data);
+        const fetchedAt = new Date().toISOString();
+        const datasets: StatlockerCollectedDatasetV1[] = [];
+
+        for (let index = 0; index < targets.length; index += this.maxConcurrency) {
+          const chunk = targets.slice(index, index + this.maxConcurrency);
+          const chunkResults = await Promise.all(chunk.map(async (target) => {
+            const path = buildDatasetPath(target, statlockerPatchId);
+            const response = await this.fetchFromPage(page, path, statlockerPatchId);
+            this.assertSuccessfulResponse(path, response);
+            return {
+              dataset: target.dataset,
+              scopeKey: target.scopeKey,
+              path,
+              status: response.status,
+              fetchedAt,
+              statlockerPatchId,
+              data: response.data,
+            } satisfies StatlockerCollectedDatasetV1;
+          }));
+          datasets.push(...chunkResults);
+        }
+
+        return {
+          statlockerPatchId,
+          fetchedAt,
+          datasets,
+        };
       });
-
-      const patchControl = await this.fetchFromPage(page, '/api/info/wpa-patches');
-      this.assertSuccessfulResponse('/api/info/wpa-patches', patchControl);
-      const statlockerPatchId = resolveMinorPatchId(patchControl.data);
-      const fetchedAt = new Date().toISOString();
-      const datasets: StatlockerCollectedDatasetV1[] = [];
-
-      for (let index = 0; index < targets.length; index += this.maxConcurrency) {
-        const chunk = targets.slice(index, index + this.maxConcurrency);
-        const chunkResults = await Promise.all(chunk.map(async (target) => {
-          const path = buildDatasetPath(target, statlockerPatchId);
-          const response = await this.fetchFromPage(page, path, statlockerPatchId);
-          this.assertSuccessfulResponse(path, response);
-          return {
-            dataset: target.dataset,
-            scopeKey: target.scopeKey,
-            path,
-            status: response.status,
-            fetchedAt,
-            statlockerPatchId,
-            data: response.data,
-          } satisfies StatlockerCollectedDatasetV1;
-        }));
-        datasets.push(...chunkResults);
-      }
-
-      return {
-        statlockerPatchId,
-        fetchedAt,
-        datasets,
-      };
     } finally {
       await this.closeBrowser(browser);
+    }
+  }
+
+  /**
+   * Never let a collection hang.
+   *
+   * The awaits inside `collectBatch` are otherwise unbounded. `page.goto` and the
+   * `AbortController` inside `fetchFromPage` only bound the fetch itself, not the
+   * `page.evaluate` round trip around it, and neither `browser.newPage()` nor
+   * `page.evaluate` carries a timeout at all - a crashed or detached page can
+   * leave the evaluate pending forever.
+   *
+   * The damage is worse than a slow refresh. `StatlockerRefreshService` runs the
+   * collection inside `singleFlight`, so a promise that never settles pins its
+   * `inFlight` key and that scope never refreshes again until the process
+   * restarts. Observed on 2026-09-17: the global key was still in flight, and
+   * WPA_PATCH_DATA and T4_CHAINS - a 30-minute TTL - had gaps of 4 and 8 days
+   * between fetches, because only a restart ever cleared the key.
+   *
+   * `closeBrowser` already documents and guards the same failure mode for
+   * `browser.close()`; this is that guard applied to the rest of the batch, so a
+   * hang anywhere in it fails the collection instead of wedging the schedule.
+   */
+  private async withDeadline<T>(timeoutMs: number, label: string, work: () => Promise<T>): Promise<T> {
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      return await Promise.race([
+        work(),
+        new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(
+            () => reject(new Error(`${label} exceeded ${timeoutMs}ms`)),
+            timeoutMs,
+          );
+        }),
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   }
 
