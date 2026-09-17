@@ -172,13 +172,17 @@ describe('AdaptiveDecisionStateV1Service', () => {
     expect(first.stateRevision).toBe(second.stateRevision);
   });
 
-  it('keeps unidentified roster slots out of the enemy roster', async () => {
+  it('keeps unidentified roster slots out of every roster derivation', async () => {
     // GEP reports slots it cannot attribute with `steam_id: "0"`, and the live
     // state turns those into `bot:<slot>` players carrying placeholder hero ids
     // (55, 1 and 0 were observed). On 2026-09-17, match 106167848, seven such
     // slots pushed the enemy roster to 8 heroes instead of 6, so every request
     // for the whole match answered ENEMY_ROSTER_INCOMPLETE and the app showed no
     // build at all.
+    //
+    // One of the phantoms here deliberately carries no `souls`: a single slot
+    // without that field turns the whole team total into `undefined`, which is
+    // the second way a phantom can corrupt the state.
     const withUnidentifiedSlots: MinimalMatchState = {
       ...matchState,
       playersBySteamId: {
@@ -189,7 +193,6 @@ describe('AdaptiveDecisionStateV1Service', () => {
           heroId: 55,
           heroName: 'UNKNOWN',
           teamId: 2,
-          souls: 0,
           items: [],
         },
         'bot:roster_5': {
@@ -197,7 +200,7 @@ describe('AdaptiveDecisionStateV1Service', () => {
           playerName: 'UNKNOWN',
           heroId: 1,
           heroName: 'INFERNUS',
-          teamId: 2,
+          teamId: 1,
           souls: 0,
           items: [],
         },
@@ -209,6 +212,10 @@ describe('AdaptiveDecisionStateV1Service', () => {
 
     expect(built.enemyHeroIds).toEqual([20, 30]);
     expect((built.enemyHeroes ?? []).map((hero) => hero.heroId)).toEqual([20, 30]);
+    expect((built.enemyLiveStates ?? []).map((enemy) => enemy.heroId)).toEqual([20, 30]);
+    expect(built.allyHeroIds).toEqual([11]);
+    expect(built.enemyTeamSouls).toBe(9000);
+    expect(built.ourTeamSouls).toBe(5000);
   });
 
   it('carries deterministic per-enemy live state without inventing missing metrics', async () => {

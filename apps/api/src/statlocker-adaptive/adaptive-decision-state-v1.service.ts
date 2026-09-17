@@ -194,7 +194,7 @@ export class AdaptiveDecisionStateV1Service {
       ? observedFact(local.souls as number, `souls-affordability:${compiled.rulesetId}:${version.payloadSha256}`)
       : unknownFact<number>('souls-affordability-scope-unverified');
 
-    const players = Object.values(match.playersBySteamId);
+    const players = identifiedPlayers(match);
     const allies = players.filter((player) => player.teamId === local.teamId && player.steamId !== localSteamId);
     const enemies = players.filter((player) => player.teamId !== undefined && player.teamId !== local.teamId);
     const allyHeroIds = stableHeroIds(allies);
@@ -266,11 +266,25 @@ function isUnidentifiedPlayer(playerKey: string): boolean {
   return playerKey.startsWith('bot:');
 }
 
+/**
+ * The players GEP has actually attributed to someone.
+ *
+ * `resolveLocalSteamId` has always excluded unidentified slots; every other
+ * derivation has to as well. A phantom slot is not merely an extra row: on
+ * 2026-09-17 (match 106167848) seven of them inflated the enemy roster to 8
+ * heroes and the readiness check failed for the entire match, and because such a
+ * slot carries no `souls` at all, one of them can also turn a team soul total
+ * into `undefined`.
+ */
+function identifiedPlayers(match: MinimalMatchState): readonly MinimalPlayerState[] {
+  return Object.entries(match.playersBySteamId)
+    .filter(([playerKey]) => !isUnidentifiedPlayer(playerKey))
+    .map(([, player]) => player);
+}
+
 function resolveEnemyHeroes(match: MinimalMatchState, localTeamId: number): readonly AdaptiveEnemyHeroV1[] {
   const byHeroId = new Map<number, AdaptiveEnemyHeroV1>();
-  // Entries, not values: the key is what identifies an unidentified player.
-  for (const [playerKey, player] of Object.entries(match.playersBySteamId)) {
-    if (isUnidentifiedPlayer(playerKey)) continue;
+  for (const player of identifiedPlayers(match)) {
     if (player.teamId === undefined || player.teamId === localTeamId || !Number.isInteger(player.heroId)) continue;
     const heroId = Number(player.heroId);
     const heroName = typeof player.heroName === 'string' && player.heroName.trim()
@@ -288,7 +302,7 @@ function resolveEnemyLiveStates(
   match: MinimalMatchState,
   localTeamId: number,
 ): readonly AdaptiveEnemyLiveStateV1[] {
-  return Object.values(match.playersBySteamId)
+  return identifiedPlayers(match)
     .filter((player) => player.teamId !== undefined && player.teamId !== localTeamId && Number.isInteger(player.heroId))
     .map((player) => ({
       steamId: player.steamId,
@@ -345,8 +359,8 @@ function calculateTeamSoulTotals(
   match: MinimalMatchState,
   localTeamId: number,
 ): { our?: number; enemy?: number } {
-  const ourPlayers = Object.values(match.playersBySteamId).filter((player) => player.teamId === localTeamId);
-  const enemyPlayers = Object.values(match.playersBySteamId).filter(
+  const ourPlayers = identifiedPlayers(match).filter((player) => player.teamId === localTeamId);
+  const enemyPlayers = identifiedPlayers(match).filter(
     (player) => player.teamId !== undefined && player.teamId !== localTeamId,
   );
   return {
