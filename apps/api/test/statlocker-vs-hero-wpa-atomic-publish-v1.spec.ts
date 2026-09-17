@@ -59,6 +59,30 @@ describe('Statlocker VS_HERO_WPA atomic relational publication V1', () => {
     }));
   });
 
+  it('replaces the rows already stored for the same snapshot when the payload is re-ingested', async () => {
+    // The snapshot id is the content hash, so re-ingesting an unchanged payload
+    // under a new catalog identity writes rows with the same snapshotId and the
+    // same logical keys. Without the delete the insert violates
+    // uq_statlocker_vs_hero_wpa_source_row_v1 and the ingest fails - which is
+    // exactly how the rows stayed stamped with a superseded catalog on
+    // 2026-09-17 while queryWpa filtered them all out.
+    const dataSource = new FakePublicationDataSource({
+      raw: [rawSnapshot('snapshot-b', 'PENDING', '2026-09-17T18:00:00.000Z')],
+      rows: [persistedRow('snapshot-b', 2, 'rank_8')],
+    });
+    const publisher = new StatlockerVsHeroWpaPublisherV1Service(dataSource as never);
+
+    await publisher.publish({
+      snapshotId: 'snapshot-b',
+      rows: [normalizedRow('snapshot-b', 2, 'rank_8'), normalizedRow('snapshot-b', 3, 'rank_9')],
+    });
+
+    const stored = dataSource.state.rows.filter((row) => row.snapshotId === 'snapshot-b');
+    expect(stored).toHaveLength(2);
+    expect(stored.map((row) => row.itemId).sort((a, b) => a - b)).toEqual([2, 3]);
+    expect(statusOf(dataSource.state, 'snapshot-b')).toBe('PUBLISHED');
+  });
+
   it('keeps the previous published snapshot active and marks the new RAW snapshot failed when row insertion fails', async () => {
     const dataSource = new FakePublicationDataSource({
       raw: [
@@ -209,6 +233,11 @@ function repositoryFor(
           nextId += 1;
         }
         return { identifiers: [] };
+      },
+      delete: async (where: Partial<StatlockerVsHeroWpaRowV1Entity>) => {
+        const before = state.rows.length;
+        state.rows = state.rows.filter((row) => !matches(row, where));
+        return { affected: before - state.rows.length };
       },
     };
   }

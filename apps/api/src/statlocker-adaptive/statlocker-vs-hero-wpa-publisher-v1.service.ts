@@ -36,6 +36,14 @@ export class StatlockerVsHeroWpaPublisherV1Service {
           order: { fetchedAt: 'DESC' },
         });
 
+        // Rows are unique per (snapshotId, rankBucket, heroId, enemyHeroId,
+        // itemId) and the snapshot id is the content hash, so re-ingesting an
+        // unchanged payload under a new catalog identity collides with the rows
+        // already stored for it. Replacing them is also what re-stamps the rows
+        // to the current identity, which is the whole point of the re-ingest:
+        // without it the ingest fails and the rows stay invisible to queryWpa.
+        await rowRepository.delete({ snapshotId: snapshot.snapshotId });
+
         const ROW_BATCH_SIZE = 1_000;
         for (let index = 0; index < input.rows.length; index += ROW_BATCH_SIZE) {
           const batch = input.rows.slice(index, index + ROW_BATCH_SIZE);
