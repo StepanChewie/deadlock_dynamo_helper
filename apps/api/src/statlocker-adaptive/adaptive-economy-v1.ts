@@ -149,6 +149,24 @@ export function createCanonicalEconomyRulesV1(
       vitality: [1600],
       spirit: [1600],
     },
+    // Not optional in practice, however optional the field looks.
+    //
+    // `deriveUpgradeCost` returns undefined without a policy, and
+    // `compileStrictRecommendationCatalogV1` then drops every recipe whose soul
+    // cost is unknown. A canonical entry without this field therefore produces a
+    // catalog with no upgrade recipes at all, and no progression path is
+    // executable: on 2026-09-17 the full build stopped after four family entry
+    // purchases and the rest of the match answered REQUIRED_FAMILY_UNSATISFIED.
+    //
+    // This is the same default the canonical entry for the previous catalog
+    // carried. An operator-verified policy still wins - publishing it
+    // deactivates the canonical row for the same (rulesetId, catalogSha256).
+    upgradePricingPolicy: {
+      mode: 'TARGET_COST_MINUS_VERIFIED_COMPONENT_CREDIT',
+      componentCreditRatio: 1,
+      evidence: 'RECONSTRUCTED',
+      source: 'canonical-deadlock-economy-v1',
+    },
   };
 }
 export function resolveRecommendationEconomyRulesV1(
