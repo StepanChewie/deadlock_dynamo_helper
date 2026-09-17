@@ -54,6 +54,59 @@ export class BuildArchetypeSnapshotStoreV2Service {
     });
   }
 
+  /**
+   * The active snapshot for this hero, plus the patch it was actually built for.
+   *
+   * `resolveLocalPatchId` returns the patch of the newest evidence row, which can
+   * be a patch statlocker has only just rolled to and for which nothing has been
+   * built yet. On 2026-09-17 the per-hero datasets moved to 698776157349216434
+   * while all 145 archetype snapshots - and every WPA row - were still on
+   * 676255623445218601. `getActive` then found nothing, every request answered
+   * BUILD_ARCHETYPE_V2_UNAVAILABLE, and the app showed no build at all.
+   *
+   * The caller must use the returned patch for its WPA query as well, otherwise
+   * the snapshot and the rows disagree and the matchup evidence is lost again.
+   */
+  async getActiveWithPatch(
+    identity: BuildArchetypeSnapshotIdentityV2,
+  ): Promise<{ snapshot: BuildArchetypeSnapshotV2; statlockerPatchId: string }> {
+    const normalized = normalizeIdentity(identity);
+    const repository = this.dataSource.getRepository(BuildArchetypeSnapshotV2Entity);
+    const exact = await repository.findOne({
+      where: {
+        heroId: normalized.heroId,
+        rulesetVersion: normalized.rulesetVersion,
+        statlockerPatchId: normalized.statlockerPatchId,
+        catalogSha256: normalized.catalogSha256,
+        isActive: true,
+      },
+      order: { publishedAt: 'DESC', snapshotId: 'DESC' },
+    });
+    if (exact) {
+      return { snapshot: parsePayload(exact), statlockerPatchId: exact.statlockerPatchId };
+    }
+
+    const newestForHero = await repository.findOne({
+      where: {
+        heroId: normalized.heroId,
+        rulesetVersion: normalized.rulesetVersion,
+        catalogSha256: normalized.catalogSha256,
+        isActive: true,
+      },
+      order: { publishedAt: 'DESC', snapshotId: 'DESC' },
+    });
+    if (!newestForHero) {
+      throw new Error(
+        `Build archetype v2 snapshot not found for hero ${normalized.heroId} ` +
+        `${normalized.rulesetVersion}/${normalized.statlockerPatchId}/${normalized.catalogSha256}`,
+      );
+    }
+    return {
+      snapshot: parsePayload(newestForHero),
+      statlockerPatchId: newestForHero.statlockerPatchId,
+    };
+  }
+
   async getActive(identity: BuildArchetypeSnapshotIdentityV2): Promise<BuildArchetypeSnapshotV2> {
     const normalized = normalizeIdentity(identity);
     const repository = this.dataSource.getRepository(BuildArchetypeSnapshotV2Entity);

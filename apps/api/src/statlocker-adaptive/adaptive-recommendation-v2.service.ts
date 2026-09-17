@@ -269,15 +269,26 @@ export class AdaptiveRecommendationV2Service {
       return notReadyRecommendation(decision, ['STATLOCKER_PATCH_UNAVAILABLE']);
     }
 
-    const activeIdentity: BuildArchetypeSnapshotIdentityV2 = {
-      heroId: decision.state.heroId,
-      rulesetVersion: decision.rulesetId,
-      statlockerPatchId,
-      catalogSha256: decision.catalogSha256,
-    };
     let snapshot: BuildArchetypeSnapshotV2;
+    let activeIdentity: BuildArchetypeSnapshotIdentityV2;
     try {
-      snapshot = await this.snapshotStore.getActive(activeIdentity);
+      const resolved = await this.snapshotStore.getActiveWithPatch({
+        heroId: decision.state.heroId,
+        rulesetVersion: decision.rulesetId,
+        statlockerPatchId,
+        catalogSha256: decision.catalogSha256,
+      });
+      snapshot = resolved.snapshot;
+      // Use the patch the snapshot was actually built for, not the newest patch
+      // the evidence reports. The WPA rows are stamped with the snapshot's patch
+      // and queryWpa filters on it, so mixing the two loses the matchup evidence
+      // even once the snapshot is found.
+      activeIdentity = {
+        heroId: decision.state.heroId,
+        rulesetVersion: decision.rulesetId,
+        statlockerPatchId: resolved.statlockerPatchId,
+        catalogSha256: decision.catalogSha256,
+      };
     } catch {
       return notReadyRecommendation(decision, ['BUILD_ARCHETYPE_V2_UNAVAILABLE']);
     }

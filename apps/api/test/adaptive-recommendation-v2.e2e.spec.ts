@@ -326,6 +326,7 @@ function harness(resolverOverride?: { resolve(input: unknown): ResolvedFullBuild
   };
   const snapshotStore = {
     getActive: jest.fn(async () => snapshot),
+    getActiveWithPatch: jest.fn(async () => ({ snapshot, statlockerPatchId: PATCH_ID })),
     getById: jest.fn(async (snapshotId: string) => {
       if (snapshotId !== snapshot.snapshotId) throw new Error(`Unknown snapshot ${snapshotId}`);
       return snapshot;
@@ -376,6 +377,9 @@ function harness(resolverOverride?: { resolve(input: unknown): ResolvedFullBuild
   return {
     controller,
     traceStore,
+    snapshotStore,
+    wpaRepository,
+    snapshot,
     setFullRoster() {
       currentDecision = liveDecision(ENEMY_HERO_IDS);
     },
@@ -386,6 +390,26 @@ function harness(resolverOverride?: { resolve(input: unknown): ResolvedFullBuild
 }
 
 describe('Adaptive recommendation V2 endpoint', () => {
+  it('uses the patch the snapshot was built for, not the newest one the evidence reports', async () => {
+    // The evidence reports the newest patch, which can be one statlocker has only
+    // just rolled to and for which nothing is built yet: on 2026-09-17 the
+    // per-hero datasets moved to 698776157349216434 while all 145 archetype
+    // snapshots and every WPA row were still on 676255623445218601. `getActive`
+    // then found nothing and the whole match answered BUILD_ARCHETYPE_V2_UNAVAILABLE.
+    const h = harness();
+    h.setFullRoster();
+    h.snapshotStore.getActiveWithPatch.mockResolvedValue({
+      snapshot: h.snapshot,
+      statlockerPatchId: 'patch-previous',
+    });
+
+    await h.controller.recommend({ matchId: 'match-v2-fallback', localSteamId: 'steam-local' });
+
+    expect(h.wpaRepository.findActive).toHaveBeenCalledWith(
+      expect.objectContaining({ statlockerPatchId: 'patch-previous' }),
+    );
+  });
+
   it('waits for a full enemy roster before the first immutable archetype lock', async () => {
     const h = harness();
 
