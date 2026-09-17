@@ -42,6 +42,7 @@ function createHarness(options: {
             target.dataset === 'PRO_BUILD_ANALYSIS' ? statlockerV1Fixtures.proBuild :
             statlockerV1Fixtures.filteredItems,
         })),
+        failures: [],
       };
     }),
   };

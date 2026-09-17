@@ -48,6 +48,11 @@ function shortenBatchTimeout(service: StatlockerBrowserCollectorService, ms = 20
   (service as unknown as { batchTimeoutMs: number }).batchTimeoutMs = ms;
 }
 
+// Production uses 90 s; the tests only need it to be observable.
+function shortenTargetTimeout(service: StatlockerBrowserCollectorService, ms = 20): void {
+  (service as unknown as { targetTimeoutMs: number }).targetTimeoutMs = ms;
+}
+
 function targets() {
   return [{ dataset: 'T4_CHAINS' as const, scopeKey: 'global' }];
 }
@@ -142,5 +147,33 @@ describe('StatlockerBrowserCollectorService browser lifecycle', () => {
     shortenBatchTimeout(service);
 
     await expect(service.collectBatch(targets())).rejects.toThrow('exceeded 20ms');
+  });
+
+  it('returns the datasets that succeeded when one target hangs', async () => {
+    // One hanging dataset used to discard the whole chunk. On 2026-09-17
+    // /api/info/wpa-patch-data/<new patch> never returned, and T4_CHAINS and
+    // VS_HERO_WPA - both HTTP 200, in 1s and 7s - were thrown away with it, so
+    // nothing was published for either and the global data went stale.
+    const page = createPage();
+    page.evaluate = jest.fn(async (_fn: unknown, input: { path: string }) => {
+      if (input.path === '/api/info/wpa-patches') {
+        return { status: 200, data: [{ minorPatchId: '7.3' }] };
+      }
+      if (input.path.startsWith('/api/info/wpa-patch-data')) {
+        return new Promise(() => undefined);
+      }
+      return { status: 200, data: { ok: true } };
+    });
+    const browser = createFakeBrowser({ newPage: jest.fn().mockResolvedValue(page) });
+    const service = buildService(browser);
+    shortenTargetTimeout(service);
+
+    const result = await service.collectBatch([
+      { dataset: 'WPA_PATCH_DATA', scopeKey: 'patch:current' },
+      { dataset: 'T4_CHAINS', scopeKey: 'global' },
+    ]);
+
+    expect(result.failures.map((failure) => failure.dataset)).toEqual(['WPA_PATCH_DATA']);
+    expect(result.datasets.map((entry) => entry.dataset)).toEqual(['T4_CHAINS']);
   });
 });

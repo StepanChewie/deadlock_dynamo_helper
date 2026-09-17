@@ -199,6 +199,16 @@ export class StatlockerRefreshService implements OnApplicationBootstrap {
         if (globalDue) this.lastSuccessByKey.set(key, nowMs);
         if (vsHeroWpaDue) this.lastSuccessByKey.set(vsHeroWpaKey, nowMs);
         this.markSuccess(nowMs);
+        if (result.failures.length > 0) {
+          // What came back was published and the rest waits for the next cycle.
+          // Recorded after markSuccess so it stays visible in the status instead
+          // of being cleared by it - a partial refresh must not read as a clean
+          // one, which is how the 2026-09-17 outage stayed invisible.
+          this.lastError = `partial collection: ${result.failures
+            .map((failure) => `${failure.dataset} (${failure.error})`)
+            .join('; ')}`;
+          this.logger.warn(`global refresh: ${this.lastError}`);
+        }
       } catch (error) {
         // This used to be silent. The error reached only `lastError`, which the
         // status endpoint does not expose, so a failing global refresh looked

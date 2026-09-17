@@ -23,10 +23,25 @@ export interface StatlockerCollectedDatasetV1 {
   data: unknown;
 }
 
+export interface StatlockerCollectionFailureV1 {
+  dataset: StatlockerCollectableDatasetV1;
+  error: string;
+}
+
 export interface StatlockerBrowserCollectionResultV1 {
   statlockerPatchId: string;
   fetchedAt: string;
   datasets: readonly StatlockerCollectedDatasetV1[];
+  /**
+   * Targets that failed on their own, without taking the rest of the batch down.
+   *
+   * A chunk is fetched concurrently and one dataset hanging used to discard the
+   * others: on 2026-09-17 `/api/info/wpa-patch-data/<new patch>` never returned,
+   * and `T4_CHAINS` and `VS_HERO_WPA` - both HTTP 200 in 1s and 7s - were thrown
+   * away with it, so nothing was published for either. Each target now has its
+   * own deadline, and a failure is reported here instead of aborting the batch.
+   */
+  failures: readonly StatlockerCollectionFailureV1[];
 }
 
 export interface StatlockerBrowserLauncherV1 {
@@ -81,6 +96,12 @@ export class StatlockerBrowserCollectorService {
    * builds - so it only ever fires on a genuine hang, never on a slow network.
    */
   private readonly batchTimeoutMs = 180_000;
+  /**
+   * Per-target ceiling, so one dataset cannot take the chunk down with it. Set
+   * above `bodyTimeoutMs` (60s) so a merely slow fetch still gets its full inner
+   * budget, and well below the batch ceiling so the others have room to finish.
+   */
+  private readonly targetTimeoutMs = 90_000;
   private readonly logger = new Logger(StatlockerBrowserCollectorService.name);
 
   constructor(
@@ -117,32 +138,49 @@ export class StatlockerBrowserCollectorService {
         const fetchedAt = new Date().toISOString();
         const datasets: StatlockerCollectedDatasetV1[] = [];
 
+        const failures: StatlockerCollectionFailureV1[] = [];
         for (let index = 0; index < targets.length; index += this.maxConcurrency) {
           const chunk = targets.slice(index, index + this.maxConcurrency);
           this.logger.log(`collection: chunk [${chunk.map((entry) => entry.dataset).join(', ')}]`);
           const chunkResults = await Promise.all(chunk.map(async (target) => {
             const path = buildDatasetPath(target, statlockerPatchId);
             this.logger.log(`collection: fetching ${target.dataset} -> ${path}`);
-            const response = await this.fetchFromPage(page, path, statlockerPatchId);
-            this.assertSuccessfulResponse(path, response);
-            this.logger.log(`collection: fetched ${target.dataset} status=${response.status}`);
-            return {
-              dataset: target.dataset,
-              scopeKey: target.scopeKey,
-              path,
-              status: response.status,
-              fetchedAt,
-              statlockerPatchId,
-              data: response.data,
-            } satisfies StatlockerCollectedDatasetV1;
+            try {
+              const response = await this.withDeadline(
+                this.targetTimeoutMs,
+                `${target.dataset} fetch`,
+                () => this.fetchFromPage(page, path, statlockerPatchId),
+              );
+              this.assertSuccessfulResponse(path, response);
+              this.logger.log(`collection: fetched ${target.dataset} status=${response.status}`);
+              return {
+                dataset: target.dataset,
+                scopeKey: target.scopeKey,
+                path,
+                status: response.status,
+                fetchedAt,
+                statlockerPatchId,
+                data: response.data,
+              } satisfies StatlockerCollectedDatasetV1;
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error);
+              this.logger.error(`collection: ${target.dataset} failed: ${message}`);
+              failures.push({ dataset: target.dataset, error: message });
+              return undefined;
+            }
           }));
-          datasets.push(...chunkResults);
+          datasets.push(
+            ...chunkResults.filter(
+              (entry): entry is StatlockerCollectedDatasetV1 => entry !== undefined,
+            ),
+          );
         }
 
         return {
           statlockerPatchId,
           fetchedAt,
           datasets,
+          failures,
         };
       });
     } finally {

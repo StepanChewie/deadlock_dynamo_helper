@@ -38,6 +38,7 @@ describe('Statlocker VS_HERO_WPA RAW ingest V1', () => {
             data: rawPayload,
           },
         ],
+        failures: [],
       })),
     };
     const normalizer = {
@@ -136,6 +137,7 @@ describe('Statlocker VS_HERO_WPA RAW ingest V1', () => {
             data: rawPayload,
           },
         ],
+        failures: [],
       })),
     };
     const normalizer = {
@@ -222,6 +224,7 @@ describe('Statlocker VS_HERO_WPA RAW ingest V1', () => {
             data: rawPayload,
           },
         ],
+        failures: [],
       })),
     };
     const normalizer = {
@@ -329,6 +332,7 @@ describe('Statlocker VS_HERO_WPA RAW ingest V1', () => {
         statlockerPatchId: 'test',
         fetchedAt: '2026-09-09T10:00:00.000Z',
         datasets: [],
+        failures: [],
       })),
     };
     const service = new StatlockerRefreshService(
