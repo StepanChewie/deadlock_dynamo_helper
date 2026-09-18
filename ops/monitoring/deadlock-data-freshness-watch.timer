@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the Dynamo Lab build data freshness watch every 15 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+AccuracySec=30s
+Unit=deadlock-data-freshness-watch.service
+
+[Install]
+WantedBy=timers.target

@@ -111,10 +111,13 @@ jobs:
           # someone copied it by hand -- which is how a stale build stayed
           # deployed once already.
           sudo install -m 0755 ops/monitoring/deadlock-health-watch.sh /usr/local/bin/
+          sudo install -m 0755 ops/monitoring/deadlock-data-freshness-watch.sh /usr/local/bin/
           sudo install -m 0755 ops/backups/deadlock-db-backup.sh       /usr/local/bin/
           sudo install -m 0755 ops/nginx/check-drift.sh                /usr/local/bin/deadlock-nginx-drift-check.sh
           sudo install -m 0644 ops/monitoring/deadlock-health-watch.service /etc/systemd/system/
           sudo install -m 0644 ops/monitoring/deadlock-health-watch.timer   /etc/systemd/system/
+          sudo install -m 0644 ops/monitoring/deadlock-data-freshness-watch.service /etc/systemd/system/
+          sudo install -m 0644 ops/monitoring/deadlock-data-freshness-watch.timer   /etc/systemd/system/
           sudo install -m 0644 ops/backups/deadlock-db-backup.service       /etc/systemd/system/
           sudo install -m 0644 ops/backups/deadlock-db-backup.timer         /etc/systemd/system/
 
@@ -127,17 +130,31 @@ jobs:
 
           sudo systemctl daemon-reload
           sudo systemctl enable --now deadlock-health-watch.timer
+          sudo systemctl enable --now deadlock-data-freshness-watch.timer
           sudo systemctl enable --now deadlock-db-backup.timer
 
           # Assert the install happened instead of trusting it: a copy that
           # silently did nothing is exactly the failure this step exists for.
           cmp -s ops/monitoring/deadlock-health-watch.sh /usr/local/bin/deadlock-health-watch.sh
+          cmp -s ops/monitoring/deadlock-data-freshness-watch.sh /usr/local/bin/deadlock-data-freshness-watch.sh
           cmp -s ops/backups/deadlock-db-backup.sh       /usr/local/bin/deadlock-db-backup.sh
           cmp -s ops/nginx/check-drift.sh                /usr/local/bin/deadlock-nginx-drift-check.sh
           cmp -s ops/nginx/aboba-telegramovich.duckdns.org.conf /usr/local/share/deadlock/nginx-snapshot.conf
           systemctl is-active --quiet deadlock-health-watch.timer
+          systemctl is-active --quiet deadlock-data-freshness-watch.timer
           systemctl is-active --quiet deadlock-db-backup.timer
-          echo 'ops units installed; both timers active'
+          echo 'ops units installed; all timers active'
+
+          # Run the freshness watch once, right now, and report what it found.
+          # Deliberately non-fatal: a stale dataset is a symptom to investigate,
+          # not a reason to fail a deploy that otherwise succeeded. Making it
+          # gate the pipeline would turn a reporting signal into an outage path
+          # -- the same mistake as putting a rate limiter on a healthcheck.
+          if sudo /usr/local/bin/deadlock-data-freshness-watch.sh; then
+            echo 'build data is fresh'
+          else
+            echo "::warning title=build data is stale::deadlock-data-freshness-watch reported a problem. Read the output above; the same finding has been alerted if a webhook is configured."
+          fi
 
       - name: Verify Statlocker adaptive serving locally
         run: |

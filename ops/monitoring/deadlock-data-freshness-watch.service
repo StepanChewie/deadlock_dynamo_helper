@@ -1,0 +1,15 @@
+[Unit]
+Description=Dynamo Lab build data freshness watch (evidence, matchup rows, archetypes)
+Documentation=https://github.com/StepanChewie/deadlock_dynamo_helper/blob/main/ops/monitoring/README-data-freshness.md
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/deadlock-data-freshness-watch.sh
+
+# Needs the docker CLI to run psql inside the database container.
+User=root
+
+# Exits 1 when any dataset is older than its cadence, so the failure is also
+# visible in `systemctl --failed` -- a second, independent signal from the log
+# line and the alert.
