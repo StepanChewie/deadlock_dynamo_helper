@@ -15,7 +15,12 @@ const OVERWOLF_TEST_SCREEN_HEIGHT = 720;
 // Appstore requires 256x256 icons. The previous icon was 447x447, so this is a
 // real fix rather than a formality.
 const STORE_ICON_SIZE = 256;
-const STORE_ICON_MAX_BYTES = 40 * 1024;
+// 30 KB, not 40: Overwolf's asset documentation states "max 30KB" for `icon` and
+// `icon_gray`, and a limit looser than the platform's would let an icon pass here
+// and be rejected at submission - the validator would be reporting readiness it
+// cannot actually guarantee. `window_icon` has no published limit; holding it to
+// the same ceiling is deliberate and safe.
+const STORE_ICON_MAX_BYTES = 30 * 1024;
 const STORE_ICON_FIELDS = ['icon', 'icon_gray', 'window_icon'];
 
 // Origins that can never be part of a shipped build.
