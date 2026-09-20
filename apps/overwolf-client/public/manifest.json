@@ -76,7 +76,6 @@
         "transparent": true,
         "resizable": true,
         "clickthrough": false,
-        "use_in_game_coordinate_system": true,
         "size": {
           "width": 340,
           "height": 620
@@ -85,9 +84,9 @@
           "width": 340,
           "height": 180
         },
-        "default_position": {
-          "x": 20,
-          "y": 80
+        "start_position": {
+          "top": 80,
+          "left": 20
         },
         "in_game_only": true
       },
@@ -99,14 +98,13 @@
         "transparent": true,
         "resizable": true,
         "clickthrough": false,
-        "use_in_game_coordinate_system": true,
         "size": {
           "width": 400,
           "height": 150
         },
-        "default_position": {
-          "x": 800,
-          "y": 180
+        "start_position": {
+          "top": 180,
+          "left": 800
         },
         "in_game_only": true
       }
@@ -114,17 +112,17 @@
     "hotkeys": {
       "toggle_overlay": {
         "title": "Toggle In-Game Build Overlay",
-        "action-name": "toggle_overlay",
+        "action-type": "custom",
         "default": "Ctrl+Shift+D"
       },
       "show_desktop_build": {
         "title": "Show Full Build Window",
-        "action-name": "show_desktop_build",
+        "action-type": "custom",
         "default": "Ctrl+Shift+B"
       },
       "reset_desktop_build": {
         "title": "Reset Full Build Window Position",
-        "action-name": "reset_desktop_build",
+        "action-type": "custom",
         "default": "Ctrl+Shift+Home"
       }
     },

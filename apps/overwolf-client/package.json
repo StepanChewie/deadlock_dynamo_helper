@@ -13,6 +13,7 @@
     "build": "node scripts/generate-adaptive-item-catalog.js --check && node scripts/generate-adaptive-hero-catalog.js --check && webpack --mode production && node scripts/configure-api-base-url.js && node scripts/validate-release.js && node scripts/sync-public-to-windows.js",
     "configure:api": "node scripts/configure-api-base-url.js",
     "validate:release": "node scripts/validate-release.js",
+    "check:manifest-schema": "bash scripts/check-manifest-schema.sh",
     "dev": "webpack --mode development",
     "test": "jest --runInBand",
     "lint": "echo \"overwolf: no lint\""

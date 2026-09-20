@@ -162,11 +162,14 @@ assert(
 );
 
 const inGameWindow = manifest.data?.windows?.in_game;
+// `start_position`, not `default_position`: the latter is not an Overwolf
+// property, so this check was reading a value Overwolf ignores and the offset it
+// was meant to verify was never applied.
 assert(
-  (inGameWindow?.default_position?.y || 0) +
+  (inGameWindow?.start_position?.top || 0) +
     (inGameWindow?.size?.height || 0) <=
     OVERWOLF_TEST_SCREEN_HEIGHT,
-  `in_game offset ${inGameWindow?.default_position?.y} plus declared height ${inGameWindow?.size?.height} exceeds the ${OVERWOLF_TEST_SCREEN_HEIGHT}px Overwolf test screen.`,
+  `in_game offset ${inGameWindow?.start_position?.top} plus declared height ${inGameWindow?.size?.height} exceeds the ${OVERWOLF_TEST_SCREEN_HEIGHT}px Overwolf test screen.`,
 );
 
 // Store icons: must exist, be real PNGs, be exactly 256x256, and stay small

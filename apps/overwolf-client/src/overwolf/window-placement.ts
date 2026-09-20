@@ -40,7 +40,7 @@ function isPositive(value: unknown): value is number {
  * the area instead, which is still fully visible.
  *
  * Centring is what "reset" means here — Overwolf centres a window that declares
- * no `default_position`, and the desktop window declares none.
+ * no `start_position`, and the desktop window declares none.
  */
 export function resolveWindowPlacement(
   workArea: WorkArea,

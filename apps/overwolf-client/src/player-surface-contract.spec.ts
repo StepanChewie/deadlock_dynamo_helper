@@ -217,7 +217,10 @@ describe('Dynamo Lab release manifest contract', () => {
       width: 340,
       height: OVERLAY_MAX_HEIGHT,
     });
-    expect(manifest.data.windows.in_game.default_position.y).toBe(OVERLAY_TOP_OFFSET);
+    // `start_position`, not `default_position`: the latter is not an Overwolf
+    // property at all, so asserting it proved nothing while the offset was in
+    // fact never applied. See the manifest schema check.
+    expect(manifest.data.windows.in_game.start_position.top).toBe(OVERLAY_TOP_OFFSET);
     expect(manifest.data.game_targeting.game_ids).toEqual([24482]);
     expect(manifest.permissions).toEqual(['GameInfo', 'Hotkeys']);
     expect(Object.keys(manifest.data.hotkeys))
