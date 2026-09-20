@@ -160,6 +160,51 @@ def phys_chunk(dpi=72):
     return struct.pack(">IIB", per_metre, per_metre, 1)
 
 
+def corner_radius(size):
+    """22% of the side - the usual proportion for an app-icon corner.
+
+    Floored at 2 px so the 16 px layer still reads as rounded rather than square.
+    """
+    return max(2, int(round(size * 0.22)))
+
+
+def round_corners(rgba, size, radius):
+    """Set alpha outside a rounded rectangle, so the icon has transparent corners.
+
+    Two documented requirements meet here. The dock icons are described as
+    "rounded" while the window icon is "squared", and the launcher icon is "a
+    256x256 transparent .png converted into an .ico" - a fully opaque square has
+    no transparency at all. Rounding the dock icons and the launcher satisfies
+    both readings at once, and keeps the launcher looking like the dock icon as
+    the guide also asks.
+
+    Edge pixels get partial alpha so the corner is antialiased rather than jagged.
+    """
+    out = bytearray(rgba)
+    for y in range(size):
+        for x in range(size):
+            # Distance to the nearest corner centre, 0 in the straight sections.
+            dx = 0
+            if x < radius:
+                dx = radius - x
+            elif x > size - 1 - radius:
+                dx = x - (size - 1 - radius)
+            dy = 0
+            if y < radius:
+                dy = radius - y
+            elif y > size - 1 - radius:
+                dy = y - (size - 1 - radius)
+            if dx == 0 or dy == 0:
+                continue
+            distance = (dx * dx + dy * dy) ** 0.5
+            if distance <= radius - 0.5:
+                continue
+            coverage = max(0.0, min(1.0, radius + 0.5 - distance))
+            index = (y * size + x) * 4 + 3
+            out[index] = int(out[index] * coverage)
+    return bytes(out)
+
+
 def quantize(rgba, max_colors=64):
     """Median-cut the image down to a palette.
 
@@ -173,7 +218,10 @@ def quantize(rgba, max_colors=64):
     # the pixels in sorted order instead of image order - which scrambles the
     # picture into a smear. `ordered` keeps the original raster order for the final
     # pass; `working` is what the splitting may reorder.
-    ordered = [(rgba[i], rgba[i + 1], rgba[i + 2]) for i in range(0, len(rgba), 4)]
+    ordered = [
+        (rgba[i], rgba[i + 1], rgba[i + 2], rgba[i + 3])
+        for i in range(0, len(rgba), 4)
+    ]
     working = list(ordered)
     boxes = [working]
     while len(boxes) < max_colors:
@@ -182,7 +230,9 @@ def quantize(rgba, max_colors=64):
         for box in boxes:
             if len(box) < 2:
                 continue
-            for channel in range(3):
+            # Alpha is a dimension too: the rounded corners add a transparency
+            # ramp that a colour-only split would quantise into visible steps.
+            for channel in range(4):
                 values = [p[channel] for p in box]
                 spread = max(values) - min(values)
                 if spread > widest:
@@ -206,10 +256,11 @@ def quantize(rgba, max_colors=64):
                 sum(p[0] for p in box) // count,
                 sum(p[1] for p in box) // count,
                 sum(p[2] for p in box) // count,
+                sum(p[3] for p in box) // count,
             )
         )
     while len(palette) < 2:
-        palette.append((0, 0, 0))
+        palette.append((0, 0, 0, 255))
 
     cache = {}
     indices = bytearray()
@@ -222,6 +273,7 @@ def quantize(rgba, max_colors=64):
                     (pixel[0] - entry[0]) ** 2
                     + (pixel[1] - entry[1]) ** 2
                     + (pixel[2] - entry[2]) ** 2
+                    + (pixel[3] - entry[3]) ** 2
                 )
                 if distance < best_distance:
                     best, best_distance = position, distance
@@ -232,7 +284,12 @@ def quantize(rgba, max_colors=64):
 
 
 def png_encode_palette(width, height, indices, palette):
-    """Colour-type 3 PNG: one byte per pixel plus a palette chunk."""
+    """Colour-type 3 PNG: one byte per pixel, a palette, and alpha when needed.
+
+    Palette entries are (r, g, b, a). Transparency travels in a tRNS chunk, which
+    is why the rounded corners can still ship as a palette PNG - an RGBA PNG of
+    this art is 46 KB, over the 30 KB the store allows.
+    """
     raw = bytearray()
     for row in range(height):
         raw.append(0)
@@ -246,12 +303,16 @@ def png_encode_palette(width, height, indices, palette):
             + struct.pack(">I", zlib.crc32(kind + body) & 0xFFFFFFFF)
         )
 
-    plte = b"".join(bytes(entry) for entry in palette)
+    plte = b"".join(bytes(entry[:3]) for entry in palette)
+    alphas = [entry[3] for entry in palette]
+    while alphas and alphas[-1] == 255:
+        alphas.pop()
     header = struct.pack(">IIBBBBB", width, height, 8, 3, 0, 0, 0)
     return (
         b"\x89PNG\r\n\x1a\n"
         + chunk(b"IHDR", header)
         + chunk(b"PLTE", plte)
+        + (chunk(b"tRNS", bytes(alphas)) if alphas else b"")
         + chunk(b"pHYs", phys_chunk())
         + chunk(b"IDAT", zlib.compress(bytes(raw), 9))
         + chunk(b"IEND", b"")
@@ -428,11 +489,17 @@ def main():
     grey_square = desaturate(square)
     grey = {size: resample(side, side, grey_square, size) for size in ICO_SIZES}
 
+    # Rounded, with transparent corners: the dock icons and the launcher.
+    rounded_color = {size: round_corners(color[size], size, corner_radius(size)) for size in ICO_SIZES}
+    rounded_grey = {size: round_corners(grey[size], size, corner_radius(size)) for size in ICO_SIZES}
+
     written = []
     for name, data, size in (
-        ("icon-256.png", color[256], 256),
-        ("icon-gray-256.png", grey[256], 256),
-        ("window-icon-256.png", color[256], 256),
+        ("IconMouseOver.png", rounded_color[256], 256),
+        ("IconMouseNormal.png", rounded_grey[256], 256),
+        # The window icon is squared on purpose - the guide says the dock icons
+        # are rounded "while this taskbar icon should be squared".
+        ("WindowIcon.png", color[256], 256),
     ):
         path = os.path.join(out_dir, name)
         palette, indices = quantize(data)
@@ -442,7 +509,7 @@ def main():
 
     entries = []
     for size in ICO_SIZES:
-        data = color[size]
+        data = rounded_color[size]
         # PNG entry only for 256, DIB everywhere else: that is what Windows shells
         # expect and what every icon tool writes.
         if size == 256:
@@ -452,9 +519,9 @@ def main():
             payload = dib_encode(size, size, data)
         entries.append((size, size, payload))
     ico = ico_encode(entries)
-    path = os.path.join(out_dir, "launcher.ico")
+    path = os.path.join(out_dir, "launcher_icon.ico")
     open(path, "wb").write(ico)
-    written.append(("launcher.ico", len(ico), 0))
+    written.append(("launcher_icon.ico", len(ico), 0))
 
     for name, size, colors in written:
         suffix = f"  ({colors} colours)" if colors else ""

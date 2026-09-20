@@ -8,10 +8,10 @@
     "minimum-gep-version": "305.0",
     "author": "StepanChewbacca",
     "description": "Live Deadlock build route: one current purchase plus the next four legal purchases for the running match",
-    "icon": "store/icon-256.png",
-    "icon_gray": "store/icon-gray-256.png",
-    "launcher_icon": "store/launcher.ico",
-    "window_icon": "store/window-icon-256.png",
+    "icon": "store/IconMouseOver.png",
+    "icon_gray": "store/IconMouseNormal.png",
+    "launcher_icon": "store/launcher_icon.ico",
+    "window_icon": "store/WindowIcon.png",
     "dock_button_title": "Dynamo Lab"
   },
   "permissions": [
