@@ -212,7 +212,7 @@ describe('Dynamo Lab release manifest contract', () => {
 
   it('pins declared windows, game targeting, permissions, and hotkeys', () => {
     expect(manifest.data.start_window).toBe('desktop');
-    expect(Object.keys(manifest.data.windows)).toEqual(['desktop', 'in_game', 'dynamo_warning']);
+    expect(Object.keys(manifest.data.windows)).toEqual(['desktop', 'in_game']);
     expect(manifest.data.windows.in_game.size).toEqual({
       width: 340,
       height: OVERLAY_MAX_HEIGHT,

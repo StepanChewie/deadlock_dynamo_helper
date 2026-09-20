@@ -89,24 +89,6 @@
           "left": 20
         },
         "in_game_only": true
-      },
-      "dynamo_warning": {
-        "file": "dynamo_warning.html",
-        "block_top_window_navigation": true,
-        "popup_blocker": true,
-        "mute": true,
-        "transparent": true,
-        "resizable": true,
-        "clickthrough": false,
-        "size": {
-          "width": 400,
-          "height": 150
-        },
-        "start_position": {
-          "top": 180,
-          "left": 800
-        },
-        "in_game_only": true
       }
     },
     "hotkeys": {

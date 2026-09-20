@@ -5,7 +5,6 @@ const { version } = require('./package.json');
 module.exports = {
   entry: {
     index: './src/index.ts',
-    dynamo_warning: './src/dynamo_warning.ts',
   },
   output: {
     filename: '[name].js',

@@ -274,10 +274,6 @@ for (const match of desktopHtml.matchAll(/openExternal\?\.\('([^']+)'\)/g)) {
 
 const distDir = path.join(publicDir, 'dist');
 assert(fs.existsSync(path.join(distDir, 'index.js')), 'Compiled dist/index.js is missing.');
-assert(
-  fs.existsSync(path.join(distDir, 'dynamo_warning.js')),
-  'Compiled dist/dynamo_warning.js is missing.',
-);
 
 if (errors.length > 0) {
   throw new Error(`Overwolf release validation failed:\n- ${errors.join('\n- ')}`);

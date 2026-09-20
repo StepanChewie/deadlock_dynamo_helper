@@ -9,7 +9,6 @@ const copySources = [
   join('public', 'manifest.json'),
   join('public', 'desktop.html'),
   join('public', 'in_game.html'),
-  join('src', 'dynamo_warning.ts'),
 ];
 
 describe('toggle_overlay hotkey copy', () => {
