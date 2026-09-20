@@ -57,14 +57,17 @@ services:
       - BUILD_DEBUG_SESSION_TTL_SEC=${BUILD_DEBUG_SESSION_TTL_SEC:-3600}
       - BUILD_DEBUG_TRACE_TAIL=${BUILD_DEBUG_TRACE_TAIL:-5}
       - BUILD_DEBUG_TRACE_IDLE_TTL_SEC=${BUILD_DEBUG_TRACE_IDLE_TTL_SEC:-1800}
-      - DEADLOCK_API_KEY=${DEADLOCK_API_KEY}
       # Guards operator-only routes (reference-data, live reads, debug page, statelocker probe).
       # Unset means those routes fail closed with 401 rather than becoming public. The shipped
       # Overwolf client never sends it -- it only calls recommend, feedback and live/events.
       - INTERNAL_API_KEY=${INTERNAL_API_KEY:-}
-      # Comma-separated CORS allowlist. Empty keeps the API permissive, which is the current
-      # deliberate state: the real Overwolf Origin has not been measured yet, and pinning a
-      # guess would break the client in the field.
+      # Comma-separated CORS allowlist. Empty keeps the API permissive.
+      #
+      # Measured, not guessed: the Overwolf client sends a non-standard Origin that carries the
+      # app UID -- `https://www.overwolf.com/<uid>` -- captured from live traffic through nginx.
+      # A plain `https://www.overwolf.com` entry would NOT match, because the comparison is on the
+      # whole string. The UID is derived from meta.name and meta.author, so renaming the app
+      # changes this value and the client would stop being allowed until it is updated here.
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-}
       - DEADLOCK_API_BASE_URL=${DEADLOCK_API_BASE_URL:-https://api.deadlock-api.com}
       - ADAPTIVE_ECONOMY_RULES_JSON=${ADAPTIVE_ECONOMY_RULES_JSON:-}
