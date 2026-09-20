@@ -96,7 +96,12 @@ def decode(path):
         expanded[pixel * 3: pixel * 3 + 3] = palette[entry: entry + 3]
     return width, height, 3, bytes(expanded)
 
-ICO_SIZES = [256, 64, 48, 32, 24, 16]
+# Exactly the sizes Overwolf requires for launcher_icon, and no others. Their
+# release guide is explicit: "Make sure that your icon's layer sizes include all of
+# (and only) the above sizes (16x16, 32x32, 48x48, 256x256)". An earlier build of
+# this script used six sizes (adding 24 and 64, which is the usual Windows
+# practice) and so violated the "only" half of that rule.
+ICO_SIZES = [256, 48, 32, 16]
 MARK_FILL = 0.80  # fraction of the canvas the mark should occupy
 
 # Every ICO entry is a straight downscale of the master, including 16 and 24 px.

@@ -22,6 +22,10 @@ const STORE_ICON_SIZE = 256;
 // the same ceiling is deliberate and safe.
 const STORE_ICON_MAX_BYTES = 30 * 1024;
 const STORE_ICON_FIELDS = ['icon', 'icon_gray', 'window_icon'];
+// Overwolf's release guide: "Make sure that your icon's layer sizes include all of
+// (and only) the above sizes (16x16, 32x32, 48x48, 256x256)". Both halves matter -
+// extra layers are a defect, not a bonus.
+const LAUNCHER_ICON_SIZES = [16, 32, 48, 256];
 
 // Origins that can never be part of a shipped build.
 //
@@ -190,8 +194,27 @@ if (typeof manifest.meta?.launcher_icon === 'string') {
   const icoPath = path.join(publicDir, manifest.meta.launcher_icon);
   assert(fs.existsSync(icoPath), 'manifest.meta.launcher_icon is missing.');
   if (fs.existsSync(icoPath)) {
-    const head = fs.readFileSync(icoPath).subarray(0, 4).toString('hex');
+    const ico = fs.readFileSync(icoPath);
+    const head = ico.subarray(0, 4).toString('hex');
     assert(head === '00000100', 'manifest.meta.launcher_icon must be a real ICO file.');
+
+    // The size set is checked, not just the container magic. Overwolf's release
+    // guide requires "all of (and only)" 16, 32, 48 and 256 - so a six-size icon,
+    // which is the ordinary Windows practice, is a submission defect. Checking
+    // only the magic let exactly that ship.
+    const count = ico.readUInt16LE(4);
+    const sizes = [];
+    for (let index = 0; index < count; index += 1) {
+      const width = ico[6 + index * 16] || 256;
+      const height = ico[6 + index * 16 + 1] || 256;
+      sizes.push(width === height ? width : `${width}x${height}`);
+    }
+    assert(
+      sizes.length === LAUNCHER_ICON_SIZES.length
+        && LAUNCHER_ICON_SIZES.every((size) => sizes.includes(size)),
+      `manifest.meta.launcher_icon must contain exactly the layers `
+      + `${LAUNCHER_ICON_SIZES.join(', ')}; found ${sizes.join(', ')}.`,
+    );
   }
 }
 
