@@ -97,16 +97,17 @@ integrate», и v1 могут не одобрить.
 ### Полное описание (markdown, ≤2000 символов)
 
 ```markdown
-**Dynamo Lab tells you what to buy next — and what comes after that.**
+**Dynamo Lab tells you the whole build — not just the next item.**
 
 Deadlock rewards planning. Between fights you have seconds to decide, and a build that looked right
 at ten minutes can be the wrong one at twenty. Dynamo Lab reads the match you are actually in and
-lays out the next five legal purchases for your hero, in order.
+lays out the **complete purchase route for your hero**, from the item in your hand to the finished
+build.
 
 **What it shows**
 
-- The item to buy right now
-- The next four purchases, in the order you will reach them
+- The full build, in the order you will buy it — every purchase, not a five-item window
+- The item to buy right now, called out so you never have to work out where you are
 - Adjustments for the enemy team you are facing
 
 **Two windows, one job**

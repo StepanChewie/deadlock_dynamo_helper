@@ -7,7 +7,7 @@
     "minimum-overwolf-version": "0.197.0",
     "minimum-gep-version": "305.0",
     "author": "StepanChewbacca",
-    "description": "Live Deadlock build route: one current purchase plus the next four legal purchases for the running match",
+    "description": "Full Deadlock build route for the match you are in: the complete purchase order through to the finished build, with your next buy called out in-game",
     "icon": "store/IconMouseOver.png",
     "icon_gray": "store/IconMouseNormal.png",
     "launcher_icon": "store/launcher_icon.ico",
