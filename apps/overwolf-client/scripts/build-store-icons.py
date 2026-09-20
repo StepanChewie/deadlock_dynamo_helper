@@ -142,9 +142,22 @@ def png_encode(width, height, rgba):
     return (
         b"\x89PNG\r\n\x1a\n"
         + chunk(b"IHDR", header)
+        + chunk(b"pHYs", phys_chunk())
         + chunk(b"IDAT", zlib.compress(bytes(raw), 9))
         + chunk(b"IEND", b"")
     )
+
+
+def phys_chunk(dpi=72):
+    """A pHYs chunk declaring the image resolution.
+
+    Overwolf's asset requirements say the icons must be "256x256 pixels with at
+    least 72 PPI". A PNG without pHYs has no declared resolution at all, so a
+    reviewer checking that line has nothing to read. 72 DPI is the documented
+    minimum and what the spec asks for.
+    """
+    per_metre = int(round(dpi / 0.0254))
+    return struct.pack(">IIB", per_metre, per_metre, 1)
 
 
 def quantize(rgba, max_colors=64):
@@ -239,6 +252,7 @@ def png_encode_palette(width, height, indices, palette):
         b"\x89PNG\r\n\x1a\n"
         + chunk(b"IHDR", header)
         + chunk(b"PLTE", plte)
+        + chunk(b"pHYs", phys_chunk())
         + chunk(b"IDAT", zlib.compress(bytes(raw), 9))
         + chunk(b"IEND", b"")
     )

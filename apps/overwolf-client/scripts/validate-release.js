@@ -187,6 +187,16 @@ for (const field of STORE_ICON_FIELDS) {
     fs.statSync(filePath).size <= STORE_ICON_MAX_BYTES,
     `meta.${field} exceeds ${Math.round(STORE_ICON_MAX_BYTES / 1024)}KB.`,
   );
+
+  // "at least 72 PPI" is a documented requirement, so it is asserted rather than
+  // left to whatever a viewer assumes.
+  const ppi = readPngPpi(filePath);
+  assert(
+    ppi !== undefined && ppi >= 72,
+    ppi === undefined
+      ? `meta.${field} declares no resolution (no pHYs chunk); at least 72 PPI is required.`
+      : `meta.${field} declares ${Math.round(ppi)} PPI; at least 72 is required.`,
+  );
 }
 
 // The launcher icon must be a real ICO container, not a PNG with a new name.
@@ -278,6 +288,31 @@ function assert(condition, message) {
   if (!condition) {
     errors.push(message);
   }
+}
+
+/**
+ * Read the resolution a PNG declares in its pHYs chunk, in dots per inch.
+ *
+ * Returns undefined when the chunk is absent. That is not the same as 72 DPI: it
+ * means no resolution is declared at all, and Overwolf's asset requirements ask
+ * for "256x256 pixels with at least 72 PPI" on the store icons, so a reviewer
+ * checking that line would have nothing to read.
+ */
+function readPngPpi(filePath) {
+  const buffer = fs.readFileSync(filePath);
+  let offset = 8;
+  while (offset + 8 <= buffer.length) {
+    const length = buffer.readUInt32BE(offset);
+    const type = buffer.subarray(offset + 4, offset + 8).toString('ascii');
+    if (type === 'pHYs' && length >= 9) {
+      const unit = buffer.readUInt8(offset + 16);
+      if (unit !== 1) return undefined;
+      return buffer.readUInt32BE(offset + 8) * 0.0254;
+    }
+    if (type === 'IDAT' || type === 'IEND') break;
+    offset += 12 + length;
+  }
+  return undefined;
 }
 
 function assertPng(filePath, label) {
