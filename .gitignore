@@ -16,3 +16,7 @@ graphify-out/
 .superpowers/
 
 .impeccable/
+
+# The store package is a build artefact: reproducible from the checkout, and a
+# zip in git history is dead weight.
+*.opk
