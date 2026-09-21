@@ -25,7 +25,7 @@ comparison on a schedule, out of process, where a bug in the API cannot hide it.
 | Check | Fails when | Default |
 |---|---|---|
 | Global evidence (`WPA_PATCH_DATA`, `T4_CHAINS`) | older than 2 h (cadence is 30 min) | `DEADLOCK_GLOBAL_MAX_AGE_SEC` |
-| Matchup rows (`VS_HERO_WPA`) | published snapshot older than 36 h (cadence 24 h) | `DEADLOCK_WPA_MAX_AGE_SEC` |
+| Matchup rows (`VS_HERO_WPA`) | upstream last reached more than 36 h ago (cadence 24 h) | `DEADLOCK_WPA_MAX_AGE_SEC` |
 | Archetype snapshots | newest active one older than 36 h | `DEADLOCK_ARCHETYPE_MAX_AGE_SEC` |
 | Patch consistency | newest evidence patch ≠ newest archetype patch | always on |
 | Database reachable | `select 1` does not return | always on |
@@ -37,7 +37,22 @@ Two notes on what is deliberately *not* checked:
   active. Alerting on them would fire every time nobody played for a day.
 - **`VS_HERO_WPA` in the evidence table** is always `UNAVAILABLE` by design — the
   dataset is relational-only and the snapshot store refuses it. That row's age is
-  not a signal, which is why the check reads the published raw snapshot instead.
+  not a signal.
+- **The age of the published `VS_HERO_WPA` snapshot is not used either**, even
+  though an earlier version of this check read it. The raw snapshot is
+  deduplicated by content hash, so its `fetchedAt` only advances when the upstream
+  payload actually changes. Statlocker served byte-identical matchup data from
+  2026-09-18 to 2026-09-21 — confirmed by a cycle that fetched it and got HTTP 200
+  with the same hash — and the row's age grew the whole time while the data was
+  perfectly fresh. The check now reads `vsHeroWpaLastCheckAt` from the status
+  endpoint, which the refresh service records whenever it reaches upstream,
+  published or not. That answers "how long since we last looked", which is the
+  question that distinguishes a healthy refresh from one that has stopped.
+
+  A consequence worth knowing: the value is in-memory, so it is absent for about a
+  minute after the API restarts. The check treats absent as unknown rather than
+  stale — the refresh re-runs within a minute of start anyway — and an unreachable
+  status endpoint is reported as a finding in its own right.
 
 The **patch-consistency** check is the one that would have caught the outage
 outright. The app resolves a single patch id for the whole identity from the

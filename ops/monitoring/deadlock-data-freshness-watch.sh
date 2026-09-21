@@ -27,6 +27,8 @@
 #   DEADLOCK_ARCHETYPE_MAX_AGE_SEC archetype snapshots (default 129600 = 36h)
 #   DEADLOCK_REMIND_MIN            re-alert interval while still bad (default 120)
 #   DEADLOCK_STATE_FILE           (default /var/lib/deadlock-data-freshness/state)
+#   DEADLOCK_STATUS_URL           status endpoint the matchup check time is read
+#                                 from (default the API on localhost:3000)
 #   DEADLOCK_FRESHNESS_TEST_ALERT=1  mark the alert as a deliberate test
 #
 # The file is sourced BEFORE the defaults are resolved, so a value in the file
@@ -67,6 +69,9 @@ WPA_MAX_AGE="${DEADLOCK_WPA_MAX_AGE_SEC:-129600}"
 ARCHETYPE_MAX_AGE="${DEADLOCK_ARCHETYPE_MAX_AGE_SEC:-129600}"
 REMIND_MIN="${DEADLOCK_REMIND_MIN:-120}"
 STATE_FILE="${DEADLOCK_STATE_FILE:-/var/lib/deadlock-data-freshness/state}"
+# Where to read the refresh service's own record of when it last reached upstream
+# for the matchup dataset. Local: the watcher runs on the same host as the API.
+STATUS_URL="${DEADLOCK_STATUS_URL:-http://127.0.0.1:3000/deadlock/adaptive/v1/status}"
 TEST_ALERT="${DEADLOCK_FRESHNESS_TEST_ALERT:-0}"
 
 mkdir -p "$(dirname "$STATE_FILE")" 2>/dev/null || true
@@ -101,14 +106,36 @@ EOF
 
   # --- 2. matchup rows --------------------------------------------------------
   # VS_HERO_WPA is relational-only: the evidence table cannot hold it, which is
-  # why its own row there always reads as unavailable and is not a signal. The
-  # published raw snapshot is the real source.
-  wpa_age="$(printf '%s' "select coalesce(extract(epoch from (now() - max(\"fetchedAt\")))::bigint, -1) from statlocker_vs_hero_wpa_raw_snapshots_v1 where \"ingestStatus\" = 'PUBLISHED';" | sql)"
-  case "$wpa_age" in
-    ''|*[!0-9-]*) problems+=("matchup rows: could not read the published snapshot age") ;;
-    -1) problems+=("matchup rows: no PUBLISHED snapshot at all") ;;
-    *) [ "$wpa_age" -gt "$WPA_MAX_AGE" ] && problems+=("matchup rows are ${wpa_age}s old (max ${WPA_MAX_AGE}s)") ;;
-  esac
+  # why its own row there always reads as unavailable and is not a signal.
+  #
+  # Deliberately NOT measured by the age of the published snapshot any more. That
+  # row is deduplicated by content hash, so its fetchedAt only advances when the
+  # upstream payload actually changes. Statlocker held the same matchup data from
+  # 2026-09-18 to 2026-09-21 - verified by a cycle that fetched it with HTTP 200
+  # and found it identical - and the age grew the whole time while the data was
+  # perfectly fresh. Row age cannot tell "unchanged upstream" from "silently
+  # stopped", which is exactly the distinction this unit exists to make.
+  #
+  # The API records vsHeroWpaLastCheckAt whenever it reaches upstream, published
+  # or not, and that is the signal: how long since we last looked.
+  status_json="$(curl -sS --max-time 10 "$STATUS_URL" 2>/dev/null || true)"
+  if [ -z "$status_json" ]; then
+    problems+=("matchup rows: could not read the status endpoint at ${STATUS_URL}")
+  else
+    wpa_check_at="$(printf '%s' "$status_json" \
+      | sed -n 's/.*"vsHeroWpaLastCheckAt"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+    if [ -z "$wpa_check_at" ]; then
+      # Absent means the process has restarted since its last check; it re-runs
+      # within a minute of start, so a missing value is not itself a finding.
+      logger -t "$TAG" "matchup check time unknown (process restarted); not alerting"
+    else
+      wpa_age="$(($(date -u +%s) - $(date -u -d "$wpa_check_at" +%s)))"
+      case "$wpa_age" in
+        ''|*[!0-9-]*) problems+=("matchup rows: unreadable check time ${wpa_check_at}") ;;
+        *) [ "$wpa_age" -gt "$WPA_MAX_AGE" ] && problems+=("matchup rows last checked ${wpa_age}s ago (max ${WPA_MAX_AGE}s)") ;;
+      esac
+    fi
+  fi
 
   # --- 3. archetype snapshots -------------------------------------------------
   archetype_age="$(printf '%s' "select coalesce(extract(epoch from (now() - max(\"publishedAt\")))::bigint, -1) from build_archetype_snapshots_v2 where \"isActive\";" | sql)"
