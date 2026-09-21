@@ -33,6 +33,12 @@ export interface StatlockerRefreshStatusV1 {
   lastAttemptAt?: string;
   lastSuccessAt?: string;
   lastError?: string;
+  // When upstream was last actually reached for VS_HERO_WPA, published or not.
+  // Distinct from the age of the stored rows, which only advance when the content
+  // changes: a dataset whose upstream copy is genuinely unchanged looks older
+  // every day while being perfectly fresh, so row age alone cannot tell a healthy
+  // refresh from one that has silently stopped.
+  vsHeroWpaLastCheckAt?: string;
   identity?: StatlockerGameIdentityV1;
 }
 
@@ -55,6 +61,7 @@ export class StatlockerRefreshService implements OnApplicationBootstrap {
   private identity?: StatlockerGameIdentityV1;
   private readonly activeHeroes = new Map<number, number>();
   private readonly lastSuccessByKey = new Map<string, number>();
+  private lastVsHeroWpaCheckAt?: string;
   private readonly inFlight = new Map<string, Promise<void>>();
   private readonly activeHeroTtlMs = readBoundedMs(
     process.env.STATLOCKER_ACTIVE_HERO_TTL_MS,
@@ -152,7 +159,21 @@ export class StatlockerRefreshService implements OnApplicationBootstrap {
             if (!rawSnapshot) {
               throw new Error('VS_HERO_WPA RAW persistence is unavailable');
             }
-            if (rawSnapshot.ingestStatus === 'PUBLISHED') continue;
+
+            // Upstream was reached and the payload stored, so this counts as a
+            // check whether or not anything is republished below. Without this the
+            // only trace of a healthy cycle is a row that did not change, which is
+            // indistinguishable from a cycle that never ran.
+            this.lastVsHeroWpaCheckAt = new Date(nowMs).toISOString();
+
+            if (rawSnapshot.ingestStatus === 'PUBLISHED') {
+              this.logger.log(
+                'VS_HERO_WPA: upstream content unchanged, keeping snapshot '
+                + `${rawSnapshot.snapshotId} fetched at ${rawSnapshot.fetchedAt}`
+                + ' - nothing to republish, but the check succeeded',
+              );
+              continue;
+            }
 
             const ingestStartedAt = Date.now();
             try {
@@ -328,6 +349,7 @@ export class StatlockerRefreshService implements OnApplicationBootstrap {
       lastAttemptAt: this.lastAttemptAt,
       lastSuccessAt: this.lastSuccessAt,
       lastError: this.lastError,
+      vsHeroWpaLastCheckAt: this.lastVsHeroWpaCheckAt,
       identity: this.identity ? { ...this.identity } : undefined,
     };
   }
