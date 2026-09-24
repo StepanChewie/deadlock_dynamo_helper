@@ -1,8 +1,26 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, readdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { HERO_REFERENCE_SEED } from '../deadlock-live/reference-data.seed';
 import { StatlockerDatasetV1 } from './statlocker-adaptive.types';
 
 export const STATLOCKER_BROWSER_LAUNCHER_V1 = Symbol('STATLOCKER_BROWSER_LAUNCHER_V1');
+
+/**
+ * Datasets that are fetched to disk instead of through the devtools protocol.
+ *
+ * A payload has to cross the browser boundary to be read in node, and the
+ * protocol cannot carry a large one: `WPA_PATCH_DATA` is 258 MB for the current
+ * patch, and returning it from `page.evaluate` was still unfinished after twenty
+ * minutes. Neither a longer deadline nor parsing in node helps, because both
+ * still have to move the same bytes across that boundary.
+ *
+ * Chromium can write the file itself. The page triggers a download, chromium
+ * writes it to disk, and node reads it - measured end to end at 18 seconds for
+ * the 258 MB payload, with the parse taking 3.3 of those.
+ */
+const DISK_BACKED_DATASETS: readonly StatlockerDatasetV1[] = ['WPA_PATCH_DATA'];
 
 export type StatlockerCollectableDatasetV1 = Exclude<StatlockerDatasetV1, 'CONSENSUS_SKELETON'>;
 
@@ -61,6 +79,11 @@ interface StatlockerBrowserV1 {
 interface StatlockerPageV1 {
   goto(url: string, options: Record<string, unknown>): Promise<unknown>;
   evaluate<T>(fn: (...args: any[]) => unknown, input: unknown): Promise<T>;
+  createCDPSession(): Promise<StatlockerCdpSessionV1>;
+}
+
+interface StatlockerCdpSessionV1 {
+  send(method: string, params: Record<string, unknown>): Promise<unknown>;
 }
 
 interface BrowserFetchResultV1 {
@@ -102,6 +125,12 @@ export class StatlockerBrowserCollectorService {
    * budget, and well below the batch ceiling so the others have room to finish.
    */
   private readonly targetTimeoutMs = 90_000;
+  /**
+   * Deadline for the disk-backed path. Writing 258 MB and reading it back
+   * measured 18s, but a slower upstream should be allowed room; it stays below
+   * the batch ceiling so the rest of the chunk is not starved.
+   */
+  private readonly diskTargetTimeoutMs = 150_000;
   private readonly logger = new Logger(StatlockerBrowserCollectorService.name);
 
   constructor(
@@ -146,10 +175,13 @@ export class StatlockerBrowserCollectorService {
             const path = buildDatasetPath(target, statlockerPatchId);
             this.logger.log(`collection: fetching ${target.dataset} -> ${path}`);
             try {
+              const viaDisk = DISK_BACKED_DATASETS.includes(target.dataset);
               const response = await this.withDeadline(
-                this.targetTimeoutMs,
+                viaDisk ? this.diskTargetTimeoutMs : this.targetTimeoutMs,
                 `${target.dataset} fetch`,
-                () => this.fetchFromPage(page, path, statlockerPatchId),
+                () => (viaDisk
+                  ? this.fetchToDisk(page, path, statlockerPatchId)
+                  : this.fetchFromPage(page, path, statlockerPatchId)),
               );
               this.assertSuccessfulResponse(path, response);
               this.logger.log(`collection: fetched ${target.dataset} status=${response.status}`);
@@ -316,6 +348,94 @@ export class StatlockerBrowserCollectorService {
         clearTimeout(timer);
       }
     }, { path, timeoutMs: this.bodyTimeoutMs, statlockerPatchId });
+  }
+
+  /**
+   * Fetch by having chromium write the payload to disk and reading the file here.
+   *
+   * The page still does the request, because that is the only way the endpoint
+   * answers - it accepts the site's own referer and answers 401 to anything else,
+   * and there is no API key. What changes is how the bytes get to node: the page
+   * hands the blob to chromium's downloader instead of returning it through the
+   * protocol, which cannot carry a payload this size.
+   */
+  private async fetchToDisk(
+    page: StatlockerPageV1,
+    path: string,
+    statlockerPatchId: string,
+  ): Promise<BrowserFetchResultV1> {
+    const dir = join(
+      tmpdir(),
+      `statlocker-dl-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    );
+    mkdirSync(dir, { recursive: true });
+    const target = join(dir, 'payload.json');
+
+    try {
+      const session = await page.createCDPSession();
+      await session.send('Page.setDownloadBehavior', {
+        behavior: 'allow',
+        downloadPath: dir,
+      });
+
+      const status = await page.evaluate<number>(async (input: {
+        path: string;
+        name: string;
+      }) => {
+        const response = await fetch(input.path, {
+          method: 'GET',
+          credentials: 'same-origin',
+        });
+        if (!response.ok) return response.status;
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = input.name;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        return response.status;
+      }, { path, name: 'payload.json' });
+
+      if (status < 200 || status >= 300) {
+        return { status, data: null };
+      }
+
+      await this.waitForDownloadToSettle(target);
+      const text = readFileSync(target, 'utf8');
+      this.logger.log(`collection: read ${path} from disk (${text.length} chars)`);
+      return { status, data: JSON.parse(text) };
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  /**
+   * Chromium writes the file itself and gives no completion callback, so watch
+   * for the size to stop changing. A single unchanged read is not enough - a
+   * large download can pause - so require several in a row.
+   */
+  private async waitForDownloadToSettle(target: string, timeoutMs = 240_000): Promise<void> {
+    const started = Date.now();
+    let previous = -1;
+    let stable = 0;
+    while (Date.now() - started < timeoutMs) {
+      if (existsSync(target)) {
+        const size = statSync(target).size;
+        if (size > 0 && size === previous) {
+          stable += 1;
+          if (stable >= 3) return;
+        } else {
+          stable = 0;
+          previous = size;
+        }
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    throw new Error(
+      `download did not settle: ${target} (${readdirSync(join(target, '..')).join(', ') || 'empty'})`,
+    );
   }
 
   private assertSuccessfulResponse(path: string, response: BrowserFetchResultV1): void {

@@ -1,3 +1,5 @@
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   StatlockerBrowserCollectorService,
   StatlockerCollectionAccessError,
@@ -8,15 +10,33 @@ function createHarness(overrides: Record<string, { status: number; data: unknown
   const calls: string[] = [];
   const inputs: Array<{ path: string; timeoutMs: number; statlockerPatchId?: string }> = [];
   const close = jest.fn().mockResolvedValue(undefined);
+  // A disk-backed fetch never sends its payload through the devtools protocol:
+  // chromium writes the file itself. The stub captures the download directory from
+  // the CDP call and writes the payload there, so the collector reads a real file
+  // exactly as it would in production.
+  let downloadDir = '';
   const page = {
     goto: jest.fn().mockResolvedValue(undefined),
+    createCDPSession: jest.fn().mockResolvedValue({
+      send: jest.fn(async (_method: string, params: { downloadPath?: string }) => {
+        if (params?.downloadPath) downloadDir = params.downloadPath;
+        return undefined;
+      }),
+    }),
     evaluate: jest.fn(async (
       _fn: unknown,
-      input: { path: string; timeoutMs: number; statlockerPatchId?: string },
+      input: { path: string; timeoutMs?: number; statlockerPatchId?: string; name?: string },
     ) => {
       calls.push(input.path);
-      inputs.push(input);
       const overridden = overrides[input.path];
+      // The disk-backed call wants a status number back and a file to appear.
+      if (input.name) {
+        const payload = overridden ?? { status: 200, data: { path: input.path } };
+        mkdirSync(downloadDir, { recursive: true });
+        writeFileSync(join(downloadDir, input.name), JSON.stringify(payload.data));
+        return payload.status;
+      }
+      inputs.push(input as { path: string; timeoutMs: number; statlockerPatchId?: string });
       if (overridden) return overridden;
       if (input.path === '/api/info/wpa-patches') {
         return {
