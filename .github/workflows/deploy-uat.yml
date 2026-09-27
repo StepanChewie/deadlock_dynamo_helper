@@ -37,6 +37,7 @@ jobs:
       DEPLOY_DIR: /home/ubuntu/apps/deadlock_dynamo_helper_uat
       COMPOSE_FILE: docker-compose.uat.yml
       UAT_PORT: '3003'
+      PROD_PORT: '3000'
       PUBLIC_UAT_BASE_URL: ${{ vars.PUBLIC_UAT_BASE_URL || 'https://aboba-telegramovich.duckdns.org/deadlock-uat' }}
 
     steps:
@@ -124,9 +125,19 @@ jobs:
 
           uat_block="$(sudo awk '/# BEGIN DEADLOCK_DYNAMO_HELPER_UAT/,/# END DEADLOCK_DYNAMO_HELPER_UAT/' \
             /etc/nginx/sites-available/aboba-telegramovich.duckdns.org)"
-          if ! printf '%s' "$uat_block" | grep -qF "proxy_pass http://127.0.0.1:${UAT_PORT};"; then
-            echo "The UAT nginx block does not proxy to 127.0.0.1:${UAT_PORT}." >&2
+          # The trailing slash is part of the match: it is what strips the
+          # /deadlock-uat/ prefix before the API sees the request. Matching
+          # without it silently fails on a correct block.
+          if ! printf '%s' "$uat_block" | grep -qF "proxy_pass http://127.0.0.1:${UAT_PORT}/;"; then
+            echo "The UAT nginx block does not proxy to 127.0.0.1:${UAT_PORT}/." >&2
             printf '%s\n' "$uat_block" >&2
+            exit 1
+          fi
+          # The negative half, which is the one that matters: a copy-paste that
+          # left the port at production's would serve production's data on the
+          # UAT URL, and every other check here would still pass.
+          if printf '%s' "$uat_block" | grep -qF "proxy_pass http://127.0.0.1:${PROD_PORT}"; then
+            echo "The UAT nginx block proxies to production's port ${PROD_PORT}." >&2
             exit 1
           fi
 
