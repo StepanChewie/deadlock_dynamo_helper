@@ -46,7 +46,13 @@ const MINUTE = 60_000;
 import { AdaptiveRecommendationObservabilityV1Service } from './adaptive-recommendation-observability-v1.service';
 
 const HOUR = 60 * MINUTE;
-const GLOBAL_REFRESH_TTL_MS = 30 * MINUTE;
+// Cadence is per dataset, not per "global". T4_CHAINS is small and cheap;
+// WPA_PATCH_DATA is ~258 MB per fetch and is aggregated per patch, so it comes
+// back byte-identical almost every time. Measured in production over 72 h: 68
+// fetches, 67 of them the same content hash - about 12 GB/day of unchanged
+// bytes, each one a full Chromium download. Only the small one keeps 30 minutes.
+const T4_CHAINS_REFRESH_TTL_MS = 30 * MINUTE;
+const WPA_PATCH_DATA_REFRESH_TTL_MS = 24 * HOUR;
 const VS_HERO_WPA_REFRESH_TTL_MS = 24 * HOUR;
 const HERO_REFRESH_TTL_MS = 36 * HOUR;
 const DEFAULT_ACTIVE_HERO_TTL_MS = 30 * MINUTE;
@@ -122,21 +128,27 @@ export class StatlockerRefreshService implements OnApplicationBootstrap {
   async refreshGlobalNow(force = false, nowMs = Date.now()): Promise<void> {
     const identity = this.requireIdentity();
     const key = this.globalRefreshKey(identity);
+    const wpaPatchKey = `${key}:wpa-patch-data`;
     const vsHeroWpaKey = this.globalVsHeroWpaRefreshKey(identity);
-    const globalDue = force || this.isDue(key, GLOBAL_REFRESH_TTL_MS, nowMs);
+    const t4ChainsDue = force || this.isDue(key, T4_CHAINS_REFRESH_TTL_MS, nowMs);
+    // ponytail: keyed by identity, so a patch rollover waits up to 24 h for the
+    // new patch's WPA data; the app falls back to the newest snapshot that exists
+    // in the meantime. Key it by the resolved patch if that lag ever matters.
+    const wpaPatchDue = force || this.isDue(wpaPatchKey, WPA_PATCH_DATA_REFRESH_TTL_MS, nowMs);
     const vsHeroWpaDue = force || this.isDue(vsHeroWpaKey, VS_HERO_WPA_REFRESH_TTL_MS, nowMs);
-    if (!globalDue && !vsHeroWpaDue) return;
+    if (!t4ChainsDue && !wpaPatchDue && !vsHeroWpaDue) return;
 
     const targets: StatlockerCollectionTargetV1[] = [];
-    if (globalDue) targets.push({ dataset: 'WPA_PATCH_DATA', scopeKey: 'patch:current' });
+    if (wpaPatchDue) targets.push({ dataset: 'WPA_PATCH_DATA', scopeKey: 'patch:current' });
     if (vsHeroWpaDue) targets.push({ dataset: 'VS_HERO_WPA', scopeKey: 'global' });
-    if (globalDue) targets.push({ dataset: 'T4_CHAINS', scopeKey: 'global' });
+    if (t4ChainsDue) targets.push({ dataset: 'T4_CHAINS', scopeKey: 'global' });
 
     return this.singleFlight(key, async () => {
       this.markAttempt(nowMs);
       try {
         this.logger.log(
-          `global refresh: globalDue=${globalDue} vsHeroWpaDue=${vsHeroWpaDue} `
+          `global refresh: t4ChainsDue=${t4ChainsDue} wpaPatchDue=${wpaPatchDue} `
+          + `vsHeroWpaDue=${vsHeroWpaDue} `
           + `targets=[${targets.map((target) => target.dataset).join(', ')}]`,
         );
         const result = await this.collector.collectBatch(targets);
@@ -217,7 +229,8 @@ export class StatlockerRefreshService implements OnApplicationBootstrap {
             + `snapshot=${published.snapshotId} fetchedAt=${published.fetchedAt.toISOString()}`,
           );
         }
-        if (globalDue) this.lastSuccessByKey.set(key, nowMs);
+        if (t4ChainsDue) this.lastSuccessByKey.set(key, nowMs);
+        if (wpaPatchDue) this.lastSuccessByKey.set(wpaPatchKey, nowMs);
         if (vsHeroWpaDue) this.lastSuccessByKey.set(vsHeroWpaKey, nowMs);
         this.markSuccess(nowMs);
         if (result.failures.length > 0) {

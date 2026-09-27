@@ -326,7 +326,7 @@ describe('Statlocker VS_HERO_WPA RAW ingest V1', () => {
     expect(repository.save).not.toHaveBeenCalled();
   });
 
-  it('refreshes VS_HERO_WPA every 24 hours without slowing other global datasets and force bypasses cadence', async () => {
+  it('gives WPA_PATCH_DATA a daily cadence and leaves T4_CHAINS on 30 minutes', async () => {
     const collector = {
       collectBatch: jest.fn(async (_targets: unknown) => ({
         statlockerPatchId: 'test',
@@ -352,21 +352,25 @@ describe('Statlocker VS_HERO_WPA RAW ingest V1', () => {
       'T4_CHAINS',
     ]);
 
+    // A scheduler tick just past the 30 minute TTL re-fetches the small dataset
+    // and nothing else. This is the assertion that fails if WPA_PATCH_DATA goes
+    // back to sharing T4_CHAINS' cadence: 258 MB every half hour, for content
+    // that only changes when statlocker re-aggregates the patch.
     await service.refreshGlobalNow(false, 31 * 60_000);
-    expect(datasetNames(collector.collectBatch.mock.calls[1]?.[0])).toEqual([
-      'WPA_PATCH_DATA',
-      'T4_CHAINS',
-    ]);
+    expect(datasetNames(collector.collectBatch.mock.calls[1]?.[0])).toEqual(['T4_CHAINS']);
+
+    await service.refreshGlobalNow(false, 23 * 60 * 60_000);
+    expect(datasetNames(collector.collectBatch.mock.calls[2]?.[0])).toEqual(['T4_CHAINS']);
 
     await service.refreshGlobalNow(false, 24 * 60 * 60_000 + 1);
-    expect(datasetNames(collector.collectBatch.mock.calls[2]?.[0])).toEqual([
+    expect(datasetNames(collector.collectBatch.mock.calls[3]?.[0])).toEqual([
       'WPA_PATCH_DATA',
       'VS_HERO_WPA',
       'T4_CHAINS',
     ]);
 
     await service.refreshGlobalNow(true, 24 * 60 * 60_000 + 60_000);
-    expect(datasetNames(collector.collectBatch.mock.calls[3]?.[0])).toEqual([
+    expect(datasetNames(collector.collectBatch.mock.calls[4]?.[0])).toEqual([
       'WPA_PATCH_DATA',
       'VS_HERO_WPA',
       'T4_CHAINS',

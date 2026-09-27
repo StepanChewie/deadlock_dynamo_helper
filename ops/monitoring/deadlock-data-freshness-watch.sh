@@ -10,10 +10,10 @@
 # because that field is shared with the per-hero path, and the collection's
 # errors were being swallowed.
 #
-# The lesson is not "refresh more often" - the refresh does run every 30 minutes.
-# It is that a refresh which stops working looks exactly like a healthy one until
-# someone compares the data's age against the cadence it is supposed to have.
-# This script makes that comparison on a schedule.
+# The lesson is not "refresh more often" - the refresh does run on its own
+# cadence. It is that a refresh which stops working looks exactly like a healthy
+# one until someone compares the data's age against the cadence it is supposed to
+# have. This script makes that comparison on a schedule.
 #
 # Exit codes: 0 = everything fresh, 1 = something stale (so `systemctl --failed`
 # shows it too, and the timer's OnFailure path can act on it).
@@ -22,7 +22,8 @@
 #   DISCORD_WEBHOOK_URL=      post alerts to a Discord webhook
 #   ALERT_CMD=                arbitrary command, receives <level> <message>
 #   DEADLOCK_DB_CONTAINER, DEADLOCK_DB_NAME, DEADLOCK_DB_USER
-#   DEADLOCK_GLOBAL_MAX_AGE_SEC   global datasets (default 7200 = 2h)
+#   DEADLOCK_T4_CHAINS_MAX_AGE_SEC  T4_CHAINS (default 7200 = 2h)
+#   DEADLOCK_WPA_PATCH_MAX_AGE_SEC  WPA_PATCH_DATA (default 129600 = 36h)
 #   DEADLOCK_WPA_MAX_AGE_SEC      matchup rows (default 129600 = 36h)
 #   DEADLOCK_ARCHETYPE_MAX_AGE_SEC archetype snapshots (default 129600 = 36h)
 #   DEADLOCK_REMIND_MIN            re-alert interval while still bad (default 120)
@@ -64,7 +65,8 @@ DB_USER="${DEADLOCK_DB_USER:-postgres}"
 # The app stops trusting evidence after 4 days; alerting at 4 days would mean
 # finding out only once the recommendation had already degraded. These fire
 # within a handful of missed cycles instead.
-GLOBAL_MAX_AGE="${DEADLOCK_GLOBAL_MAX_AGE_SEC:-7200}"
+T4_CHAINS_MAX_AGE="${DEADLOCK_T4_CHAINS_MAX_AGE_SEC:-7200}"
+WPA_PATCH_MAX_AGE="${DEADLOCK_WPA_PATCH_MAX_AGE_SEC:-129600}"
 WPA_MAX_AGE="${DEADLOCK_WPA_MAX_AGE_SEC:-129600}"
 ARCHETYPE_MAX_AGE="${DEADLOCK_ARCHETYPE_MAX_AGE_SEC:-129600}"
 REMIND_MIN="${DEADLOCK_REMIND_MIN:-120}"
@@ -92,13 +94,21 @@ if [ "$db_reachable" -eq 0 ]; then
   problems+=("database ${DB_NAME} in ${DB_CONTAINER} is unreachable")
 else
   # --- 1. global evidence datasets -------------------------------------------
-  # These refresh unconditionally every 30 minutes, whatever the player activity,
-  # so any real age here means the collection stopped.
+  # Each has its own cadence, so each needs its own threshold. T4_CHAINS is small
+  # and refreshes every 30 minutes; WPA_PATCH_DATA is ~258 MB per fetch and
+  # aggregated per patch, so it comes back unchanged and refreshes once a day. A
+  # single shared threshold cannot serve both: it would either hide a stopped
+  # T4_CHAINS for a day, or fire on WPA_PATCH_DATA every night.
   while IFS='|' read -r dataset age; do
     [ -n "${dataset:-}" ] || continue
     case "$age" in ''|*[!0-9]*) continue ;; esac
-    if [ "$age" -gt "$GLOBAL_MAX_AGE" ]; then
-      problems+=("evidence ${dataset} is ${age}s old (max ${GLOBAL_MAX_AGE}s)")
+    case "$dataset" in
+      T4_CHAINS) max_age="$T4_CHAINS_MAX_AGE" ;;
+      WPA_PATCH_DATA) max_age="$WPA_PATCH_MAX_AGE" ;;
+      *) continue ;;
+    esac
+    if [ "$age" -gt "$max_age" ]; then
+      problems+=("evidence ${dataset} is ${age}s old (max ${max_age}s)")
     fi
   done <<EOF
 $(printf '%s' "select \"dataset\", extract(epoch from (now() - max(\"fetchedAt\")))::bigint from statlocker_evidence_snapshots_v1 where \"dataset\" in ('WPA_PATCH_DATA','T4_CHAINS') group by 1;" | sql)

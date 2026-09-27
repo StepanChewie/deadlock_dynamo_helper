@@ -14,23 +14,35 @@ Both were invisible. `/deadlock/adaptive/v1/status` still reported a recent
 "something refreshed", not that the global data did. And the collection's errors
 were being swallowed into a `lastError` the endpoint did not expose.
 
-The lesson is **not** "refresh more often". The refresh does run every 30 minutes,
-and the cadence was verified across seven consecutive cycles. It is that a refresh
-which stops working looks exactly like a healthy one until someone compares the
-data's age against the cadence it is supposed to have. This unit makes that
-comparison on a schedule, out of process, where a bug in the API cannot hide it.
+The lesson is **not** "refresh more often". The refresh does run on its own
+cadence — every 30 minutes for `T4_CHAINS`, daily for the large per-patch
+`WPA_PATCH_DATA` — and that cadence was verified across consecutive cycles. It is
+that a refresh which stops working looks exactly like a healthy one until someone
+compares the data's age against the cadence it is supposed to have. This unit
+makes that comparison on a schedule, out of process, where a bug in the API cannot
+hide it.
 
 ## What it checks
 
 | Check | Fails when | Default |
 |---|---|---|
-| Global evidence (`WPA_PATCH_DATA`, `T4_CHAINS`) | older than 2 h (cadence is 30 min) | `DEADLOCK_GLOBAL_MAX_AGE_SEC` |
+| Global evidence — `T4_CHAINS` | older than 2 h (cadence is 30 min) | `DEADLOCK_T4_CHAINS_MAX_AGE_SEC` |
+| Global evidence — `WPA_PATCH_DATA` | older than 36 h (cadence is 24 h) | `DEADLOCK_WPA_PATCH_MAX_AGE_SEC` |
 | Matchup rows (`VS_HERO_WPA`) | upstream last reached more than 36 h ago (cadence 24 h) | `DEADLOCK_WPA_MAX_AGE_SEC` |
 | Archetype snapshots | newest active one older than 36 h | `DEADLOCK_ARCHETYPE_MAX_AGE_SEC` |
 | Patch consistency | newest evidence patch ≠ newest archetype patch | always on |
 | Database reachable | `select 1` does not return | always on |
 
 Two notes on what is deliberately *not* checked:
+
+- **The two global datasets no longer share a threshold.** They used to, on the
+  reasoning that both refresh every 30 minutes. `WPA_PATCH_DATA` does not: it is
+  ~258 MB per fetch and aggregated per patch, so it returns byte-identical almost
+  every time — 68 fetches over 72 h on 2026-09-27, 67 of them the same content
+  hash. Fetching 12 GB a day of unchanged bytes to re-derive a hash is waste, so
+  it moved to a daily cadence and its threshold moved with it. `T4_CHAINS` is
+  small and stays on 30 minutes. A single shared value would either hide a stopped
+  `T4_CHAINS` for a day, or fire on `WPA_PATCH_DATA` every night.
 
 - **Per-hero datasets** (`CONSENSUS_SKELETON`, `PRO_BUILD_ANALYSIS`,
   `HERO_LEADERBOARD`, `WPA_FILTERED_ITEMS`) are only refreshed while heroes are
@@ -99,7 +111,8 @@ alert, which came back as a reported outage.
 
 ```
 sudo DEADLOCK_FRESHNESS_TEST_ALERT=1 \
-  DEADLOCK_GLOBAL_MAX_AGE_SEC=1 \
+  DEADLOCK_T4_CHAINS_MAX_AGE_SEC=1 \
+  DEADLOCK_WPA_PATCH_MAX_AGE_SEC=1 \
   /usr/local/bin/deadlock-data-freshness-watch.sh
 ```
 

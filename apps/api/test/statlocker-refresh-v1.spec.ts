@@ -161,9 +161,9 @@ describe('StatlockerRefreshService', () => {
     await h.service.refreshGlobalNow(false, 1_001);
     expect(h.collector.collectBatch).toHaveBeenCalledTimes(1);
 
-    // Repeated scheduler ticks inside the 24h VS_HERO_WPA TTL never re-fetch the
-    // large endpoint; the smaller global datasets keep their own 30 minute cadence,
-    // but only the elapsed 24h TTL re-arms the daily VS_HERO_WPA target.
+    // Repeated scheduler ticks inside the 24h TTLs never re-fetch the two large
+    // endpoints; the small T4_CHAINS keeps its own 30 minute cadence, but only
+    // the elapsed 24h TTL re-arms the daily WPA_PATCH_DATA and VS_HERO_WPA targets.
     await h.service.refreshGlobalNow(false, 1_000 + 23 * 60 * 60_000);
     const vsHeroTargets = () => h.collector.collectBatch.mock.calls
       .flatMap(([targets]) => targets)
