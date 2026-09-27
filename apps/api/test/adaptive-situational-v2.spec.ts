@@ -39,7 +39,9 @@ function decisionStub() {
     itemGraph: { getAllItems: () => [] },
     rulesetId: 'ruleset-1',
     stateRevision: 'rev-1',
-    enemyLiveStates: [],
+    // One enemy with a live state and the rest without, so the roster mapping
+    // below is pinned on both of its branches.
+    enemyLiveStates: [{ steamId: 'enemy-live-7', heroId: 7 }],
   };
 }
 
@@ -52,17 +54,18 @@ function build(overrides: {
     ? { ok: false, decision: decisionStub(), blockers: ['ENEMY_ROSTER_INCOMPLETE'] }
     : { ok: true, decision: decisionStub(), context: overrides.context ?? contextWith('VS_HERO_WPA') }));
   const select = jest.fn(() => overrides.selection ?? []);
+  const scoreEnemies = jest.fn(() => []);
   const service = new AdaptiveSituationalV2Service(
     { resolveLockContext } as never,
     { select } as never,
-    { scoreEnemies: jest.fn(() => []) } as never,
+    { scoreEnemies } as never,
   );
-  return { service, select, resolveLockContext };
+  return { service, select, resolveLockContext, scoreEnemies };
 }
 
 describe('AdaptiveSituationalV2Service', () => {
   it('returns the selection as situational items and marks the mode', async () => {
-    const { service, select } = build({
+    const { service, select, scoreEnemies } = build({
       selection: [{ itemId: 101, score: 0.5, confidence: 0.6, coverage: 1, against: [{ enemyHeroId: 7, deltaWpa: 0.1, count: 100 }] }],
     });
 
@@ -93,6 +96,18 @@ describe('AdaptiveSituationalV2Service', () => {
       ownedItemIds: [201],
       enemyHeroIds: [7, 8, 9, 10, 11, 12],
     }));
+    // Threat weights must come from the same roster mapping the full-build mode
+    // uses, or the two modes could rank the same enemies differently. This pins
+    // the copy of that mapping: live states win, the rest fall back in roster
+    // order to the synthetic `enemy-hero:<id>` identity.
+    expect(scoreEnemies).toHaveBeenCalledWith([
+      { steamId: 'enemy-live-7', heroId: 7 },
+      { steamId: 'enemy-hero:8', heroId: 8 },
+      { steamId: 'enemy-hero:9', heroId: 9 },
+      { steamId: 'enemy-hero:10', heroId: 10 },
+      { steamId: 'enemy-hero:11', heroId: 11 },
+      { steamId: 'enemy-hero:12', heroId: 12 },
+    ]);
   });
 
   it('is not ready when the lock resolved to the offline default', async () => {

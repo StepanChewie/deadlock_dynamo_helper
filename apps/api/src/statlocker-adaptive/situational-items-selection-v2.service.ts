@@ -114,7 +114,6 @@ function againstFor(
 ): readonly SituationalTargetV2[] {
   return contributions
     .filter((entry) => entry.weightedContribution > 0)
-    .slice()
     .sort((a, b) =>
       b.weightedContribution - a.weightedContribution || a.enemyHeroId - b.enemyHeroId)
     .slice(0, SITUATIONAL_AGAINST_LIMIT_V2)

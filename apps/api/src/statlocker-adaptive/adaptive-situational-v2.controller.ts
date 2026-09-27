@@ -15,8 +15,11 @@ export class AdaptiveSituationalV2Controller {
     private readonly availability: AdaptiveAvailabilityV1Service,
   ) {}
 
-  // The same client polls this on the same cadence as /recommend, so it shares
-  // that route's budget rather than getting a second one of its own.
+  // The same client polls this on the same cadence as /recommend, so it carries
+  // the same 240/min limit value. The guard keys its bucket per controller +
+  // handler + IP, so this route gets a bucket of its own rather than sharing
+  // /recommend's — a 480/min per-address ceiling while both are polled. That is
+  // acceptable: the client's mode switch means only one loop is active at a time.
   @Post('situational')
   @UseGuards(RateLimitGuard)
   @RateLimit({ limit: 240, windowMs: 60_000 })

@@ -175,6 +175,9 @@ describe('SituationalItemsSelectionV2Service', () => {
     });
 
     expect(result[0].against).toHaveLength(SITUATIONAL_AGAINST_LIMIT_V2);
+    // The three strongest contributions survive — deltaWpa 0.08, 0.06, 0.04 —
+    // not merely three of the four.
+    expect(result[0].against.map((target) => target.enemyHeroId)).toEqual([10, 9, 8]);
   });
 
   it('caps the returned items', () => {
@@ -185,6 +188,8 @@ describe('SituationalItemsSelectionV2Service', () => {
     });
 
     expect(result).toHaveLength(SITUATIONAL_ITEM_LIMIT_V2);
+    // The five highest deltas survive, in descending order: 107…103, not 101…105.
+    expect(result.map((entry) => entry.itemId)).toEqual([107, 106, 105, 104, 103]);
   });
 
   it('breaks ties deterministically by item id', () => {
