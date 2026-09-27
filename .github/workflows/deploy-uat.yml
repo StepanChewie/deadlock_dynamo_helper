@@ -1,0 +1,156 @@
+name: Deploy UAT
+
+# The UAT environment. Everything that used to be tested by pushing to main
+# belongs here instead, so that a broken build cannot reach the environment the
+# Overwolf submission points at.
+#
+# Triggered by the `uat` branch, not by main. To test a change: push it to uat
+# (or merge it there), let this run, and check the result at the UAT base URL.
+# Nothing here touches production's containers, database, port or nginx block.
+
+on:
+  push:
+    branches:
+      - uat
+    # Same reasoning as the production workflow: docs cannot change the image.
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Separate from the production group on purpose. A shared group would let a UAT
+# deploy cancel a production deploy in flight.
+concurrency:
+  group: deploy-api-uat
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, Linux, Arm64]
+    timeout-minutes: 60
+    env:
+      ADAPTIVE_UAT_IMAGE: deadlock-adaptive-uat:${{ github.sha }}
+      CHROMIUM_PATH: /usr/bin/chromium-browser
+      DEPLOY_DIR: /home/ubuntu/apps/deadlock_dynamo_helper_uat
+      COMPOSE_FILE: docker-compose.uat.yml
+      UAT_PORT: '3003'
+      PUBLIC_UAT_BASE_URL: ${{ vars.PUBLIC_UAT_BASE_URL || 'https://aboba-telegramovich.duckdns.org/deadlock-uat' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Copy files to the UAT deployment directory
+        run: |
+          set -euo pipefail
+          mkdir -p "$DEPLOY_DIR"
+          rsync -avz --delete \
+            --exclude 'node_modules' \
+            --exclude '.env' \
+            --exclude 'storage' \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude 'docs' \
+            --exclude 'training' \
+            ./ "$DEPLOY_DIR/"
+
+      - name: Rebuild and restart the UAT API
+        run: |
+          set -euo pipefail
+          cd "$DEPLOY_DIR"
+          sudo docker build --platform linux/arm64 \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            -t "$ADAPTIVE_UAT_IMAGE" .
+          # Migrations run against deadlock_builds_uat. The database name is
+          # hardcoded in docker-compose.uat.yml precisely so that a stale
+          # DB_NAME in the environment file cannot point this at production.
+          sudo env \
+            DEADLOCK_API_IMAGE="$ADAPTIVE_UAT_IMAGE" \
+            CHROMIUM_PATH="$CHROMIUM_PATH" \
+            docker compose -f "$COMPOSE_FILE" run --rm --no-deps api node run-migrations.js
+          sudo env \
+            DEADLOCK_API_IMAGE="$ADAPTIVE_UAT_IMAGE" \
+            DB_RUN_MIGRATIONS='false' \
+            CHROMIUM_PATH="$CHROMIUM_PATH" \
+            docker compose -f "$COMPOSE_FILE" up -d --force-recreate --no-build --no-deps api
+
+      - name: Wait for the UAT container to be healthy
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$DEPLOY_DIR"
+          container_id="$(sudo docker compose -f "$COMPOSE_FILE" ps -q api)"
+          if [ -z "$container_id" ]; then
+            echo 'UAT API container was not created.' >&2
+            exit 1
+          fi
+
+          sudo bash scripts/verify-deployed-api-image.sh \
+            "$GITHUB_SHA" \
+            "$container_id" \
+            "$ADAPTIVE_UAT_IMAGE"
+
+          for attempt in $(seq 1 40); do
+            status="$(sudo docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}' "$container_id")"
+            echo "UAT API health status: $status ($attempt/40)"
+            if [ "$status" = 'healthy' ]; then
+              exit 0
+            fi
+            if [ "$status" = 'unhealthy' ]; then
+              sudo docker compose -f "$COMPOSE_FILE" logs --tail=200 api
+              exit 1
+            fi
+            sleep 5
+          done
+
+          sudo docker compose -f "$COMPOSE_FILE" logs --tail=200 api
+          echo 'UAT API did not become healthy in time.' >&2
+          exit 1
+
+      # Proves the route reaches THIS environment and not production. Both
+      # environments answer the same status payload, so a misrouted proxy would
+      # otherwise look perfectly healthy - the assertions are on the nginx block
+      # and on which container owns the port, not on the response body.
+      - name: Verify the UAT route serves the UAT container
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$DEPLOY_DIR"
+
+          uat_block="$(sudo awk '/# BEGIN DEADLOCK_DYNAMO_HELPER_UAT/,/# END DEADLOCK_DYNAMO_HELPER_UAT/' \
+            /etc/nginx/sites-available/aboba-telegramovich.duckdns.org)"
+          if ! printf '%s' "$uat_block" | grep -qF "proxy_pass http://127.0.0.1:${UAT_PORT};"; then
+            echo "The UAT nginx block does not proxy to 127.0.0.1:${UAT_PORT}." >&2
+            printf '%s\n' "$uat_block" >&2
+            exit 1
+          fi
+
+          published="$(sudo docker compose -f "$COMPOSE_FILE" ps --format '{{.Ports}}' api)"
+          if ! printf '%s' "$published" | grep -q "127.0.0.1:${UAT_PORT}->"; then
+            echo "The UAT container is not published on 127.0.0.1:${UAT_PORT}: ${published}" >&2
+            exit 1
+          fi
+
+          curl --fail --show-error --silent \
+            --retry 10 \
+            --retry-delay 1 \
+            --retry-all-errors \
+            "$PUBLIC_UAT_BASE_URL/deadlock/adaptive/v1/status"
+          echo
+          echo "UAT is serving at $PUBLIC_UAT_BASE_URL"
+
+      - name: Record verified UAT Compose fallback
+        shell: bash
+        run: sudo docker tag "$ADAPTIVE_UAT_IMAGE" deadlock-adaptive-uat:current
+
+      - name: Show UAT API logs on failure
+        if: failure()
+        run: |
+          cd "$DEPLOY_DIR"
+          sudo docker compose -f "$COMPOSE_FILE" ps
+          sudo docker compose -f "$COMPOSE_FILE" logs --tail=300 api

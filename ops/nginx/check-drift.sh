@@ -78,9 +78,12 @@ status=0
 required_blocks=(
   'BEGIN DEADLOCK_DYNAMO_HELPER'
   'END DEADLOCK_DYNAMO_HELPER'
+  'BEGIN DEADLOCK_DYNAMO_HELPER_UAT'
+  'END DEADLOCK_DYNAMO_HELPER_UAT'
   'BEGIN STATLOCKER_PROBE_POC'
   'END STATLOCKER_PROBE_POC'
   'location ^~ /deadlock/ {'
+  'location ^~ /deadlock-uat/ {'
 )
 
 for needle in "${required_blocks[@]}"; do
@@ -99,15 +102,34 @@ if ! grep -qF -- 'proxy_pass http://127.0.0.1:3000;' "$LIVE_PATH"; then
 fi
 
 # 3. Byte-level drift against the snapshot.
-if ! diff -u "$SNAPSHOT_PATH" "$LIVE_PATH" >/tmp/nginx-drift.diff 2>&1; then
+#
+#    The diff goes to a mktemp file, not to a fixed /tmp path. A shared name is
+#    a real bug in two ways: two concurrent runs clobber each other, and if the
+#    file is left owned by another user the redirection itself fails - which the
+#    old `if ! diff ... >/tmp/...` reported as DRIFT, because a failed command
+#    and a real difference are indistinguishable to `!`. That produced a false
+#    "live config differs" on 2026-09-27 while the two files were in fact
+#    identical. The exit code is now checked explicitly for the same reason:
+#    1 means different, anything else means the comparison could not be made.
+drift_diff="$(mktemp)"
+trap 'rm -f "$drift_diff"' EXIT
+
+diff_status=0
+diff -u "$SNAPSHOT_PATH" "$LIVE_PATH" >"$drift_diff" 2>&1 || diff_status=$?
+
+if [ "$diff_status" -eq 1 ]; then
   log "DRIFT: live config differs from the committed snapshot."
   log "       Refresh the snapshot after reviewing the change:"
   log "         ssh <host> 'cat $LIVE_PATH' > $SNAPSHOT_PATH"
   if [ "$QUIET" -eq 0 ]; then
     log ""
     log "--- committed snapshot (-) vs live (+) ---"
-    cat /tmp/nginx-drift.diff
+    cat "$drift_diff"
   fi
+  status=1
+elif [ "$diff_status" -ne 0 ]; then
+  log "ERROR: could not compare $SNAPSHOT_PATH with $LIVE_PATH (diff exit $diff_status)"
+  cat "$drift_diff"
   status=1
 else
   log "OK: live nginx config matches the committed snapshot."

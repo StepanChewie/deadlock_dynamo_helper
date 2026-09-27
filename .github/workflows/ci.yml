@@ -7,6 +7,9 @@ on:
   push:
     branches:
       - main
+      # UAT deploys from this branch, so it gets the same suite. Without it a
+      # push to uat would build and deploy an image that no test ever saw.
+      - uat
     # Matches the Deploy API filter. A docs-only commit cannot change the build
     # or the tests, and running four jobs for a README tweak is pure cost.
     # Note this only applies to `push`; PRs are unaffected.

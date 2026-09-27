@@ -1,0 +1,93 @@
+# UAT (user acceptance testing) environment.
+#
+# This is deliberately a near-copy of docker-compose.yml rather than a shared
+# file driven by variables. Production and UAT have to be able to diverge
+# without one edit moving both at once, and the whole point of UAT is that a
+# mistake there cannot reach production.
+#
+# Everything that differs from production, and nothing else:
+#
+#   name:          deadlock_dynamo_helper_uat - pinned, so the project name can
+#                  never be inherited from whatever directory this file happens
+#                  to be run out of. That is what keeps the container names and
+#                  the storage volume from colliding with production's.
+#   image:         deadlock-adaptive-uat:*
+#   host port:     127.0.0.1:3003 (3000 production, 3001 uptime-kuma, 3002 taken)
+#   database:      deadlock_builds_uat
+#
+# What is deliberately absent: the ops/ systemd units. Those are installed by
+# the production deploy and reference the production container and database by
+# name, so installing them from here would silently repoint production's health
+# watcher, freshness watcher and nightly backup at this environment.
+
+name: deadlock_dynamo_helper_uat
+
+services:
+  api:
+    image: ${DEADLOCK_API_IMAGE:-deadlock-adaptive-uat:current}
+
+    # Same two blast-radius guards as production, for the same reasons - the long
+    # explanations live in docker-compose.yml. UAT shares the host with
+    # production, so a runaway here starves production exactly as a production
+    # runaway once starved every other container on the box.
+    init: true
+    pids_limit: 4096
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+    ports:
+      - '127.0.0.1:3003:3000'
+    volumes:
+      - deadlock-storage-uat:/app/apps/api/storage
+    environment:
+      - DB_HOST=${DB_HOST:-aboba-telegramovich-postgres-1}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD}
+      # Hardcoded, not `${DB_NAME:-deadlock_builds_uat}`. This is the one setting
+      # where a stale variable in the environment file would point the whole UAT
+      # stack at production's data, so it is not configurable here on purpose.
+      # If UAT ever needs its own name, change it in this file and commit it.
+      - DB_NAME=deadlock_builds_uat
+      - DB_CONNECT_TIMEOUT_MS=${DB_CONNECT_TIMEOUT_MS:-10000}
+      - DB_POOL_SIZE=${DB_POOL_SIZE:-10}
+      - DB_KEEP_ALIVE_INITIAL_DELAY_MS=${DB_KEEP_ALIVE_INITIAL_DELAY_MS:-10000}
+      - DB_IDLE_TIMEOUT_MS=${DB_IDLE_TIMEOUT_MS:-30000}
+      - DB_RUN_MIGRATIONS=${DB_RUN_MIGRATIONS:-false}
+      - BUILD_DEBUG_PASSWORD=${BUILD_DEBUG_PASSWORD}
+      - BUILD_DEBUG_SESSION_SECRET=${BUILD_DEBUG_SESSION_SECRET}
+      - BUILD_DEBUG_SESSION_TTL_SEC=${BUILD_DEBUG_SESSION_TTL_SEC:-3600}
+      - BUILD_DEBUG_TRACE_TAIL=${BUILD_DEBUG_TRACE_TAIL:-5}
+      - BUILD_DEBUG_TRACE_IDLE_TTL_SEC=${BUILD_DEBUG_TRACE_IDLE_TTL_SEC:-1800}
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-}
+      # Same allowlist as production: the Overwolf client sends the same Origin
+      # whichever environment it is pointed at, so a test build talks to UAT
+      # without a second entry here.
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-}
+      - DEADLOCK_API_BASE_URL=${DEADLOCK_API_BASE_URL:-https://api.deadlock-api.com}
+      - ADAPTIVE_ECONOMY_RULES_JSON=${ADAPTIVE_ECONOMY_RULES_JSON:-}
+      - CHROMIUM_PATH=${CHROMIUM_PATH:-/usr/bin/chromium-browser}
+      - NODE_OPTIONS=--max-old-space-size=4096
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          node -e "fetch('http://127.0.0.1:3000/deadlock/adaptive/v1/status').then((response) => { if (!response.ok) process.exit(1); }).catch(() => process.exit(1));"
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 60s
+    restart: always
+    networks:
+      - default
+      - aboba-telegramovich_default
+
+volumes:
+  deadlock-storage-uat:
+
+networks:
+  aboba-telegramovich_default:
+    external: true
