@@ -70,6 +70,7 @@ recorded because several are counter-intuitive.
 | What is a "core" item? | Whatever the existing flow already calls core: `role === 'CORE'` on the archetype snapshot, which `roleForTier()` derives straight from statlocker's own `frequencyTier` (`build-archetype-compiler-v2.service.ts:828`). Not a new definition. |
 | Ranked by what? | **Pure matchup.** `ThreatWeightedMatchupV1Service.scoreItem().normalized`. Not `baseWpa`, and not the `structure` / `progression` / `transition` layers. |
 | Candidate pool? | The **whole shopable catalog**, minus core items, minus what the player already owns. |
+| Tier-1 components in that pool? | **Allowed.** No tier filter and no ingredient exclusion — a component that genuinely beats this enemy team is a legitimate answer. |
 | Affordability filter? | **None.** An item costing 6400 is shown at minute 3 if the evidence supports it. |
 | How many enemies per item? | **Two or three**, with magnitudes. |
 | How is it polled? | A **dedicated 30-second timer** in the client. |
@@ -299,12 +300,12 @@ ids into a `"vs X, Y"` label.
 
 ## Risks and open questions
 
-- **Tier-1 components in the output.** The pool is the whole catalog with no tier
-  filter, so an ingredient could in principle reach the top five. The
-  `coverage` / `confidence` gate should exclude most of them — components rarely
-  have a large sample against one specific enemy — but it does not guarantee it.
-  **Decision: ship without a tier filter and look at real output.** If junk
-  appears, excluding ingredients is a one-line change.
+- **Tier-1 components in the output — accepted, not mitigated.** The pool is the
+  whole catalog with no tier filter, so an ingredient can reach the top five.
+  **Owner decision, 2026-09-27: that is fine.** No tier filter and no ingredient
+  exclusion are added, pre-emptively or otherwise. If the output turns out to be
+  dominated by components in practice, excluding ingredients is a one-line change
+  — but it is a change to make against real output, not against a guess.
 - **The lock refactor** is the only edit to code the existing modes depend on.
   Covered by the existing lock-lifecycle suite, but it deserves the review
   attention.
