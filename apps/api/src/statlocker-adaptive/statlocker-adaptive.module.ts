@@ -20,6 +20,8 @@ import { AdaptiveFeedbackV1Controller } from './adaptive-feedback-v1.controller'
 import { AdaptiveRecommendationObservabilityV1Service } from './adaptive-recommendation-observability-v1.service';
 import { AdaptiveRecommendationV2Controller } from './adaptive-recommendation-v2.controller';
 import { AdaptiveRecommendationV2Service } from './adaptive-recommendation-v2.service';
+import { AdaptiveSituationalV2Controller } from './adaptive-situational-v2.controller';
+import { AdaptiveSituationalV2Service } from './adaptive-situational-v2.service';
 import { AdaptiveStatusCompatibilityV1Controller } from './adaptive-status-compatibility-v1.controller';
 import { BuildArchetypeCompilerV2Service } from './build-archetype-compiler-v2.service';
 import { BuildArchetypeMinerV2Service } from './build-archetype-miner-v2.service';
@@ -45,6 +47,7 @@ import {
   RecommendationEconomyRulesBootstrapV1Service,
 } from './recommendation-economy-rules-bootstrap-v1.service';
 import { RecommendationEconomyRulesStoreV1Service } from './recommendation-economy-rules-store-v1.service';
+import { SituationalItemsSelectionV2Service } from './situational-items-selection-v2.service';
 import {
   STATLOCKER_BROWSER_LAUNCHER_V1,
   StatlockerBrowserCollectorService,
@@ -80,6 +83,7 @@ import { ThreatWeightedMatchupV1Service } from './threat-weighted-matchup-v1.ser
   ],
   controllers: [
     AdaptiveRecommendationV2Controller,
+    AdaptiveSituationalV2Controller,
     AdaptiveStatusCompatibilityV1Controller,
     AdaptiveFeedbackV1Controller,
   ],
@@ -127,6 +131,8 @@ import { ThreatWeightedMatchupV1Service } from './threat-weighted-matchup-v1.ser
     AdaptiveDecisionStateV1Service,
     EnemyThreatV1Service,
     ThreatWeightedMatchupV1Service,
+    SituationalItemsSelectionV2Service,
+    AdaptiveSituationalV2Service,
     AdaptiveRecommendationObservabilityV1Service,
   ],
   exports: [
