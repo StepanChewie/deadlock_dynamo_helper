@@ -34,9 +34,9 @@ function archetypeWithRoles(roles: Readonly<Record<number, string>>): BuildArche
   } as unknown as BuildArchetypeV2;
 }
 
-// count drives sampleConfidence and deltaWpa drives the score. 0.15 is the
-// normalisation scale inside ThreatWeightedMatchupV1Service, so a delta of 0.15
-// with a large count approaches a score of 1 without reaching it.
+// count drives sampleConfidence and deltaWpa drives the score: the score rises
+// with deltaWpa and is damped by sampleConfidence, which shrinks toward zero for
+// small samples.
 function row(itemId: number, enemyHeroId: number, deltaWpa: number, count = 2000) {
   return { heroId: HERO_ID, enemyHeroId, itemId, count, deltaWpa };
 }
@@ -104,12 +104,39 @@ describe('SituationalItemsSelectionV2Service', () => {
     expect(result.map((entry) => entry.itemId)).toEqual([102]);
   });
 
+  it('excludes an inactive item even when its evidence would rank it first', () => {
+    const result = select({
+      itemGraph: createRecommendationItemGraph([
+        itemDefinition(101),
+        itemDefinition(102),
+        { ...itemDefinition(103), active: false },
+      ]),
+      vsHeroRows: [row(103, 7, 0.10), row(101, 7, 0.02), row(102, 7, 0.01)],
+    });
+
+    expect(result.map((entry) => entry.itemId)).toEqual([101, 102]);
+  });
+
   it('ranks by normalised matchup score', () => {
     const result = select({
       vsHeroRows: [row(101, 7, 0.02), row(102, 7, 0.10)],
     });
 
     expect(result.map((entry) => entry.itemId)).toEqual([102, 101]);
+  });
+
+  it('exposes the underlying matchup score, confidence and coverage', () => {
+    // One contributing enemy (7) out of two (7, 8), both threatMultiplier 1,
+    // count 2000. sampleConfidence = count / (count + 500) = 0.8.
+    //   coverage   = contributing / total          = 1 / 2            = 0.5
+    //   confidence = (0.8 × 1) / 2                 = 0.4
+    //   score      = tanh((0.10 × 0.8) / 0.15) / 2 = 0.24396249…
+    const result = select({ vsHeroRows: [row(101, 7, 0.10)] });
+
+    expect(result).toHaveLength(1);
+    expect(result[0].coverage).toBeCloseTo(0.5, 5);
+    expect(result[0].confidence).toBeCloseTo(0.4, 5);
+    expect(result[0].score).toBeCloseTo(0.24396249, 5);
   });
 
   it('rejects an item whose score is not positive', () => {
