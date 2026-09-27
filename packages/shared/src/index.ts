@@ -4,6 +4,7 @@ export * from './souls-affordability-contract';
 export * from './souls-affordability-evidence-v2';
 export * from './adaptive-recommendation-v1';
 export * from './adaptive-recommendation-v2';
+export * from './adaptive-situational-v2';
 export * from './adaptive-decision-trace-v1';
 export * from './adaptive-transaction-plan-v1';
 export * from './adaptive-strategy-state-v1';

@@ -570,7 +570,7 @@ function nextAction(plan: AdaptiveFullBuildPlanV2): AdaptiveImmediateActionV2 {
   };
 }
 
-function lockSummary(
+export function lockSummary(
   lock: BuildArchetypeMatchLockV2Entity,
   selection: BuildArchetypeSelectionV2,
 ): AdaptiveArchetypeLockSummaryV2 {
