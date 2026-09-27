@@ -57,7 +57,7 @@ import { StatlockerHeroItemLifecycleV1 } from './statlocker-adaptive.types';
 
 const FULL_ENEMY_ROSTER_SIZE = 6;
 
-interface AdaptiveRecommendationLockContextV2 {
+export interface AdaptiveRecommendationLockContextV2 {
   lock: BuildArchetypeMatchLockV2Entity;
   snapshot: BuildArchetypeSnapshotV2;
   selection: BuildArchetypeSelectionV2;
@@ -66,6 +66,10 @@ interface AdaptiveRecommendationLockContextV2 {
   vsHeroRows: readonly StatlockerVsHeroWpaAggregateSourceV1[];
   trace: BuildDecisionTraceCollectorV2;
 }
+
+export type AdaptiveLockResolutionV2 =
+  | { ok: true; decision: AdaptiveDecisionStateV1; context: AdaptiveRecommendationLockContextV2 }
+  | { ok: false; decision: AdaptiveDecisionStateV1; blockers: readonly string[] };
 
 @Injectable()
 export class AdaptiveRecommendationV2Service {
@@ -89,13 +93,11 @@ export class AdaptiveRecommendationV2Service {
     request: AdaptiveRecommendationRequestV2,
     capture?: BuildIterationCaptureV1,
   ): Promise<AdaptiveRecommendationResultV2> {
-    validateRequest(request);
-    const decision = await this.decisionState.build(request.matchId, request.localSteamId);
-    const existingLock = await this.session.get(request.matchId, decision.localSteamId);
-    const context = existingLock
-      ? await this.reuseLock(decision, existingLock)
-      : await this.createLock(decision, request.matchId);
-    if ('ready' in context) return context;
+    const resolution = await this.resolveLockContext(request);
+    if (!resolution.ok) {
+      return notReadyRecommendation(resolution.decision, resolution.blockers);
+    }
+    const { decision, context } = resolution;
 
     const { lock, snapshot, selection, enemyHeroIds, evidence, vsHeroRows, trace } = context;
     const archetype = snapshot.archetypes.find((entry) => entry.archetypeId === lock.archetypeId);
@@ -205,6 +207,19 @@ export class AdaptiveRecommendationV2Service {
       selection,
       plan,
     });
+  }
+
+  async resolveLockContext(request: AdaptiveRecommendationRequestV2): Promise<AdaptiveLockResolutionV2> {
+    validateRequest(request);
+    const decision = await this.decisionState.build(request.matchId, request.localSteamId);
+    const existingLock = await this.session.get(request.matchId, decision.localSteamId);
+    const context = existingLock
+      ? await this.reuseLock(decision, existingLock)
+      : await this.createLock(decision, request.matchId);
+    if ('ready' in context) {
+      return { ok: false, decision, blockers: context.blockers };
+    }
+    return { ok: true, decision, context };
   }
 
   private async loadLifecycleEvidence(
