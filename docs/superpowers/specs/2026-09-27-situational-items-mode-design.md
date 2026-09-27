@@ -59,6 +59,16 @@ a presentation surface.
   its own review cycle.
 - Data retention or cleanup work.
 
+### Subsystems and delivery
+
+The API and the Overwolf client are **separate subsystems**, delivered as
+separate plans. This document describes both; the API plan covers the server
+only, and the client work (mode switch, panel, 30-second poll) is planned and
+reviewed on its own.
+
+`reasonCodes` on `AdaptiveSituationalItemV2` is specified above but deliberately
+omitted from the implementation until something reads it.
+
 ## Decisions taken
 
 Each of these was decided by the owner during design, and the reasoning is
