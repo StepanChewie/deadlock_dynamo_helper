@@ -376,6 +376,55 @@ describe('Statlocker VS_HERO_WPA RAW ingest V1', () => {
       'T4_CHAINS',
     ]);
   });
+
+  it('re-arms a failed global dataset on the short cadence instead of its own TTL', async () => {
+    const collected = () => ({
+      statlockerPatchId: 'test',
+      fetchedAt: '2026-09-09T10:00:00.000Z',
+      datasets: [] as unknown[],
+      failures: [] as Array<{ dataset: string; error: string }>,
+    });
+    const collector = { collectBatch: jest.fn(async (_targets: unknown) => collected()) };
+    const service = new StatlockerRefreshService(
+      collector as never,
+      {} as never,
+      { listActive: jest.fn(() => []) } as never,
+    );
+    service.observeGameIdentity({
+      rulesetVersion: 'ruleset-test',
+      catalogSha256: 'a'.repeat(64),
+    });
+
+    await service.refreshGlobalNow(false, 0);
+
+    // The daily tick, where the large dataset times out. A per-target failure
+    // arrives in result.failures rather than throwing, so without an explicit
+    // retry floor the next attempt would be a whole day away.
+    const daily = 24 * 60 * 60_000 + 1;
+    collector.collectBatch.mockResolvedValueOnce({
+      ...collected(),
+      failures: [{ dataset: 'WPA_PATCH_DATA', error: 'upstream timed out' }],
+    });
+    await service.refreshGlobalNow(false, daily);
+    expect(datasetNames(collector.collectBatch.mock.calls[1]?.[0])).toEqual([
+      'WPA_PATCH_DATA',
+      'VS_HERO_WPA',
+      'T4_CHAINS',
+    ]);
+
+    // 31 minutes later T4_CHAINS is due on its own cadence - and the failed
+    // WPA_PATCH_DATA has to come with it, not wait out its 24 h TTL.
+    await service.refreshGlobalNow(false, daily + 31 * 60_000);
+    expect(datasetNames(collector.collectBatch.mock.calls[2]?.[0])).toEqual([
+      'WPA_PATCH_DATA',
+      'T4_CHAINS',
+    ]);
+
+    // Once it succeeds the day-long cadence is back: 31 minutes after that
+    // successful attempt, only T4_CHAINS is due.
+    await service.refreshGlobalNow(false, daily + 62 * 60_000);
+    expect(datasetNames(collector.collectBatch.mock.calls[3]?.[0])).toEqual(['T4_CHAINS']);
+  });
 });
 
 function datasetNames(targets: unknown): string[] {

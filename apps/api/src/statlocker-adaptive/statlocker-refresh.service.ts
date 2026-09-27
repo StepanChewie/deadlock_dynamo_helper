@@ -54,6 +54,10 @@ const HOUR = 60 * MINUTE;
 const T4_CHAINS_REFRESH_TTL_MS = 30 * MINUTE;
 const WPA_PATCH_DATA_REFRESH_TTL_MS = 24 * HOUR;
 const VS_HERO_WPA_REFRESH_TTL_MS = 24 * HOUR;
+// A global dataset that FAILED is re-armed on the short cadence rather than waiting
+// out its own TTL. Both day-long ones would otherwise lose a whole day of evidence to
+// a single timeout - and the 258 MB fetch is precisely the one that times out.
+const GLOBAL_RETRY_TTL_MS = 30 * MINUTE;
 const HERO_REFRESH_TTL_MS = 36 * HOUR;
 const DEFAULT_ACTIVE_HERO_TTL_MS = 30 * MINUTE;
 const MAX_PROFILES_PER_HERO = 10;
@@ -67,6 +71,7 @@ export class StatlockerRefreshService implements OnApplicationBootstrap {
   private identity?: StatlockerGameIdentityV1;
   private readonly activeHeroes = new Map<number, number>();
   private readonly lastSuccessByKey = new Map<string, number>();
+  private readonly lastFailureByKey = new Map<string, number>();
   private lastVsHeroWpaCheckAt?: string;
   private readonly inFlight = new Map<string, Promise<void>>();
   private readonly activeHeroTtlMs = readBoundedMs(
@@ -229,9 +234,12 @@ export class StatlockerRefreshService implements OnApplicationBootstrap {
             + `snapshot=${published.snapshotId} fetchedAt=${published.fetchedAt.toISOString()}`,
           );
         }
-        if (t4ChainsDue) this.lastSuccessByKey.set(key, nowMs);
-        if (wpaPatchDue) this.lastSuccessByKey.set(wpaPatchKey, nowMs);
-        if (vsHeroWpaDue) this.lastSuccessByKey.set(vsHeroWpaKey, nowMs);
+        // A per-target failure does not throw - it arrives in result.failures - so
+        // the key is marked either way and the outcome decides when to look again.
+        const failed = new Set<string>(result.failures.map((failure) => failure.dataset));
+        if (t4ChainsDue) this.recordGlobalOutcome(key, 'T4_CHAINS', failed, nowMs);
+        if (wpaPatchDue) this.recordGlobalOutcome(wpaPatchKey, 'WPA_PATCH_DATA', failed, nowMs);
+        if (vsHeroWpaDue) this.recordGlobalOutcome(vsHeroWpaKey, 'VS_HERO_WPA', failed, nowMs);
         this.markSuccess(nowMs);
         if (result.failures.length > 0) {
           // What came back was published and the rest waits for the next cycle.
@@ -535,7 +543,23 @@ export class StatlockerRefreshService implements OnApplicationBootstrap {
 
   private isDue(key: string, ttlMs: number, nowMs: number): boolean {
     const lastSuccess = this.lastSuccessByKey.get(key);
-    return lastSuccess === undefined || nowMs - lastSuccess >= ttlMs;
+    // Never succeeded - which includes just after an identity change, since that
+    // clears the map - so there is nothing to wait out.
+    if (lastSuccess === undefined) return true;
+    if (nowMs - lastSuccess >= ttlMs) return true;
+    const failedAt = this.lastFailureByKey.get(key);
+    return failedAt !== undefined && nowMs - failedAt >= GLOBAL_RETRY_TTL_MS;
+  }
+
+  private recordGlobalOutcome(
+    key: string,
+    dataset: string,
+    failed: ReadonlySet<string>,
+    nowMs: number,
+  ): void {
+    this.lastSuccessByKey.set(key, nowMs);
+    if (failed.has(dataset)) this.lastFailureByKey.set(key, nowMs);
+    else this.lastFailureByKey.delete(key);
   }
 
   private pruneInactiveHeroes(nowMs: number): void {
