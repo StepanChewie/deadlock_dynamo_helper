@@ -23,7 +23,21 @@ function contextWith(selectionMode: 'VS_HERO_WPA' | 'OFFLINE_DEFAULT') {
     },
     selection: { mode: selectionMode },
     enemyHeroIds: [7, 8, 9, 10, 11, 12],
-    evidence: {},
+    // The service reads the hero's consensus build out of the evidence bundle to
+    // decide what the player buys anyway. A stub without it throws, which is how
+    // this fixture was caught — the bundle is no longer optional to the call.
+    evidence: {
+      byDataset: {
+        CONSENSUS_SKELETON: {
+          payload: {
+            heroId: 13,
+            profileCount: 10,
+            groups: [],
+            items: [{ itemId: 999, tier: 'CORE' }],
+          },
+        },
+      },
+    },
     vsHeroRows: [],
     trace: { record: jest.fn() },
   };

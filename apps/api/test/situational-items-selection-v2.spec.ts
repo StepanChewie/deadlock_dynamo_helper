@@ -80,6 +80,33 @@ describe('SituationalItemsSelectionV2Service', () => {
     expect(result.map((entry) => entry.itemId)).toEqual([102]);
   });
 
+  // The archetype is compiled per matchup and omits items it does not model, so
+  // a staple can be missing from it entirely — Infuser is in the Viktor consensus
+  // build and in none of his archetypes. The consensus build is what decides
+  // "buys anyway", and FREQUENT counts: the mode exists to suggest what the player
+  // would not have picked.
+  it('excludes what the hero consensus build marks CORE or FREQUENT', () => {
+    const result = select({
+      consensusItems: [
+        { itemId: 101, tier: 'CORE' },
+        { itemId: 102, tier: 'FREQUENT' },
+        { itemId: 103, tier: 'SOMETIMES' },
+      ],
+      vsHeroRows: [row(101, 7, 0.10), row(102, 7, 0.10), row(103, 7, 0.10)],
+    });
+
+    expect(result.map((entry) => entry.itemId)).toEqual([103]);
+  });
+
+  it('keeps an item the consensus build only sometimes takes', () => {
+    const result = select({
+      consensusItems: [{ itemId: 101, tier: 'FLEX' }],
+      vsHeroRows: [row(101, 7, 0.10)],
+    });
+
+    expect(result.map((entry) => entry.itemId)).toEqual([101]);
+  });
+
   it('keeps non-core archetype roles in the pool', () => {
     const result = select({
       archetype: archetypeWithRoles({ 101: 'SITUATIONAL', 102: 'FLEX' }),

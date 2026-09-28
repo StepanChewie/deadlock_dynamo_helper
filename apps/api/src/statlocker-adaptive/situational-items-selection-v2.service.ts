@@ -15,6 +15,19 @@ export interface SituationalSelectionInputV2 {
   heroId: number;
   rulesetId: string;
   archetype: BuildArchetypeV2;
+  /**
+   * The hero's consensus build, as `{ itemId, tier }`.
+   *
+   * The archetype alone is not enough to decide what the player "buys anyway".
+   * It is compiled per matchup and only carries the items it models, so a staple
+   * can be absent from it entirely — Infuser is in the Viktor consensus build
+   * and in none of his archetypes, which is how it reached the situational list
+   * in testing. The skeleton is per hero and complete, so it is the source that
+   * can actually answer the question.
+   *
+   * Optional: a hero with no skeleton yet falls back to the archetype alone.
+   */
+  consensusItems?: readonly { itemId: number; tier: string }[];
   itemGraph: RecommendationItemGraph;
   ownedItemIds: readonly number[];
   enemyHeroIds: readonly number[];
@@ -64,6 +77,19 @@ export class SituationalItemsSelectionV2Service {
     );
     const owned = new Set(input.ownedItemIds);
 
+    // What the player buys anyway. `FREQUENT` counts as core here even though
+    // statlocker's own vocabulary separates them: the mode exists to suggest the
+    // items he would *not* have picked, so "usually bought" is the same answer as
+    // "always bought" for this list. Infuser is the case that proved the
+    // archetype is the wrong source — it is FREQUENT in the hero's consensus
+    // build and absent from every archetype, so a CORE-only archetype filter let
+    // it through and the player saw a staple offered as a situational pick.
+    const standardItemIds = new Set(
+      (input.consensusItems ?? [])
+        .filter((entry) => entry.tier === 'CORE' || entry.tier === 'FREQUENT')
+        .map((entry) => entry.itemId),
+    );
+
     const scored: { candidate: SituationalCandidateV2 }[] = [];
 
     for (const item of input.itemGraph.getAllItems()) {
@@ -71,6 +97,7 @@ export class SituationalItemsSelectionV2Service {
       if (!item.availableRulesetIds.includes(input.rulesetId)) continue;
       if (owned.has(item.itemId)) continue;
       if (coreItemIds.has(item.itemId)) continue;
+      if (standardItemIds.has(item.itemId)) continue;
 
       const score = this.matchup.scoreItem({
         ourHeroId: input.heroId,
