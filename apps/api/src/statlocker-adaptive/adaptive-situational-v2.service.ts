@@ -12,6 +12,7 @@ import {
   lockSummary,
 } from './adaptive-recommendation-v2.service';
 import { EnemyThreatV1Service } from './enemy-threat-v1.service';
+import { ConsensusSkeletonV1 } from './statlocker-adaptive.types';
 import {
   SituationalCandidateV2,
   SituationalItemsSelectionV2Service,
@@ -38,7 +39,7 @@ export class AdaptiveSituationalV2Service {
       return notReadySituational(resolution.decision, resolution.blockers);
     }
     const { decision, context } = resolution;
-    const { lock, snapshot, selection, enemyHeroIds, vsHeroRows } = context;
+    const { lock, snapshot, selection, enemyHeroIds, vsHeroRows, evidence } = context;
 
     // The whole feature is matchup evidence. An offline-default selection means
     // there is none, so an empty list would be a lie dressed as an answer.
@@ -60,10 +61,19 @@ export class AdaptiveSituationalV2Service {
       ),
     );
 
+    // The hero's consensus build is what decides "buys anyway". The archetype
+    // cannot answer that on its own: it is compiled per matchup and carries only
+    // the items it models, so Infuser — a staple in the Viktor consensus build —
+    // is absent from every Viktor archetype and slipped through a CORE-only
+    // archetype filter into the situational list. The skeleton is per hero and
+    // complete; when a hero has none yet, the archetype filter still applies.
+    const skeleton = evidence.byDataset.CONSENSUS_SKELETON.payload as ConsensusSkeletonV1 | undefined;
+
     const candidates = this.selection.select({
       heroId: decision.state.heroId,
       rulesetId: decision.rulesetId,
       archetype,
+      consensusItems: skeleton?.items ?? [],
       itemGraph: decision.itemGraph,
       ownedItemIds: [...decision.state.inventory.heldByItemId.keys()],
       enemyHeroIds,
