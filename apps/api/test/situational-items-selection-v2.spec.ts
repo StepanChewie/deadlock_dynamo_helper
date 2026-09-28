@@ -37,7 +37,13 @@ function archetypeWithRoles(roles: Readonly<Record<number, string>>): BuildArche
 // count drives sampleConfidence and deltaWpa drives the score: the score rises
 // with deltaWpa and is damped by sampleConfidence, which shrinks toward zero for
 // small samples.
-function row(itemId: number, enemyHeroId: number, deltaWpa: number, count = 2000) {
+//
+// The default is the **measured** real sample size — 60 is the mean and 31 the
+// median of a (hero, item, enemy) row in the dataset — not a comfortable round
+// number. An earlier revision used 2000, which is roughly thirty times the real
+// figure: it made every gate pass, and that is precisely how a confidence floor
+// that rejected every real match stayed green in the suite.
+function row(itemId: number, enemyHeroId: number, deltaWpa: number, count = 60) {
   return { heroId: HERO_ID, enemyHeroId, itemId, count, deltaWpa };
 }
 
@@ -127,16 +133,16 @@ describe('SituationalItemsSelectionV2Service', () => {
 
   it('exposes the underlying matchup score, confidence and coverage', () => {
     // One contributing enemy (7) out of two (7, 8), both threatMultiplier 1,
-    // count 2000. sampleConfidence = count / (count + 500) = 0.8.
-    //   coverage   = contributing / total          = 1 / 2            = 0.5
-    //   confidence = (0.8 × 1) / 2                 = 0.4
-    //   score      = tanh((0.10 × 0.8) / 0.15) / 2 = 0.24396249…
+    // count 60 — the dataset's measured mean. sampleConfidence = 60 / 560.
+    //   coverage   = contributing / total                 = 1 / 2  = 0.5
+    //   confidence = (0.107142857 × 1) / 2                          = 0.05357143
+    //   score      = tanh((0.10 × 0.107142857) / 0.15) / 2          = 0.03565355
     const result = select({ vsHeroRows: [row(101, 7, 0.10)] });
 
     expect(result).toHaveLength(1);
     expect(result[0].coverage).toBeCloseTo(0.5, 5);
-    expect(result[0].confidence).toBeCloseTo(0.4, 5);
-    expect(result[0].score).toBeCloseTo(0.24396249, 5);
+    expect(result[0].confidence).toBeCloseTo(0.05357143, 5);
+    expect(result[0].score).toBeCloseTo(0.03565355, 5);
   });
 
   it('rejects an item whose score is not positive', () => {
@@ -163,7 +169,7 @@ describe('SituationalItemsSelectionV2Service', () => {
     });
 
     expect(result[0].against.map((target) => target.enemyHeroId)).toEqual([8, 7]);
-    expect(result[0].against[0].count).toBe(2000);
+    expect(result[0].against[0].count).toBe(60);
   });
 
   it('caps the reported enemies', () => {
@@ -200,9 +206,24 @@ describe('SituationalItemsSelectionV2Service', () => {
     expect(result.map((entry) => entry.itemId)).toEqual([101, 102, 103]);
   });
 
-  it('rejects an item whose sample is too small to clear the confidence gate', () => {
+  // The opposite of what this test used to assert. A confidence floor borrowed
+  // from the build-replacement path rejected every item the real dataset can
+  // produce — the median sample is 31 games, so an item's confidence sits near
+  // 0.06 against a 0.35 bar — and the mode showed nothing in every real match.
+  // Thin evidence is damped inside `normalized` instead, so a small sample
+  // cannot outrank a large one; what it must not do is disappear.
+  it('admits an item on a small sample when it still helps', () => {
     const result = select({
-      vsHeroRows: [row(101, 7, 0.10, 100)],
+      vsHeroRows: [row(101, 7, 0.10, 31)],
+    });
+
+    expect(result.map((entry) => entry.itemId)).toEqual([101]);
+    expect(result[0].score).toBeGreaterThan(0);
+  });
+
+  it('still drops an item whose only evidence points the wrong way', () => {
+    const result = select({
+      vsHeroRows: [row(101, 7, -0.10, 31)],
     });
 
     expect(result).toEqual([]);

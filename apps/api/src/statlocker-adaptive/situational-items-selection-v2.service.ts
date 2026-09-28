@@ -46,9 +46,10 @@ export interface SituationalCandidateV2 {
  * mode exists at all: an item has to earn its place by being good against these
  * enemies, not by being generally strong on the hero.
  *
- * The gate is the one the existing outside-candidate discovery already applies,
- * reused from config rather than re-derived. `minNormalizedSupport` being 0 is
- * what enforces "must help against them".
+ * The gate is the existing `outsideMatchupDiscovery` coverage and support
+ * thresholds, reused from config rather than re-derived, **minus its confidence
+ * floor** — see the comment at the gate for the measurement that forced that.
+ * `minNormalizedSupport` being 0 is what enforces "must help against them".
  */
 @Injectable()
 export class SituationalItemsSelectionV2Service {
@@ -78,8 +79,24 @@ export class SituationalItemsSelectionV2Service {
         rows: input.vsHeroRows,
         enemyThreats: input.enemyThreats,
       });
+      // Coverage and a positive score, but deliberately **no confidence floor**.
+      //
+      // That floor was inherited from `discover()`, where it guards replacing an
+      // item inside a prescribed build — a decision with real consequences and a
+      // bar to match. Ranking the whole catalog is a different job and the bar
+      // does not transfer. Measured against the real dataset the median
+      // (hero, item, enemy) sample is 31 games, so `sampleConfidence` is ~0.06
+      // and an item's confidence lands near 0.06 against a threshold of 0.35.
+      // Even giving every item its six *best*-sampled enemies — an upper bound
+      // no real roster can reach — only 10 of 81 items cleared it. The result
+      // was an empty selection and `SITUATIONAL_EVIDENCE_UNAVAILABLE` for every
+      // real match, which is exactly what the mode showed in testing.
+      //
+      // Thin evidence is already handled where it belongs: `sampleConfidence`
+      // shrinks `normalized`, so a 31-game row scores an order of magnitude
+      // below a 700-game one and cannot outrank it. The gate's remaining job is
+      // to drop items with no evidence at all, which the two checks below do.
       if (score.coverage < config.minCoverage) continue;
-      if (score.confidence < config.minConfidence) continue;
       if (score.normalized <= config.minNormalizedSupport) continue;
 
       scored.push({
