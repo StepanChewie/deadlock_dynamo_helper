@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { RecommendationCatalogContentV1Service } from './recommendation-catalog-content-v1.service';
@@ -13,6 +14,7 @@ import { HERO_REFERENCE_SEED, ITEM_REFERENCE_SEED } from './reference-data.seed'
 @Injectable()
 export class ReferenceDataImportService implements OnModuleInit {
   private readonly logger = new Logger(ReferenceDataImportService.name);
+  private recommendationCatalogRefreshInFlight = false;
 
   constructor(
     @InjectRepository(Hero)
@@ -33,6 +35,56 @@ export class ReferenceDataImportService implements OnModuleInit {
     await this.importHeroesIfNeeded();
     await this.importItemsIfNeeded();
     await this.syncItemsFromAssets();
+  }
+
+  /**
+   * Keeps the recommendation catalog following the game.
+   *
+   * `syncItemsFromAssets` runs only from `onModuleInit`, so a patch that lands while the
+   * container is up used to stay invisible until the next deploy — and the item catalog is
+   * the one input a Deadlock patch reliably changes (6712/6722 added three items, 726 -> 729).
+   * One cheap assets GET per tick: `importAssetsSnapshot` dedupes on the payload hash, so an
+   * unchanged catalog costs a lookup and two counts, and only a genuinely new payload writes.
+   *
+   * Deliberately does NOT re-run the legacy `items` / `item_components` sync that
+   * `syncItemsFromAssets` also performs. That one deletes and re-inserts every row, and
+   * nothing on the recommendation path reads it.
+   */
+  @Cron('*/15 * * * *')
+  async refreshRecommendationCatalog(): Promise<void> {
+    if (this.recommendationCatalogRefreshInFlight) return;
+    this.recommendationCatalogRefreshInFlight = true;
+    try {
+      const availableClientVersions = await this.itemCatalogImportService.getAvailableClientVersions();
+      const latestClientVersion = availableClientVersions[availableClientVersions.length - 1];
+      if (!latestClientVersion) return;
+
+      const assets = await this.fetchAssets(latestClientVersion);
+      if (assets.length === 0) return;
+
+      const catalog = await this.recommendationCatalogContentService.importAssetsSnapshot({
+        assets,
+        clientVersion: String(latestClientVersion),
+        contentCatalogVersionId: process.env.DEADLOCK_CONTENT_CATALOG_VERSION,
+        rulesetKey: `client-${latestClientVersion}`,
+      });
+      if (!catalog.created) return;
+
+      // A new row becomes `rulesetId` for every decision, which orphans the evidence and
+      // archetype snapshots stamped with the previous identity. That is expected and
+      // self-healing — the next request observes the new identity and rebuilds its own hero
+      // (see `StatlockerEvidenceService.warmUpIdentity`) — but it is the event worth seeing
+      // in the log when builds go quiet after a patch.
+      this.logger.log(
+        `New recommendation item catalog ${catalog.catalogVersionId} for client `
+        + `${latestClientVersion} (${catalog.itemCount} items, ${catalog.recipeCount} recipes) `
+        + `- decision identity rolled over to ${catalog.rulesetKey}`,
+      );
+    } catch (error) {
+      this.logger.warn(`Scheduled recommendation catalog refresh failed: ${(error as Error).message}`);
+    } finally {
+      this.recommendationCatalogRefreshInFlight = false;
+    }
   }
 
   private async importHeroesIfNeeded() {
@@ -71,6 +123,17 @@ export class ReferenceDataImportService implements OnModuleInit {
     this.logger.log(`Imported ${items.length} items into PostgreSQL`);
   }
 
+  // The assets payload is untyped upstream and `syncItemsFromAssets` narrows it field by
+  // field, so the element type stays loose here — the same shape axios handed back before
+  // this was extracted.
+  private async fetchAssets(clientVersion: number): Promise<any[]> {
+    const response = await axios.get('https://api.deadlock-api.com/v1/assets/items', {
+      ...getDeadlockApiRequestConfig(),
+      params: { client_version: clientVersion },
+    });
+    return Array.isArray(response.data) ? response.data : [];
+  }
+
   private async syncItemsFromAssets() {
     try {
       const availableClientVersions = await this.itemCatalogImportService.getAvailableClientVersions();
@@ -79,11 +142,7 @@ export class ReferenceDataImportService implements OnModuleInit {
         throw new Error('Deadlock API returned no available client versions');
       }
       await this.itemCatalogImportService.importCatalogs({ clientVersions: [latestClientVersion] });
-      const res = await axios.get('https://api.deadlock-api.com/v1/assets/items', {
-        ...getDeadlockApiRequestConfig(),
-        params: { client_version: latestClientVersion },
-      });
-      const assets = Array.isArray(res.data) ? res.data : [];
+      const assets = await this.fetchAssets(latestClientVersion);
       if (assets.length === 0) {
         return;
       }

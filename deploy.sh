@@ -47,6 +47,10 @@ rsync -avz --delete \
   --exclude 'graphify-out' \
   --exclude '.codex' \
   --exclude '.zcode' \
+  --exclude '.workbuddy-ai' \
+  --exclude '.agents' \
+  --exclude '.openclaw-attachments' \
+  --exclude '.superpowers' \
   "$SCRIPT_DIR/" "my-vps:$REMOTE_DIR/"
 
 echo "=== Building Docker image on my-vps ($ENVIRONMENT)... ==="

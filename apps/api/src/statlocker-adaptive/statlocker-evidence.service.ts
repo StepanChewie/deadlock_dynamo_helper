@@ -145,6 +145,31 @@ export class StatlockerEvidenceService {
     };
   }
 
+  /**
+   * Starts the collection a decision needs but cannot ask for.
+   *
+   * `getLocalEvidence` is the normal trigger, but the recommendation path returns
+   * `STATLOCKER_PATCH_UNAVAILABLE` and `BUILD_ARCHETYPE_V2_UNAVAILABLE` *before* it reaches
+   * this service, and those two are exactly the blockers a fresh catalog identity produces.
+   * A patch that changes the item payload creates a new catalog row with a new `rulesetKey`,
+   * which becomes `rulesetId` for every decision — so on the first request after such a
+   * patch there is no evidence and no archetype snapshot for that identity, the request
+   * bails out early, and nothing is ever enqueued. The only healer left is the once-a-minute
+   * pool tick, which rebuilds one hero per tick out of 39, so a player's own hero could wait
+   * up to half an hour with the overlay empty.
+   *
+   * Observing the identity and enqueuing the hero here breaks that loop: the first request
+   * after a rollover repairs its own hero instead of waiting for the pool cursor to reach it.
+   * Both calls are due-checked downstream, so this stays a no-op once the identity is warm.
+   */
+  warmUpIdentity(identity: StatlockerGameIdentityV1, heroId: number, nowMs = Date.now()): void {
+    if (!identity.rulesetVersion || !/^[a-f0-9]{64}$/i.test(identity.catalogSha256)) return;
+    if (!Number.isInteger(heroId) || heroId <= 0) return;
+    this.refresh.observeGameIdentity(identity, nowMs);
+    void this.refresh.refreshGlobalNow(false, nowMs).catch(() => undefined);
+    this.refresh.enqueueHeroRefresh(heroId, nowMs);
+  }
+
   resolveLocalPatchId(rulesetVersion: string, catalogSha256: string): string | undefined {
     if (!rulesetVersion || !/^[a-f0-9]{64}$/i.test(catalogSha256)) return undefined;
     return this.store.listActive()

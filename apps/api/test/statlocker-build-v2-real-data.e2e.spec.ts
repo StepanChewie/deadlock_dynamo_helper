@@ -583,6 +583,8 @@ describe('Statlocker Build V2 real Billy fixture', () => {
       {
         resolveLocalPatchId: jest.fn(() => fixture.metadata.identity.statlockerPatchId),
         getLocalEvidence: jest.fn(() => evidence),
+        // `recommend()` observes the decision identity before either lock path.
+        warmUpIdentity: jest.fn(),
       } as any,
       snapshotStore,
       { findActive: jest.fn(async () => fixture.vsHeroWpaRows) } as any,

@@ -173,7 +173,12 @@ function harness() {
   const traceStore = new BuildDebugTraceStoreV2Service();
   const service = new AdaptiveRecommendationV2Service(
     { build: jest.fn(async () => decision) } as any,
-    { getLocalEvidence: jest.fn(() => evidenceBundle) } as any,
+    {
+      getLocalEvidence: jest.fn(() => evidenceBundle),
+      // `recommend()` observes the decision identity before either lock path, so the double
+      // needs `warmUpIdentity` even in cases that never assert on it.
+      warmUpIdentity: jest.fn(),
+    } as any,
     { getById: jest.fn(async () => snapshot) } as any,
     { findActive: jest.fn(async () => []) } as any,
     {} as any,

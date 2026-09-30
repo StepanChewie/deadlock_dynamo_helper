@@ -113,9 +113,16 @@ function lockedPlayerHarness() {
       WPA_FILTERED_ITEMS: unavailable('WPA_FILTERED_ITEMS'),
     },
   };
+  // `recommend()` observes the decision identity before either lock path, so the double
+  // needs `warmUpIdentity` even in cases that never assert on it.
+  const evidence = {
+    getLocalEvidence: jest.fn(() => evidenceBundle),
+    resolveLocalPatchId: jest.fn(),
+    warmUpIdentity: jest.fn(),
+  };
   const service = new AdaptiveRecommendationV2Service(
     { build: jest.fn().mockResolvedValue(lockedDecision()) } as any,
-    { getLocalEvidence: jest.fn(() => evidenceBundle), resolveLocalPatchId: jest.fn() } as any,
+    evidence as any,
     { getById: jest.fn(async () => snapshot) } as any,
     { findActive: jest.fn(async () => []) } as any,
     {} as any,
@@ -132,7 +139,7 @@ function lockedPlayerHarness() {
     } as any,
     { get: traceStoreGet, put: jest.fn() } as any,
   );
-  return { service, sessionGet, traceStoreGet };
+  return { service, sessionGet, traceStoreGet, evidence };
 }
 
 describe('AdaptiveRecommendationV2Service player scoping', () => {
@@ -172,5 +179,20 @@ describe('AdaptiveRecommendationV2Service player scoping', () => {
       'T4_CHAINS',
     ]);
     expect(Array.isArray(capture.stages)).toBe(true);
+  });
+
+  // Both lock paths can return before `getLocalEvidence`, so on a fresh catalog identity
+  // nothing ever enqueues the hero and the overlay stays empty until the pool tick reaches
+  // it. Observing the decision's own identity here is what makes the first request after a
+  // patch repair its own hero.
+  it('warms the decision identity before either lock path can return early', async () => {
+    const { service, evidence } = lockedPlayerHarness();
+
+    await service.recommend({ matchId: MATCH_ID, localSteamId: 'steam-111' });
+
+    expect(evidence.warmUpIdentity).toHaveBeenCalledWith(
+      { rulesetVersion: RULESET_ID, catalogSha256: CATALOG_SHA },
+      HERO_ID,
+    );
   });
 });
