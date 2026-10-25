@@ -162,6 +162,7 @@ function harness(options: {
   const evidence = {
     resolveLocalPatchId: jest.fn(() => PATCH_ID),
     getLocalEvidence: jest.fn(() => evidenceBundle()),
+    warmUpIdentity: jest.fn(),
   };
   const snapshotStore = {
     getById: jest.fn(async () => lockedSnapshot),

@@ -134,11 +134,21 @@ export class StatlockerRefreshService implements OnApplicationBootstrap {
     const identity = this.requireIdentity();
     const key = this.globalRefreshKey(identity);
     const wpaPatchKey = `${key}:wpa-patch-data`;
-    const vsHeroWpaKey = this.globalVsHeroWpaRefreshKey(identity);
+    // Keyed by the patch the app will actually resolve, not by the identity alone.
+    //
+    // A rollover leaves every matchup row tagged with the previous patch, and
+    // `findActive` matches on the patch id with no cross-patch fallback, so the matchup
+    // term drops out of scoring until this dataset is fetched again. On the identity key
+    // alone that meant waiting out the whole 24 h cadence: on 2026-10-07 the patch rolled
+    // at 16:56 and the next fetch was not due until 15:40 the next day - ~22 h of degraded
+    // builds - and patches were rolling roughly daily by then. Including the resolved patch
+    // re-arms this dataset exactly once per rollover instead.
+    const resolvedPatchId = this.resolveCurrentPatchId(identity);
+    const vsHeroWpaKey = this.globalVsHeroWpaRefreshKey(identity, resolvedPatchId);
     const t4ChainsDue = force || this.isDue(key, T4_CHAINS_REFRESH_TTL_MS, nowMs);
-    // ponytail: keyed by identity, so a patch rollover waits up to 24 h for the
-    // new patch's WPA data; the app falls back to the newest snapshot that exists
-    // in the meantime. Key it by the resolved patch if that lag ever matters.
+    // WPA_PATCH_DATA keeps the identity key and its daily cadence on purpose: it is
+    // ~258 MB per fetch, and re-arming it on every rollover would trade a bounded
+    // matchup gap for a much larger transfer.
     const wpaPatchDue = force || this.isDue(wpaPatchKey, WPA_PATCH_DATA_REFRESH_TTL_MS, nowMs);
     const vsHeroWpaDue = force || this.isDue(vsHeroWpaKey, VS_HERO_WPA_REFRESH_TTL_MS, nowMs);
     if (!t4ChainsDue && !wpaPatchDue && !vsHeroWpaDue) return;
@@ -153,7 +163,7 @@ export class StatlockerRefreshService implements OnApplicationBootstrap {
       try {
         this.logger.log(
           `global refresh: t4ChainsDue=${t4ChainsDue} wpaPatchDue=${wpaPatchDue} `
-          + `vsHeroWpaDue=${vsHeroWpaDue} `
+          + `vsHeroWpaDue=${vsHeroWpaDue} resolvedPatch=${resolvedPatchId ?? 'unknown'} `
           + `targets=[${targets.map((target) => target.dataset).join(', ')}]`,
         );
         const result = await this.collector.collectBatch(targets);
@@ -577,8 +587,18 @@ export class StatlockerRefreshService implements OnApplicationBootstrap {
     return `global:${identity.rulesetVersion}:${identity.catalogSha256}`;
   }
 
-  private globalVsHeroWpaRefreshKey(identity: StatlockerGameIdentityV1): string {
-    return `${this.globalRefreshKey(identity)}:vs-hero-wpa`;
+  private globalVsHeroWpaRefreshKey(identity: StatlockerGameIdentityV1, patchId?: string): string {
+    // The patch is part of the key so that a rollover makes this dataset due again.
+    // Absent, it falls back to the identity-only key, which is the old behaviour.
+    return `${this.globalRefreshKey(identity)}:vs-hero-wpa${patchId ? `:patch:${patchId}` : ''}`;
+  }
+
+  private resolveCurrentPatchId(identity: StatlockerGameIdentityV1): string | undefined {
+    const rows = this.store.listActive().filter((row) =>
+      row.rulesetVersion === identity.rulesetVersion &&
+      row.catalogSha256.toLowerCase() === identity.catalogSha256.toLowerCase(),
+    );
+    return this.resolveCurrentV2PatchId(rows);
   }
 
   private heroRefreshKey(identity: StatlockerGameIdentityV1, heroId: number): string {

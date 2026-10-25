@@ -157,21 +157,31 @@ function createHarness(options: {
 describe('StatlockerRefreshService', () => {
   it('gates global refresh by TTL', async () => {
     const h = createHarness();
-    await h.service.refreshGlobalNow(false, 1_000);
-    await h.service.refreshGlobalNow(false, 1_001);
-    expect(h.collector.collectBatch).toHaveBeenCalledTimes(1);
-
-    // Repeated scheduler ticks inside the 24h TTLs never re-fetch the two large
-    // endpoints; the small T4_CHAINS keeps its own 30 minute cadence, but only
-    // the elapsed 24h TTL re-arms the daily WPA_PATCH_DATA and VS_HERO_WPA targets.
-    await h.service.refreshGlobalNow(false, 1_000 + 23 * 60 * 60_000);
     const vsHeroTargets = () => h.collector.collectBatch.mock.calls
       .flatMap(([targets]) => targets)
       .filter((target: any) => target.dataset === 'VS_HERO_WPA');
-    expect(vsHeroTargets()).toHaveLength(1);
 
-    await h.service.refreshGlobalNow(false, 1_000 + 24 * 60 * 60_000 + 1);
-    expect(vsHeroTargets()).toHaveLength(2);
+    await h.service.refreshGlobalNow(false, 1_000);
+    // The first tick is what publishes the evidence the resolved patch is read from, so
+    // the patch-keyed matchup target re-arms exactly once on the tick after it. Settle
+    // that here so the assertions below are about the TTL and nothing else.
+    await h.service.refreshGlobalNow(false, 1_001);
+    const settledCollections = h.collector.collectBatch.mock.calls.length;
+    const settledVsHero = vsHeroTargets().length;
+
+    // Repeated scheduler ticks inside the TTLs re-fetch nothing.
+    await h.service.refreshGlobalNow(false, 1_002);
+    await h.service.refreshGlobalNow(false, 1_003);
+    expect(h.collector.collectBatch).toHaveBeenCalledTimes(settledCollections);
+
+    // 23h in, the small T4_CHAINS is due on its own 30 minute cadence, but the daily
+    // WPA_PATCH_DATA and VS_HERO_WPA targets are still inside their 24h TTLs.
+    await h.service.refreshGlobalNow(false, 1_001 + 23 * 60 * 60_000);
+    expect(vsHeroTargets()).toHaveLength(settledVsHero);
+
+    // Past the 24h TTL the daily matchup target is due again.
+    await h.service.refreshGlobalNow(false, 1_001 + 24 * 60 * 60_000 + 1);
+    expect(vsHeroTargets()).toHaveLength(settledVsHero + 1);
   });
 
   it('uses single-flight for the same global identity', async () => {

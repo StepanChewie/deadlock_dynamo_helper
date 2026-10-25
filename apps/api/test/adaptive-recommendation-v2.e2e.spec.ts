@@ -323,6 +323,8 @@ function harness(resolverOverride?: { resolve(input: unknown): ResolvedFullBuild
   const evidence = {
     resolveLocalPatchId: jest.fn(() => PATCH_ID),
     getLocalEvidence: jest.fn(() => evidenceBundle()),
+    // `recommend()` observes the decision identity before either lock path.
+    warmUpIdentity: jest.fn(),
   };
   const snapshotStore = {
     getActive: jest.fn(async () => snapshot),

@@ -120,4 +120,54 @@ describe('StatlockerEvidenceService', () => {
     ]);
     expect(h.service.resolveLocalPatchId('ruleset-a', catalogSha256)).toBe('15-1');
   });
+
+  describe('warmUpIdentity', () => {
+    const identity = { rulesetVersion: 'client-6722', catalogSha256 };
+
+    // The recommendation path can return before `getLocalEvidence` on a fresh catalog
+    // identity, and that early return is exactly why nothing is enqueued. Warming from the
+    // decision's own identity is what makes the first request after a patch self-healing.
+    it('observes the decision identity and enqueues its hero without waiting for the pool tick', () => {
+      const h = service([]);
+
+      h.service.warmUpIdentity(identity, 10, now);
+
+      expect(h.refresh.observeGameIdentity).toHaveBeenCalledWith(identity, now);
+      expect(h.refresh.refreshGlobalNow).toHaveBeenCalledWith(false, now);
+      expect(h.refresh.enqueueHeroRefresh).toHaveBeenCalledWith(10, now);
+    });
+
+    it('ignores an identity that cannot key a refresh', () => {
+      const h = service([]);
+
+      h.service.warmUpIdentity({ rulesetVersion: '', catalogSha256 }, 10, now);
+      h.service.warmUpIdentity({ rulesetVersion: 'client-6722', catalogSha256: 'not-a-hash' }, 10, now);
+      h.service.warmUpIdentity({ rulesetVersion: 'client-6722', catalogSha256: 'a'.repeat(63) }, 10, now);
+
+      expect(h.refresh.observeGameIdentity).not.toHaveBeenCalled();
+      expect(h.refresh.refreshGlobalNow).not.toHaveBeenCalled();
+      expect(h.refresh.enqueueHeroRefresh).not.toHaveBeenCalled();
+    });
+
+    it('ignores a hero id that is not a positive integer', () => {
+      const h = service([]);
+
+      h.service.warmUpIdentity(identity, 0, now);
+      h.service.warmUpIdentity(identity, -1, now);
+      h.service.warmUpIdentity(identity, 4.5, now);
+
+      expect(h.refresh.observeGameIdentity).not.toHaveBeenCalled();
+      expect(h.refresh.enqueueHeroRefresh).not.toHaveBeenCalled();
+    });
+
+    it('lets a rejected global refresh fail silently rather than reject the caller', async () => {
+      const h = service([]);
+      h.refresh.refreshGlobalNow.mockRejectedValue(new Error('upstream down'));
+
+      expect(() => h.service.warmUpIdentity(identity, 10, now)).not.toThrow();
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(h.refresh.enqueueHeroRefresh).toHaveBeenCalledWith(10, now);
+    });
+  });
 });

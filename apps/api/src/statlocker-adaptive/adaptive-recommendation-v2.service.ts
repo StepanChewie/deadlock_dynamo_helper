@@ -212,6 +212,14 @@ export class AdaptiveRecommendationV2Service {
   async resolveLockContext(request: AdaptiveRecommendationRequestV2): Promise<AdaptiveLockResolutionV2> {
     validateRequest(request);
     const decision = await this.decisionState.build(request.matchId, request.localSteamId);
+    // Both lock paths below can return before `getLocalEvidence`, and on a fresh catalog
+    // identity those early returns are the whole reason there is no evidence yet. Observe
+    // the decision's identity and enqueue its hero first, so the first request after a
+    // patch repairs its own hero instead of waiting for the pool tick. No-op when warm.
+    this.evidence.warmUpIdentity(
+      { rulesetVersion: decision.rulesetId, catalogSha256: decision.catalogSha256 },
+      decision.state.heroId,
+    );
     const existingLock = await this.session.get(request.matchId, decision.localSteamId);
     const context = existingLock
       ? await this.reuseLock(decision, existingLock)
