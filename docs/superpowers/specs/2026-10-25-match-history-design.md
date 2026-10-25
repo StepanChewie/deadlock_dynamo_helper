@@ -90,8 +90,9 @@ New module `apps/api/src/match-history/`:
   in the same style try/catch — a history write failure logs a warning and
   never fails the ingest.
 - Input is the already-`canonicalizeLiveBatchForStateV2` batch, so roster
-  payloads arrive in the canonical shape (`isLocal`, `heroId`, …), the same
-  one `live-match-state.service.ts` consumes.
+  payloads arrive in the legacy state shape (`steam_id`, `hero_id`, …) that
+  `canonicalRosterToLegacyStatePayload` emits — the same one
+  `live-match-state.service.ts` consumes.
 
 ## Read API
 
