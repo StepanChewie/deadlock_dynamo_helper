@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { BuildDebugV2Module } from './build-debug-v2/build-debug-v2.module';
 import { databaseOptions } from './database/data-source';
 import { DeadlockLiveModule } from './deadlock-live/deadlock-live.module';
+import { MatchHistoryModule } from './match-history/match-history.module';
 import { StatlockerAdaptiveModule } from './statlocker-adaptive/statlocker-adaptive.module';
 import { StatlockerProbeModule } from './statlocker-probe/statlocker-probe.module';
 
@@ -15,6 +16,7 @@ import { StatlockerProbeModule } from './statlocker-probe/statlocker-probe.modul
       migrationsRun: process.env.DB_RUN_MIGRATIONS === 'true',
     }),
     DeadlockLiveModule,
+    MatchHistoryModule,
     StatlockerAdaptiveModule,
     StatlockerProbeModule,
     BuildDebugV2Module,

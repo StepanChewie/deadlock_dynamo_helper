@@ -17,6 +17,8 @@ import { SoulsAffordabilityEvidenceV2Entity } from '../deadlock-live/entities/so
 import { StatlockerEvidenceSnapshotV1Entity } from '../deadlock-live/entities/statlocker-evidence-snapshot-v1.entity';
 import { StatlockerVsHeroWpaRawSnapshotV1Entity } from '../deadlock-live/entities/statlocker-vs-hero-wpa-raw-snapshot-v1.entity';
 import { StatlockerVsHeroWpaRowV1Entity } from '../deadlock-live/entities/statlocker-vs-hero-wpa-row-v1.entity';
+import { AppUserV1Entity } from '../match-history/entities/app-user-v1.entity';
+import { MatchHistoryV1Entity } from '../match-history/entities/match-history-v1.entity';
 
 export const DATABASE_ENTITIES = [
   Hero,
@@ -42,4 +44,8 @@ export const DATABASE_ENTITIES = [
   // scripts that use it directly (delete-match-data) cannot reach an entity
   // that only `forFeature` registered.
   AdaptiveFeedbackV1Entity,
+  // Same rationale as above: `forFeature` lives in MatchHistoryModule, but
+  // AppDataSource consumers (e.g. delete-match-data) only see this list.
+  AppUserV1Entity,
+  MatchHistoryV1Entity,
 ];

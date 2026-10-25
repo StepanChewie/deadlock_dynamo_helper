@@ -3,6 +3,7 @@ import { InventoryShadowReplayService } from '../src/deadlock-live/inventory-sha
 import { LiveIngestController } from '../src/deadlock-live/live-ingest.controller';
 import { LiveInventoryEventNormalizerService } from '../src/deadlock-live/live-inventory-event-normalizer.service';
 import { LiveMatchStateService } from '../src/deadlock-live/live-match-state.service';
+import { MatchHistoryService } from '../src/match-history/match-history.service';
 import { RawEventLogService } from '../src/deadlock-live/raw-event-log.service';
 import { RecentLiveEventsService } from '../src/deadlock-live/recent-live-events.service';
 
@@ -26,6 +27,10 @@ describe('LiveIngestController', () => {
             getPlayerTimeline: jest.fn().mockReturnValue(undefined),
           },
         },
+        {
+          provide: MatchHistoryService,
+          useValue: { applyBatch: jest.fn().mockResolvedValue(undefined) },
+        },
       ],
     }).compile();
 
@@ -35,6 +40,11 @@ describe('LiveIngestController', () => {
       clientId: 'client',
       events: [{ receivedAt: 1, source: 'onInfoUpdates2', key: 'match_id', payload: 'm1' }],
     });
+
+    const matchHistory = moduleRef.get(MatchHistoryService);
+    expect(matchHistory.applyBatch).toHaveBeenCalledTimes(1);
+    const arg = (matchHistory.applyBatch as jest.Mock).mock.calls[0][0];
+    expect(arg.clientId).toBe('client');
 
     expect(controller.getStates()).toHaveLength(1);
     expect(controller.getRecentEvents()).toHaveLength(1);

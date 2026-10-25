@@ -15,6 +15,9 @@ describe('LiveIngestController resilience', () => {
     const liveInventoryEventNormalizerService = {
       normalizeBatch: jest.fn((batch) => batch),
     };
+    const matchHistoryService = {
+      applyBatch: jest.fn().mockResolvedValue(undefined),
+    };
 
     const controller = new LiveIngestController(
       rawEventLogService as any,
@@ -22,6 +25,7 @@ describe('LiveIngestController resilience', () => {
       inventoryShadowReplayService as any,
       recentLiveEventsService as any,
       liveInventoryEventNormalizerService as any,
+      matchHistoryService as any,
     );
 
     const batch = {

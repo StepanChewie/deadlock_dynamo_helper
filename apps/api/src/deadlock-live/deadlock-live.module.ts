@@ -6,6 +6,7 @@ import { HistoricalCatalogBackfillService } from './historical-catalog-backfill.
 import { InventoryShadowReplayService } from './inventory-shadow-replay.service';
 import { ItemCatalogImportService } from './item-catalog-import.service';
 import { LiveIngestController } from './live-ingest.controller';
+import { MatchHistoryModule } from '../match-history/match-history.module';
 import { LiveInventoryEventNormalizerService } from './live-inventory-event-normalizer.service';
 import { LiveMatchStateService } from './live-match-state.service';
 import { RawEventLogService } from './raw-event-log.service';
@@ -31,6 +32,7 @@ import { SoulsAffordabilityEvidenceV2Entity } from './entities/souls-affordabili
 
 @Module({
   imports: [
+    MatchHistoryModule,
     TypeOrmModule.forFeature([
       Hero,
       Item,

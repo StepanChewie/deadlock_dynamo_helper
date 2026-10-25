@@ -5,6 +5,7 @@ import { InventoryShadowReplayService } from '../src/deadlock-live/inventory-sha
 import { LiveIngestController } from '../src/deadlock-live/live-ingest.controller';
 import { LiveInventoryEventNormalizerService } from '../src/deadlock-live/live-inventory-event-normalizer.service';
 import { LiveMatchStateService } from '../src/deadlock-live/live-match-state.service';
+import { MatchHistoryService } from '../src/match-history/match-history.service';
 import { RawEventLogService } from '../src/deadlock-live/raw-event-log.service';
 import { RecentLiveEventsService } from '../src/deadlock-live/recent-live-events.service';
 
@@ -40,6 +41,10 @@ describe('LiveIngestController request limits', () => {
             getMatchTimelines: jest.fn().mockReturnValue([]),
             getPlayerTimeline: jest.fn().mockReturnValue(undefined),
           },
+        },
+        {
+          provide: MatchHistoryService,
+          useValue: { applyBatch: jest.fn().mockResolvedValue(undefined) },
         },
       ],
     }).compile();

@@ -19,6 +19,7 @@ import { LiveInventoryEventNormalizerService } from './live-inventory-event-norm
 import { LiveMatchStateService } from './live-match-state.service';
 import { RawEventLogService } from './raw-event-log.service';
 import { RecentLiveEventsService } from './recent-live-events.service';
+import { MatchHistoryService } from '../match-history/match-history.service';
 
 /**
  * Ceiling on the events processed from one request.
@@ -53,6 +54,7 @@ export class LiveIngestController {
     private readonly recentLiveEventsService: RecentLiveEventsService,
     private readonly liveInventoryEventNormalizerService:
       LiveInventoryEventNormalizerService,
+    private readonly matchHistoryService: MatchHistoryService,
   ) {}
 
   // Public by design: the shipped Overwolf client posts here and holds no
@@ -90,6 +92,12 @@ export class LiveIngestController {
       await this.rawEventLogService.appendEvents(events);
     } catch (error) {
       this.logger.warn(`Raw live event logging failed: ${describeError(error)}`);
+    }
+
+    try {
+      await this.matchHistoryService.applyBatch(stateBatch);
+    } catch (error) {
+      this.logger.warn(`Match history projection failed: ${describeError(error)}`);
     }
 
     return { ok: true };

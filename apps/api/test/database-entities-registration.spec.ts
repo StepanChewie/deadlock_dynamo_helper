@@ -2,7 +2,13 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const apiRoot = join(__dirname, '..');
-const entitiesDir = join(apiRoot, 'src', 'deadlock-live', 'entities');
+// Every directory that declares TypeORM entities. A directory that is scanned
+// here but missing from DATABASE_ENTITIES fails the first test below, so a new
+// entity home must be added here in the same change that introduces it.
+const entityDirs = [
+  join(apiRoot, 'src', 'deadlock-live', 'entities'),
+  join(apiRoot, 'src', 'match-history', 'entities'),
+];
 
 /**
  * `DATABASE_ENTITIES` is what the standalone `AppDataSource` knows about, and
@@ -25,16 +31,19 @@ function registeredEntityNames(): string[] {
 }
 
 function declaredEntityNames(): string[] {
-  return readdirSync(entitiesDir)
-    .filter((name) => name.endsWith('.entity.ts'))
-    .map((name) => {
-      const source = readFileSync(join(entitiesDir, name), 'utf8');
-      const match = source.match(/export class ([A-Za-z_$][\w$]*)/);
-      if (!match) {
-        throw new Error(`${name} declares no exported entity class`);
-      }
-      return match[1];
-    })
+  return entityDirs
+    .flatMap((entitiesDir) =>
+      readdirSync(entitiesDir)
+        .filter((name) => name.endsWith('.entity.ts'))
+        .map((name) => {
+          const source = readFileSync(join(entitiesDir, name), 'utf8');
+          const match = source.match(/export class ([A-Za-z_$][\w$]*)/);
+          if (!match) {
+            throw new Error(`${name} declares no exported entity class`);
+          }
+          return match[1];
+        }),
+    )
     .sort();
 }
 
