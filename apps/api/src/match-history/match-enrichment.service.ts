@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import axios from 'axios';
-import { QueryDeepPartialEntity, Repository } from 'typeorm';
+import { Brackets, QueryDeepPartialEntity, Repository } from 'typeorm';
 import { getDeadlockApiRequestConfig } from '../deadlock-live/deadlock-api-request';
 import { MatchHistoryV1Entity } from './entities/match-history-v1.entity';
 
@@ -39,13 +39,15 @@ export class MatchEnrichmentService {
     try {
       const candidates = await this.matches
         .createQueryBuilder('m')
-        .where('m."enrichmentStatus" = :pending', { pending: 'PENDING' })
-        .orWhere('(m."enrichmentStatus" = :failed and m."enrichmentAttempts" < :maxAttempts)', {
-          failed: 'FAILED', maxAttempts: MAX_ATTEMPTS,
-        })
-        .orWhere('(m."enrichmentStatus" = :notFound and m."lastEventAt" > :cutoff)', {
-          notFound: 'NOT_FOUND', cutoff: new Date(Date.now() - NOT_FOUND_WINDOW_MS),
-        })
+        .where(new Brackets((qb) => {
+          qb.where('m."enrichmentStatus" = :pending', { pending: 'PENDING' })
+            .orWhere('(m."enrichmentStatus" = :failed and m."enrichmentAttempts" < :maxAttempts)', {
+              failed: 'FAILED', maxAttempts: MAX_ATTEMPTS,
+            })
+            .orWhere('(m."enrichmentStatus" = :notFound and m."lastEventAt" > :cutoff)', {
+              notFound: 'NOT_FOUND', cutoff: new Date(Date.now() - NOT_FOUND_WINDOW_MS),
+            });
+        }))
         .andWhere('m."lastEventAt" < :minAge', { minAge: new Date(Date.now() - MIN_AGE_MS) })
         .orderBy('m."lastEventAt"', 'ASC')
         .take(MAX_PER_TICK)

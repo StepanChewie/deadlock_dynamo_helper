@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { Brackets } from 'typeorm';
 import { MatchEnrichmentService } from '../src/match-history/match-enrichment.service';
 import { MatchHistoryV1Entity } from '../src/match-history/entities/match-history-v1.entity';
 
@@ -103,5 +104,20 @@ describe('MatchEnrichmentService', () => {
 
     await expect(service.enrichPending()).resolves.toBeUndefined();
     expect(repo.update).toHaveBeenCalledTimes(2);
+  });
+
+  it('filters every candidate by min age via a single bracketed where', async () => {
+    const { service, repo } = makeService();
+    withCandidates(repo, []);
+
+    await service.enrichPending();
+
+    const qb = repo.createQueryBuilder();
+    expect(qb.where).toHaveBeenCalledTimes(1);
+    expect(qb.where.mock.calls[0][0]).toBeInstanceOf(Brackets);
+    expect(qb.andWhere).toHaveBeenCalledTimes(1);
+    expect(qb.andWhere.mock.calls[0][1]).toEqual(
+      expect.objectContaining({ minAge: expect.any(Date) }),
+    );
   });
 });
