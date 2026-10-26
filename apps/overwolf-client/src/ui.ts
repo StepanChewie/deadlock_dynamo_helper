@@ -497,17 +497,26 @@ function itemGlyph(slot: string): string {
 }
 
 /* Desktop shell ------------------------------------------------------------
- * The desktop window is a two-page shell: the live build, and Settings. Both
- * pages stay in the DOM so the route keeps updating while the player reads
- * Settings — switching back must not re-fetch or re-render anything.
+ * The desktop window is a three-page shell: the live build, Matches, and
+ * Settings. Every page stays in the DOM so the route keeps updating while the
+ * player reads another page — switching back must not re-fetch or re-render
+ * anything.
  */
 
-export type Workspace = 'build' | 'settings';
+export type Workspace = 'build' | 'settings' | 'matches';
 
 const WORKSPACE_NAV: ReadonlyArray<readonly [Workspace, string]> = [
   ['build', 'nav-build'],
   ['settings', 'nav-settings'],
+  ['matches', 'nav-matches'],
 ];
+
+let renderMatches: (() => Promise<void>) | undefined;
+
+/** index.ts registers the matches view once at boot. */
+export function registerMatchesRenderer(renderer: () => Promise<void>): void {
+  renderMatches = renderer;
+}
 
 let activeWorkspace: Workspace = 'build';
 
@@ -526,6 +535,7 @@ export function showWorkspace(workspace: Workspace): void {
   activeWorkspace = workspace;
   setHidden('build-workspace', workspace !== 'build');
   setHidden('settings-workspace', workspace !== 'settings');
+  setHidden('matches-workspace', workspace !== 'matches');
 
   for (const [name, id] of WORKSPACE_NAV) {
     const button = document.getElementById(id);
@@ -544,6 +554,8 @@ export function showWorkspace(workspace: Workspace): void {
     renderSettingsStatus();
     syncOverlayAutoShowPreference();
   }
+
+  if (workspace === 'matches' && renderMatches) void renderMatches();
 }
 
 const EMPTY_SETTINGS_VALUE = '—';

@@ -15,6 +15,7 @@ import {
 } from './overwolf/window-placement';
 import { PREFERENCE_KEYS, persistPreference, readPreference } from './player-preferences';
 import * as ui from './ui';
+import { createMatchesView } from './matches-view';
 import { AdaptiveRecommendationClient } from './adaptive-recommendation-client';
 import { didAdaptiveMatchChange } from './adaptive-match-transition';
 import { APP_VERSION } from './app-version';
@@ -223,6 +224,17 @@ function initializeBackgroundWindow(): void {
     () => readPreference(PREFERENCE_KEYS.overlayAutoShow, false),
   );
   inGameOverlayLifecycle.sync(currentMatchId);
+
+  // The Матчи tab reads match history from the API. `currentLocalSteamId` is
+  // still empty before the first game of a session, and the view's render()
+  // then falls back to the first user the API reports, so the empty default
+  // is fine here.
+  const matchesView = createMatchesView({
+    apiBaseUrl,
+    defaultSteamId: currentLocalSteamId || undefined,
+  });
+  document.getElementById('matches-root')?.append(matchesView.root);
+  ui.registerMatchesRenderer(() => matchesView.render());
 
   const publishAdaptiveRecommendation = (data: any): void => {
     ui.setRefreshPending(false);

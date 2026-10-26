@@ -846,6 +846,7 @@
         <nav aria-label="Dynamo Lab navigation">
           <button type="button" id="nav-build" class="nav-item is-active" aria-current="page" onclick="overwolf.windows.getMainWindow().showWorkspace?.('build')"><span>Live Build</span><small>Active</small></button>
           <button type="button" id="nav-settings" class="nav-item" onclick="overwolf.windows.getMainWindow().showWorkspace?.('settings')"><span>Settings</span><small>Overlay, support, status</small></button>
+          <button type="button" id="nav-matches" class="nav-item" onclick="overwolf.windows.getMainWindow().showWorkspace?.('matches')"><span>Матчи</span><small>Match history</small></button>
         </nav>
         <div id="ow-ad-container" aria-hidden="true"></div>
       </aside>
@@ -955,6 +956,12 @@
               <button type="button" class="support-link" onclick="overwolf.windows.getMainWindow().openExternal?.('https://github.com/StepanChewie/deadlock_dynamo_helper/blob/main/docs/terms.md')">Terms of Use</button>
             </p>
           </details>
+        </section>
+
+        <section id="matches-workspace" class="settings-workspace" hidden>
+          <header class="build-head settings-head"><h1>Матчи</h1><span>Match history</span></header>
+
+          <div id="matches-root"></div>
         </section>
       </main>
     </div>
