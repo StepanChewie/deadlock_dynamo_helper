@@ -21,7 +21,11 @@ describe('Dynamo Lab desktop surface contract', () => {
   it('offers only navigation that works and identifies the live page', () => {
     const buttons = desktop.match(/<button\b[^>]*>[\s\S]*?<\/button>/g) ?? [];
 
-    for (const [label, workspace] of [['Live Build', 'build'], ['Settings', 'settings']] as const) {
+    for (const [label, workspace] of [
+      ['Live Build', 'build'],
+      ['Settings', 'settings'],
+      ['Матчи', 'matches'],
+    ] as const) {
       const button = buttons.find((markup) => markup.includes(`>${label}<`));
       expect(button).toBeDefined();
       expect(button).not.toMatch(/\sdisabled[\s>]/);
@@ -30,6 +34,7 @@ describe('Dynamo Lab desktop surface contract', () => {
 
     expect(desktop).toMatch(/<button[^>]*aria-current="page"[^>]*>[\s\S]*?Live Build[\s\S]*?<\/button>/);
     expect(desktop).toMatch(/<section id="settings-workspace"[^>]*hidden/);
+    expect(desktop).toMatch(/<section id="matches-workspace"[^>]*hidden/);
   });
 
   it('exposes the overlay preference and the live hotkey in Settings', () => {
@@ -102,7 +107,8 @@ describe('Dynamo Lab desktop surface contract', () => {
       'build-title', 'guide-empty', 'guide-empty-title', 'guide-empty-copy',
       'guide-active', 'situational-recommendation-panel', 'rec-update-note',
       'rec-plan', 'ow-ad-container', 'console',
-      'build-workspace', 'settings-workspace', 'nav-build', 'nav-settings',
+      'build-workspace', 'settings-workspace', 'matches-workspace',
+      'nav-build', 'nav-settings', 'nav-matches', 'matches-root',
       'hint-hotkey-toggle', 'hint-hotkey-desktop',
       'setting-overlay-auto-show', 'setting-hotkey',
       'setting-app-version', 'setting-backend-status', 'setting-gep-status',

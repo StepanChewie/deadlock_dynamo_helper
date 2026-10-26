@@ -65,7 +65,12 @@ export function formatMatchRow(match: MatchRowInput): { title: string; badge: st
 
 export function createMatchesView(options: {
   apiBaseUrl: string;
-  defaultSteamId?: string;
+  /**
+   * Read on every render, not captured at boot: the client only resolves its
+   * local steam id once a match starts, so a frozen string would stay empty
+   * for the whole session.
+   */
+  defaultSteamId?: () => string | undefined;
   fetchImpl?: typeof fetch;
 }): { render: (steamId?: string) => Promise<void>; root: HTMLElement } {
   const fetchImpl = options.fetchImpl ?? ((input: string) => fetch(input));
@@ -76,7 +81,7 @@ export function createMatchesView(options: {
     try {
       const usersResponse = await fetchImpl(`${options.apiBaseUrl}/deadlock/match-history/users`);
       const users = (await usersResponse.json()).users ?? [];
-      const selected = steamId ?? options.defaultSteamId ?? users[0]?.steamId;
+      const selected = steamId ?? options.defaultSteamId?.() ?? users[0]?.steamId;
       const matchesResponse = selected
         ? await fetchImpl(`${options.apiBaseUrl}/deadlock/match-history/users/${selected}/matches`)
         : { json: async () => ({ matches: [] }) } as Response;

@@ -14,6 +14,7 @@ import {
   readActiveWorkspace,
   readRecommendationAgeMs,
   readRecommendationFreshness,
+  registerMatchesRenderer,
   renderHotkeyBindings,
   revealPostMatchReasons,
   setRefreshPending,
@@ -105,8 +106,10 @@ const elementIds = [
   'post-match-feedback-reasons',
   'build-workspace',
   'settings-workspace',
+  'matches-workspace',
   'nav-build',
   'nav-settings',
+  'nav-matches',
   'hint-hotkey-toggle',
   'hint-hotkey-desktop',
   'setting-overlay-auto-show',
@@ -834,6 +837,27 @@ describe('Dynamo Lab desktop workspaces', () => {
     expect(elements.get('nav-build')?.attributes.has('aria-current')).toBe(false);
     expect(elements.get('nav-settings')?.className).toContain('is-active');
     expect(elements.get('nav-build')?.className).not.toContain('is-active');
+  });
+
+  it('hands the Matches page to the renderer registered at boot', () => {
+    // The Matches content is owned by matches-view, not ui.ts; the shell only
+    // guarantees the switch itself — its section is the one on screen, the
+    // highlight and aria-current moved, and the registered view was told to
+    // render.
+    const renderMatches = jest.fn(async () => {});
+    registerMatchesRenderer(renderMatches);
+
+    showWorkspace('matches');
+
+    expect(readActiveWorkspace()).toBe('matches');
+    expect(elements.get('matches-workspace')?.hidden).toBe(false);
+    expect(elements.get('build-workspace')?.hidden).toBe(true);
+    expect(elements.get('settings-workspace')?.hidden).toBe(true);
+    expect(elements.get('nav-matches')?.attributes.get('aria-current')).toBe('page');
+    expect(elements.get('nav-matches')?.className).toContain('is-active');
+    expect(elements.get('nav-build')?.attributes.has('aria-current')).toBe(false);
+    expect(elements.get('nav-settings')?.attributes.has('aria-current')).toBe(false);
+    expect(renderMatches).toHaveBeenCalledTimes(1);
   });
 
   it('leaves the rendered route in place when the player visits Settings', () => {

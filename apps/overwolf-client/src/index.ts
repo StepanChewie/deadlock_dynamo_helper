@@ -225,13 +225,13 @@ function initializeBackgroundWindow(): void {
   );
   inGameOverlayLifecycle.sync(currentMatchId);
 
-  // The Матчи tab reads match history from the API. `currentLocalSteamId` is
-  // still empty before the first game of a session, and the view's render()
-  // then falls back to the first user the API reports, so the empty default
-  // is fine here.
+  // The Матчи tab reads match history from the API. The default user is
+  // resolved per render from the live session: `currentLocalSteamId` is still
+  // empty before the first game of a session, and render() then falls back to
+  // the first user the API reports.
   const matchesView = createMatchesView({
     apiBaseUrl,
-    defaultSteamId: currentLocalSteamId || undefined,
+    defaultSteamId: () => currentLocalSteamId || undefined,
   });
   document.getElementById('matches-root')?.append(matchesView.root);
   ui.registerMatchesRenderer(() => matchesView.render());
