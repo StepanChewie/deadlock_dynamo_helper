@@ -6,9 +6,11 @@ import { MatchHistoryV1Entity } from '../src/match-history/entities/match-histor
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
+const METADATA_URL = 'https://api.deadlock-api.com/v1/matches/metadata';
+
 function pendingMatch(over: Partial<MatchHistoryV1Entity> = {}): MatchHistoryV1Entity {
   return {
-    matchId: 'm1', localSteamId: '765', players: [], enrichmentStatus: 'PENDING',
+    matchId: '126485785', localSteamId: '765', players: [], enrichmentStatus: 'PENDING',
     enrichmentAttempts: 0, startedAt: new Date(), lastEventAt: new Date(Date.now() - 3600_000),
     createdAt: new Date(), updatedAt: new Date(),
     ...over,
@@ -25,10 +27,7 @@ function makeService() {
       take: jest.fn().mockReturnThis(),
       getMany: jest.fn().mockResolvedValue([]),
     }),
-    update: jest.fn().mockReturnValue({
-      set: jest.fn().mockReturnThis(),
-      where: jest.fn().mockResolvedValue(undefined),
-    }),
+    update: jest.fn().mockResolvedValue(undefined),
   };
   const service = new MatchEnrichmentService(repo as never);
   return { service, repo };
@@ -44,29 +43,54 @@ describe('MatchEnrichmentService', () => {
     process.env.DEADLOCK_API_KEY = '';
   });
 
-  it('stores the payload and marks DONE on 200', async () => {
+  it('fetches one batched metadata request and stores the matched entry as DONE', async () => {
     const { service, repo } = makeService();
     withCandidates(repo, [pendingMatch()]);
-    mockedAxios.get.mockResolvedValueOnce({ status: 200, data: { match_id: 'm1', start_time: 1 } });
+    const entry = { match_id: 126485785, winning_team: 'Team1', start_time: 1 };
+    mockedAxios.get.mockResolvedValueOnce({ status: 200, data: [entry] });
 
     await service.enrichPending();
 
+    expect(mockedAxios.get).toHaveBeenCalledTimes(1);
     expect(mockedAxios.get).toHaveBeenCalledWith(
-      'https://api.deadlock-api.com/v1/matches/m1',
+      `${METADATA_URL}?match_ids=126485785`,
       expect.objectContaining({ timeout: expect.any(Number) }),
     );
-    expect(repo.update.mock.calls[0][0]).toBe('m1');
-    expect(repo.update.mock.calls[0][1]).toMatchObject({ enrichmentStatus: 'DONE' });
+    expect(repo.update.mock.calls[0][0]).toBe('126485785');
+    expect(repo.update.mock.calls[0][1]).toMatchObject({ enrichmentStatus: 'DONE', enrichment: entry });
   });
 
-  it('marks NOT_FOUND on 404', async () => {
+  it('marks ids absent from the metadata array NOT_FOUND without touching attempts', async () => {
     const { service, repo } = makeService();
-    withCandidates(repo, [pendingMatch()]);
+    // Sanitized GEP ids may contain non-digits: sent as-is, never matched.
+    withCandidates(repo, [
+      pendingMatch({ matchId: '126485785' }),
+      pendingMatch({ matchId: 'sanitized-id', enrichmentAttempts: 3 }),
+    ]);
+    mockedAxios.get.mockResolvedValueOnce({
+      status: 200,
+      data: [{ match_id: 126485785, winning_team: 'Team1' }],
+    });
+
+    await service.enrichPending();
+
+    expect(mockedAxios.get).toHaveBeenCalledWith(`${METADATA_URL}?match_ids=126485785,sanitized-id`, expect.anything());
+    expect(repo.update.mock.calls[0][0]).toBe('126485785');
+    expect(repo.update.mock.calls[0][1]).toMatchObject({ enrichmentStatus: 'DONE' });
+    expect(repo.update.mock.calls[1][0]).toBe('sanitized-id');
+    expect(repo.update.mock.calls[1][1]).toEqual({ enrichmentStatus: 'NOT_FOUND', updatedAt: expect.any(Date) });
+  });
+
+  it('marks every candidate NOT_FOUND when the whole request 404s', async () => {
+    const { service, repo } = makeService();
+    withCandidates(repo, [pendingMatch({ matchId: '126485785' }), pendingMatch({ matchId: '126485786' })]);
     mockedAxios.get.mockRejectedValueOnce({ response: { status: 404 } });
 
     await service.enrichPending();
 
+    expect(repo.update).toHaveBeenCalledTimes(2);
     expect(repo.update.mock.calls[0][1]).toMatchObject({ enrichmentStatus: 'NOT_FOUND' });
+    expect(repo.update.mock.calls[1][1]).toMatchObject({ enrichmentStatus: 'NOT_FOUND' });
   });
 
   it('retries keyless once when the configured key is rejected (401)', async () => {
@@ -75,32 +99,40 @@ describe('MatchEnrichmentService', () => {
     process.env.DEADLOCK_API_KEY = 'dead-key';
     mockedAxios.get
       .mockRejectedValueOnce({ response: { status: 401 } })
-      .mockResolvedValueOnce({ status: 200, data: { ok: true } });
+      .mockResolvedValueOnce({ status: 200, data: [{ match_id: 126485785, winning_team: 'Team1' }] });
 
     await service.enrichPending();
 
     expect(mockedAxios.get).toHaveBeenCalledTimes(2);
+    expect(mockedAxios.get.mock.calls[0][0]).toBe(`${METADATA_URL}?match_ids=126485785`);
     expect(mockedAxios.get.mock.calls[0][1]).toMatchObject({ headers: { 'X-API-KEY': 'dead-key' } });
+    expect(mockedAxios.get.mock.calls[1][0]).toBe(`${METADATA_URL}?match_ids=126485785`);
     expect(mockedAxios.get.mock.calls[1][1]).not.toHaveProperty('headers');
     expect(repo.update.mock.calls[0][1]).toMatchObject({ enrichmentStatus: 'DONE' });
   });
 
-  it('marks FAILED and counts the attempt on 429', async () => {
+  it('marks every candidate FAILED and counts the attempt on 429', async () => {
     const { service, repo } = makeService();
-    withCandidates(repo, [pendingMatch({ enrichmentAttempts: 2 })]);
+    withCandidates(repo, [
+      pendingMatch({ matchId: '126485785', enrichmentAttempts: 2 }),
+      pendingMatch({ matchId: '126485786', enrichmentAttempts: 0 }),
+    ]);
     mockedAxios.get.mockRejectedValueOnce({ response: { status: 429 } });
 
     await service.enrichPending();
 
     expect(repo.update.mock.calls[0][1]).toMatchObject({ enrichmentStatus: 'FAILED', enrichmentAttempts: 3 });
+    expect(repo.update.mock.calls[1][1]).toMatchObject({ enrichmentStatus: 'FAILED', enrichmentAttempts: 1 });
   });
 
-  it('never throws across matches when one fetch explodes', async () => {
+  it('does not abort the batch when one candidate update fails', async () => {
     const { service, repo } = makeService();
-    withCandidates(repo, [pendingMatch({ matchId: 'a' }), pendingMatch({ matchId: 'b' })]);
-    mockedAxios.get
-      .mockRejectedValueOnce(new Error('network'))
-      .mockResolvedValueOnce({ status: 200, data: {} });
+    withCandidates(repo, [pendingMatch({ matchId: '126485785' }), pendingMatch({ matchId: '126485786' })]);
+    mockedAxios.get.mockResolvedValueOnce({
+      status: 200,
+      data: [{ match_id: 126485785 }, { match_id: 126485786 }],
+    });
+    repo.update.mockRejectedValueOnce(new Error('db down')).mockResolvedValueOnce(undefined);
 
     await expect(service.enrichPending()).resolves.toBeUndefined();
     expect(repo.update).toHaveBeenCalledTimes(2);
@@ -119,5 +151,6 @@ describe('MatchEnrichmentService', () => {
     expect(qb.andWhere.mock.calls[0][1]).toEqual(
       expect.objectContaining({ minAge: expect.any(Date) }),
     );
+    expect(mockedAxios.get).not.toHaveBeenCalled();
   });
 });

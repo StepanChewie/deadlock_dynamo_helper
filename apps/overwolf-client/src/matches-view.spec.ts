@@ -1,4 +1,4 @@
-import { createMatchesView, enrichmentOutcome, formatMatchRow } from './matches-view';
+import { createMatchesView, enrichmentOutcome, formatMatchRow, MatchRowInput } from './matches-view';
 
 describe('matches view presentation', () => {
   it('formats a row: hero, date, K/D/A, souls, duration', () => {
@@ -13,9 +13,45 @@ describe('matches view presentation', () => {
     expect(row.badge).toBe('pending');
   });
 
-  it('derives win/loss only from enrichment', () => {
-    expect(enrichmentOutcome({ match_id: 'm1', match_result: 'VICTORY' } as never)).toBe('win');
-    expect(enrichmentOutcome(null)).toBeUndefined();
+  it('derives win when the local team matches winning_team', () => {
+    expect(enrichmentOutcome({ winning_team: 'Team1' }, [{ isLocal: true, team: 1 }])).toBe('win');
+    expect(enrichmentOutcome({ winning_team: 'Team2' }, [{ isLocal: true, team: 2 }])).toBe('win');
+  });
+
+  it('derives loss when winning_team is the opposite team', () => {
+    expect(enrichmentOutcome({ winning_team: 'Team2' }, [{ isLocal: true, team: 1 }])).toBe('loss');
+    expect(enrichmentOutcome({ winning_team: 'Team1' }, [{ isLocal: true, team: 2 }])).toBe('loss');
+  });
+
+  it('stays undefined without a derivable outcome', () => {
+    const local = [{ isLocal: true, team: 1 }];
+    expect(enrichmentOutcome(null, local)).toBeUndefined();
+    expect(enrichmentOutcome(undefined, local)).toBeUndefined();
+    // DONE rows can carry metadata without a trustworthy winning_team.
+    expect(enrichmentOutcome({}, local)).toBeUndefined();
+    expect(enrichmentOutcome({ winning_team: 'Team1', not_scored: true }, local)).toBeUndefined();
+    // Missing or out-of-range local team is not enough to call the game.
+    expect(enrichmentOutcome({ winning_team: 'Team1' }, [])).toBeUndefined();
+    expect(enrichmentOutcome({ winning_team: 'Team1' }, [{ isLocal: true }])).toBeUndefined();
+    expect(enrichmentOutcome({ winning_team: 'Team1' }, [{ isLocal: true, team: 5 }])).toBeUndefined();
+  });
+
+  it('shows the win/loss badge on DONE rows when the outcome is derivable', () => {
+    const base = {
+      matchId: 'm1', kills: 11, deaths: 3, assists: 9, startedAt: '2026-10-25T18:00:00Z',
+      enrichmentStatus: 'DONE' as const, enrichmentAttempts: 0,
+      createdAt: '', updatedAt: '', localSteamId: '765',
+    };
+    expect(formatMatchRow({
+      ...base, players: [{ isLocal: true, team: 1 }], enrichment: { winning_team: 'Team1' },
+    }).badge).toBe('win');
+    expect(formatMatchRow({
+      ...base, players: [{ isLocal: true, team: 1 }], enrichment: { winning_team: 'Team2' },
+    }).badge).toBe('loss');
+    // DONE without a derivable outcome keeps the neutral marker.
+    expect(formatMatchRow({
+      ...base, players: [{ isLocal: true, team: 1 }], enrichment: {},
+    }).badge).toBe('done');
   });
 });
 
@@ -80,5 +116,46 @@ describe('matches view default user', () => {
       'https://api.test/deadlock/match-history/users/765-first/matches',
       'https://api.test/deadlock/match-history/users/765-second/matches',
     ]);
+  });
+
+  it('renders win/loss markers on list rows, neutral otherwise', async () => {
+    globalThis.document = {
+      createElement: () => new FakeElement(),
+    } as unknown as Document;
+
+    const matches: MatchRowInput[] = [
+      {
+        matchId: 'w1', localSteamId: '765', enrichmentStatus: 'DONE',
+        enrichment: { winning_team: 'Team1' }, players: [{ isLocal: true, team: 1 }],
+        startedAt: '2026-10-25T18:00:00Z',
+      },
+      {
+        matchId: 'l1', localSteamId: '765', enrichmentStatus: 'DONE',
+        enrichment: { winning_team: 'Team2' }, players: [{ isLocal: true, team: 1 }],
+        startedAt: '2026-10-25T19:00:00Z',
+      },
+      {
+        matchId: 'n1', localSteamId: '765', enrichmentStatus: 'DONE',
+        players: [{ isLocal: true, team: 1 }],
+        startedAt: '2026-10-25T20:00:00Z',
+      },
+    ];
+    const fetchImpl = jest.fn(async (input: RequestInfo | URL): Promise<Response> => {
+      if (String(input).endsWith('/users')) {
+        return { json: async () => ({ users: [{ steamId: '765' }] }) } as Response;
+      }
+      return { json: async () => ({ matches }) } as Response;
+    });
+
+    const view = createMatchesView({ apiBaseUrl: 'https://api.test', fetchImpl });
+    await view.render();
+
+    const list = (view.root as unknown as FakeElement).children[1];
+    const buttons = list.children.map((li) => li.children[0].textContent);
+    expect(buttons[0]).toContain('✓ победа');
+    expect(buttons[1]).toContain('✗ поражение');
+    // DONE without a derivable outcome keeps the existing neutral marker.
+    expect(buttons[2]?.endsWith('✓')).toBe(true);
+    expect(buttons[2]).not.toContain('победа');
   });
 });

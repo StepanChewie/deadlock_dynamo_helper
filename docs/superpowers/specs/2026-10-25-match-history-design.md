@@ -21,9 +21,10 @@ In scope (this iteration):
 
 - `app_users_v1` and `match_history_v1` tables, written from the live ingest
 - Read API: users list, a user's matches, one match's detail
-- Enrichment cron: fetch `https://api.deadlock-api.com/v1/matches/{id}`
-  (with key if configured, falling back to keyless on 401/403), store raw
-  payload
+- Enrichment cron: batched fetch of
+  `https://api.deadlock-api.com/v1/matches/metadata?match_ids=<csv>` (with
+  key if configured, falling back to keyless on 401/403), store the raw
+  metadata entry per match
 - Client: third desktop nav tab "Матчи" (list + detail)
 
 Out of scope (deliberate):
@@ -68,7 +69,7 @@ One migration, TypeORM pattern as in
 | `enrichmentStatus` | varchar(16) NOT NULL DEFAULT 'PENDING' | PENDING / DONE / NOT_FOUND / FAILED |
 | `enrichmentAttempts` | int NOT NULL DEFAULT 0 | |
 | `enrichmentFetchedAt` | timestamptz | |
-| `enrichment` | jsonb | raw `/v1/matches/{id}` response |
+| `enrichment` | jsonb | raw `/v1/matches/metadata` entry for the match |
 | `createdAt` / `updatedAt` | timestamptz NOT NULL DEFAULT now() | |
 
 Index: `(localSteamId, startedAt DESC)`, plus partial index on
@@ -113,13 +114,20 @@ registered for the reference-data cron):
 1. Pick up to 20 rows: `enrichmentStatus` PENDING, or FAILED with
    `enrichmentAttempts < 8`, or NOT_FOUND with `lastEventAt` younger than
    7 days — and `lastEventAt` at least 10 minutes ago (official data lags).
-2. `GET https://api.deadlock-api.com/v1/matches/{matchId}` via the existing
-   `getDeadlockApiRequestConfig()`. Key policy, per owner's call: if a key is
-   configured use it; on 401/403 retry the same request keyless; no key
-   configured means keyless from the start.
-3. 200 → store raw body in `enrichment`, status DONE. 404 → NOT_FOUND
-   (the match may surface later; the 7-day window re-tries). 429 or 5xx or
-   network error → FAILED, `enrichmentAttempts + 1`.
+2. One batched request per tick:
+   `GET https://api.deadlock-api.com/v1/matches/metadata?match_ids=<csv>`
+   via the existing `getDeadlockApiRequestConfig()`. Key policy, per owner's
+   call: if a key is configured use it; on 401/403 retry the same URL
+   keyless; no key configured means keyless from the start. The batched
+   endpoint replaced the per-match `GET /v1/matches/{matchId}` after a
+   production probe showed it 404s for regular GEP match ids.
+3. 200 array → per candidate: an entry whose `match_id` matches the
+   candidate's id → store that entry in `enrichment`, status DONE; ids
+   absent from the array (including sanitized non-digit ids, sent as-is) →
+   NOT_FOUND, attempts unchanged. Whole-request 404 ("No matches found") →
+   all candidates NOT_FOUND. Any other status or a network error → all
+   candidates FAILED, `enrichmentAttempts + 1`. Rows are updated
+   independently — one failed update never aborts the batch.
 4. Re-entrancy guard, same pattern as `refreshRecommendationCatalog()`.
 
 ## Client

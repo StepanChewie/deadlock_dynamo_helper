@@ -41,12 +41,26 @@ export interface MatchRowInput {
   updatedAt?: string;
 }
 
-export function enrichmentOutcome(enrichment: unknown): 'win' | 'loss' | undefined {
+/**
+ * The enrichment payload is the third-party `/v1/matches/metadata` entry
+ * stored as jsonb — read it defensively: `winning_team` ("Team1"/"Team2")
+ * must be present and trustworthy, and the local player's team (1|2) must be
+ * known to say win or loss. Anything else (unscored, other values, missing
+ * team) stays undefined.
+ */
+export function enrichmentOutcome(
+  enrichment: unknown,
+  players: readonly MatchHistoryPlayer[],
+): 'win' | 'loss' | undefined {
   if (typeof enrichment !== 'object' || enrichment === null) return undefined;
-  const result = (enrichment as Record<string, unknown>).match_result;
-  if (result === 'VICTORY' || result === 'WIN') return 'win';
-  if (result === 'DEFEAT' || result === 'LOSS') return 'loss';
-  return undefined;
+  const metadata = enrichment as Record<string, unknown>;
+  const winningTeam = metadata.winning_team;
+  if (winningTeam !== 'Team1' && winningTeam !== 'Team2') return undefined;
+  if (metadata.not_scored === true) return undefined;
+  const localTeam = players.find((player) => player?.isLocal)?.team;
+  if (localTeam !== 1 && localTeam !== 2) return undefined;
+  if (winningTeam === `Team${localTeam}`) return 'win';
+  return 'loss';
 }
 
 function formatDuration(sec: number): string {
@@ -59,7 +73,12 @@ export function formatMatchRow(match: MatchRowInput): { title: string; badge: st
   const duration = match.durationSec ? formatDuration(match.durationSec) : '—';
   const date = new Date(match.startedAt).toLocaleString('ru-RU');
   const title = `${date} — ${kda} — ${duration}`;
-  const badge = match.enrichmentStatus === 'DONE' ? 'done' : match.enrichmentStatus === 'PENDING' ? 'pending' : 'waiting';
+  const outcome = enrichmentOutcome(match.enrichment, match.players);
+  const badge = outcome === 'win' ? 'win'
+    : outcome === 'loss' ? 'loss'
+    : match.enrichmentStatus === 'DONE' ? 'done'
+    : match.enrichmentStatus === 'PENDING' ? 'pending'
+    : 'waiting';
   return { title, badge };
 }
 
@@ -109,7 +128,12 @@ export function createMatchesView(options: {
       const row = formatMatchRow(match);
       const item = document.createElement('li');
       const button = document.createElement('button');
-      button.textContent = row.title + (row.badge === 'done' ? ' ✓' : row.badge === 'pending' ? ' …' : '');
+      const marker = row.badge === 'win' ? ' ✓ победа'
+        : row.badge === 'loss' ? ' ✗ поражение'
+        : row.badge === 'done' ? ' ✓'
+        : row.badge === 'pending' ? ' …'
+        : '';
+      button.textContent = row.title + marker;
       button.addEventListener('click', () => { void showDetail(match); });
       item.append(button);
       list.append(item);
